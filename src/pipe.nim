@@ -13,10 +13,6 @@ proc decrypt(data:var string) =
 
 proc muxPack(cid: uint32,data: string): string =
     var datalen = len(data)
-
-
-    # echo "ceil: ", ceil(datalen/globals.mux_segment_size)
-
     result = newString(len= globals.chunk_size+8)
     var totake:uint32 = min(globals.chunk_size,data.len).uint32
     copyMem(unsafeAddr result[0], unsafeAddr cid, 4)
@@ -28,17 +24,9 @@ proc muxPack(cid: uint32,data: string): string =
     
     var check:uint32 = 0
     copyMem(unsafeAddr check, unsafeAddr result[0], 4)
-
-    # if check == 0:
-    #     echo "fucked"
-    #     quit(-1)
     let diff = (globals.chunk_size) - totake 
     if diff > 0 : 
         copyMem(unsafeAddr result[totake+hsize], unsafeAddr(globals.random_600[rand(250)]), diff)
-
-   
-
-
     
 proc prepairTrustedSend*(cid: uint32, data: var string) = 
    
@@ -49,34 +37,20 @@ proc prepairTrustedSend*(cid: uint32, data: var string) =
 
 proc prepairUnTrustedSend(data: var string) = discard
 
-
-
-
 proc muxRead*(data:var string):  tuple[cid:uint32,data:string] =
     decrypt data
     var datalen = len(data)
-    
-    # echo  "mux read : ",data.len, " bytes"
-
-
     var buffer = newString(len=globals.chunk_size)
     var cid:uint32
     var dlen:uint32
     copyMem(unsafeAddr cid, unsafeAddr data[0],4)
     copyMem(unsafeAddr dlen, unsafeAddr data[4], 4)
-
-    # if cid == 0:
-    #         echo "cid  0 !"
-    #         buffer.setLen(0)
-    #         return (cid,buffer)
     if dlen != 0:
         if dlen > globals.chunk_size:
             return (0.uint32,"")
         copyMem(unsafeAddr buffer[0], unsafeAddr data[8], dlen)
         buffer.setLen(dlen)
     else:
-        # echo "datalen was ", datalen
-            # echo repr data
         buffer.setLen(0)
 
 
