@@ -4,7 +4,7 @@ import std/strformat
 import std/strutils
 
 
-const Release = true
+const Release = false
 
 
 const libs_dir = "libs"
@@ -32,7 +32,7 @@ task install, "install deps":
 task build_server, "builds server":
     let backend = "c"
     let output_dir_target = output_dir
-    const output_file_name = "FTT"&(when defined(windows): ".exe" else: "")
+    const output_file_name = "RTT"&(when defined(windows): ".exe" else: "")
 
     setCommand("c", src_dir&"/main.nim")
     switch("nimblePath", nimble_path&"/pkgs")
@@ -85,9 +85,9 @@ task build_server, "builds server":
 
 task build, "builds all":
 
-    # echo staticExec "pkill FTT"
+    # echo staticExec "pkill RTT"
     exec "nim build_server"
     withDir(output_dir):
-        exec "chmod +x FTT"
-        # echo staticExec "./FTT >> output.log 2>&1"
+        exec "chmod +x RTT"
+        # echo staticExec "./RTT >> output.log 2>&1"
         

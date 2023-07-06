@@ -1,105 +1,125 @@
-import std/[asyncdispatch, strformat]
+import std/[asyncdispatch, strformat, net, openssl, tables, random, times]
 import overrides/[asyncnet]
-import times, print, connection, pipe
+import print, connection, pipe
 from globals import nil
 
 
 type
     ServerConnectionPoolContext = object
-        listener: Connection
-        inbound: Table[uint32,Connections]
+        free_outbounds: Connections
         outbound: Connections
 
 
-let ssl_ctx = newContext(verifyMode = CVerifyPeer)
 
 var context = ServerConnectionPoolContext()
+var ssl_ctx = newContext(verifyMode = CVerifyPeer)
 
+proc poolFrame(count: uint = 0){.gcsafe.}
 
-proc ssl_connect(con: Connection, ip: string, client_origin_port: uint32, sni: string){.async.} =
-    wrapSocket(ssl_ctx, con.socket)
-    con.isfakessl = true
+proc sslConnect(con: Connection, ip: string,  sni: string){.async.} =
+    con.socket.close()
     var fc = 0
+    echo "connecting..."
+
     while true:
-        if fc > 6:
-            raise newException(ValueError, "Request Timed Out!")
-        try:
-            await con.socket.connect(ip, con.port.Port, sni = sni)
-            break
-        except:
-            echo &"ssl connect error ! retry in {min(1000,fc*50)} ms"
-            await sleepAsync(min(1000, fc*200))
+        if fc > 3:
+            con.close()
+            raise newException(ValueError, "[SslConnect] could not connect, all retires failed")
+
+        # var fut = con.socket.connect(ip, con.port.Port, sni = sni)
+        var fut = asyncnet.dial(ip, Port(con.port), buffered = false)
+
+        var timeout = withTimeout(fut, 3000)
+        yield timeout
+        if timeout.failed():
             inc fc
+            if globals.log_conn_error: echo timeout.error.msg
+            if globals.log_conn_error: echo &"[SslConnect] retry in {min(1000,fc*200)} ms"
+            await sleepAsync(min(1000, fc*200))
+            continue
+        if timeout.read() == true:
+            con.socket = fut.read()
+            break
+        if timeout.read() == false:
+            con.close()
+            raise newException(ValueError, "[SslConnect] dial timed-out")
 
-    print "ssl socket conencted"
 
-    # let to_send = &"GET / HTTP/1.1\nHost: {sni}\nAccept: */*\n\n"
-    # await socket.send(to_send)  [not required ...]
+    try:
 
-    #now we use this socket as a normal tcp data transfer socket
-    con.socket.isSsl = false 
+        ssl_ctx.wrapConnectedSocket(
+            con.socket, handshakeAsClient, sni)
+        let flags = {SocketFlag.SafeDisconn}
 
-    #AES default chunk size is 16 so use a multple of 16 
+        block handshake:
+            sslLoop(con.socket, flags, sslDoHandshake(con.socket.sslHandle))
+
+    except:
+        echo "[SslConnect] handshake error!"
+        con.close()
+        raise getCurrentException()
+
+    if globals.log_conn_create: print "[SslConnect] conencted !"
+
+
+    #AES default chunk size is 16 so use a multple of 16
     let rlen = 16*(4+rand(4))
     var random_trust_data: string
     random_trust_data.setLen(rlen)
 
-    prepareMutation(random_trust_data)
     copyMem(unsafeAddr random_trust_data[0], unsafeAddr globals.sh1.uint32, 4)
     copyMem(unsafeAddr random_trust_data[4], unsafeAddr globals.sh2.uint32, 4)
-    if globals.multi_port:
-        copyMem(unsafeAddr random_trust_data[8], unsafeAddr client_origin_port, 4)
-    # copyMem(unsafeAddr random_trust_data[12], unsafeAddr con.id, 4)
-    copyMem(unsafeAddr random_trust_data[12], unsafeAddr(globals.random_600[rand(250)]), rlen-12)
+    # if globals.multi_port:
+    #     copyMem(unsafeAddr random_trust_data[8], unsafeAddr client_origin_port, 4)
+    copyMem(unsafeAddr random_trust_data[8], unsafeAddr(globals.random_600[rand(250)]), rlen-8)
 
-    await con.socket.send(random_trust_data)
+
+    await con.pureSend(random_trust_data)
+
     con.trusted = TrustStatus.yes
 
-proc poolFrame(client_port:uint32 , count: uint = 0){.gcsafe.} =
-    proc create() =
-        var con = newConnection(address = globals.next_route_addr)
-        con.port = globals.next_route_port.uint32
-        var fut = ssl_connect(con, globals.next_route_addr, client_port, globals.final_target_domain)
-        fut.addCallback(
-            proc() {.gcsafe.} =
-            if fut.failed:
-                echo fut.error.msg
-            else:
-                if globals.log_conn_create: echo &"[createNewCon] registered a new connection to the pool"
-                context.outbound[client_port].register con
-        )
 
 
-    if count == 0:
-        var i = context.outbound[client_port].connections.len().uint
 
-        if i < globals.pool_size div 2:
-            create()
-            create()
-        else:
-            create()
 
-    else:
-        for i in 0..<count:
-            create()
+
+proc monitorData(data: string): tuple[trust: bool, port: uint32] =
+    var port: uint32
+    try:
+        if len(data) < 16: return (false, port)
+        var sh1_c: uint32
+        var sh2_c: uint32
+
+        copyMem(unsafeAddr sh1_c, unsafeAddr data[0], 4)
+        copyMem(unsafeAddr sh2_c, unsafeAddr data[4], 4)
+        copyMem(unsafeAddr port, unsafeAddr data[8], 4)
+
+        let chk1 = sh1_c == globals.sh1
+        let chk2 = sh2_c == globals.sh2
+
+        return (chk1 and chk2, port)
+    except:
+        return (false, port)
+
 
 
 proc processConnection(client_a: Connection) {.async.} =
     # var remote: Connection
     var client: Connection = client_a
-    var remote: Connection
+    var remote: Connection = nil
 
     proc proccessRemote() {.async.}
     proc proccessClient() {.async.}
 
     proc remoteTrusted(): Future[Connection]{.async.} =
-        var new_remote = newConnection(address = globals.next_route_addr)
+        var new_remote = newConnection()
         new_remote.trusted = TrustStatus.yes
         new_remote.estabilished = false
         return new_remote
 
+
     proc remoteUnTrusted(): Future[Connection]{.async.} =
-        var new_remote = newConnection(address = globals.final_target_ip)
+        var new_remote = newConnection()
         new_remote.trusted = TrustStatus.no
         await new_remote.socket.connect(globals.final_target_ip, globals.final_target_port.Port)
         if globals.log_conn_create: echo "connected to ", globals.final_target_ip, ":", $globals.final_target_port
@@ -111,7 +131,8 @@ proc processConnection(client_a: Connection) {.async.} =
             closed = true
             if globals.log_conn_destory: echo "[processRemote] closed client & remote"
             client.close()
-            remote.close()
+            if remote != nil:
+                remote.close()
 
     proc proccessRemote() {.async.} =
         var data = ""
@@ -124,7 +145,7 @@ proc processConnection(client_a: Connection) {.async.} =
                     if remote.estabilished:
                         close()
                         break
-                    else:   
+                    else:
                         if globals.log_conn_destory: echo "[processRemote] closed remote"
                         break
                 else:
@@ -140,18 +161,13 @@ proc processConnection(client_a: Connection) {.async.} =
                         normalSend(data)
                     await client.send(data)
                     if globals.log_data_len: echo &"[proccessRemote] Sent {data.len()} bytes ->  client"
-            except: 
+            except:
                 close()
                 break
-        
 
-    try:
-        remote = await remoteUnTrusted()
-        asyncCheck proccessRemote()
-    except:
-        echo &"[Error] Failed to connect to the Target {globals.final_target_ip}:{globals.final_target_port}"
-        client.close()
-        return
+
+
+
 
 
 
@@ -166,11 +182,14 @@ proc processConnection(client_a: Connection) {.async.} =
 
             if data == "":
                 break
-            if (remote.isTrusted()) and (not remote.estabilished):
+            if (client.isTrusted()) and (not remote.estabilished):
                 remote.estabilished = true
                 try:
                     await remote.socket.connect(globals.next_route_addr, client.port.Port)
                     asyncCheck proccessRemote()
+                    let i = context.free_outbounds.connections.find(client)
+                    if i != -1: context.free_outbounds.connections.del(i)
+                    poolFrame()
                 except:
                     break
 
@@ -179,26 +198,31 @@ proc processConnection(client_a: Connection) {.async.} =
                 var (trust, port) = monitorData(data)
                 if trust:
                     if globals.multi_port:
-                        echo "multi-port target:" , port
+                        echo "multi-port target:", port
                         client.port = port
                     else:
                         client.port = globals.next_route_port.uint32
                     client.trusted = TrustStatus.yes
-                    print "Fake Handshake Complete !"
-                    remote.close()
-                    asyncdispatch.poll()
-
+                    print "Fake Reverse Handshake Complete !"
+                    # remote.close()
+                    # asyncdispatch.poll()
                     try:
                         remote = await remoteTrusted()
+
                     except:
                         echo &"[Error] Failed to connect to the Target {globals.next_route_addr}:{globals.next_route_port}"
                         break
 
                     continue
-                elif (epochTime().uint - client.creation_time) > globals.trust_time:
-                    echo "[proccessClient] non-client connection detected !  forwarding to real website."
+                else:
+                    echo "[proccessClient] non-client connection detected! forwarding to real website."
                     client.trusted = TrustStatus.no
-
+                    try:
+                        remote = await remoteUnTrusted()
+                    except:
+                        echo &"[Error] Failed to connect to the Target {globals.final_target_ip}:{globals.final_target_port}"
+                        break
+                asyncCheck proccessRemote()
 
             try:
                 if client.isTrusted():
@@ -216,16 +240,45 @@ proc processConnection(client_a: Connection) {.async.} =
 
 
     try:
+        # asyncCheck proccessRemote()
+
         asyncCheck proccessClient()
     except:
         echo "[Server] root level exception"
         print getCurrentExceptionMsg()
 
+proc poolFrame(count: uint = 0){.gcsafe.} =
+    proc create() =
+        var con = newConnection()
+        con.port = globals.next_route_port.uint32
+        var fut = sslConnect(con, globals.next_route_addr, globals.final_target_domain)
 
+        fut.addCallback(
+            proc() {.gcsafe.} =
+            if fut.failed:
+                if globals.log_conn_error: echo fut.error.msg
+            else:
+                if globals.log_conn_create: echo &"[createNewCon] registered a new connection to the pool"
+                asyncCheck processConnection(con)
+
+        )
+
+    if count == 0:
+        var i = context.free_outbounds.connections.len().uint
+
+        if i < globals.pool_size div 2:
+            create()
+            create()
+        elif i < globals.pool_size:
+            create()
+
+    else:
+        for i in 0..<count:
+            create()
 proc start*(){.async.} =
     # proc start_server(){.async.} =
 
-    #     context.listener = newConnection(address = "This Server")
+    #     context.listener = newConnection()
     #     context.listener.socket.setSockOpt(OptReuseAddr, true)
     #     context.listener.socket.bindAddr(globals.listen_port.Port, globals.listen_addr)
     #     echo &"Started tcp server... {globals.listen_addr}:{globals.listen_port}"
@@ -234,17 +287,16 @@ proc start*(){.async.} =
     #         echo "Multi port mode!"
     #     while true:
     #         let (address, client) = await context.listener.socket.acceptAddr()
-    #         let con = newConnection(client, address)
+    #         let con = newConnection(client)
     #         if globals.log_conn_create: print "Connected client: ", address
     #         asyncCheck processConnection(con)
 
 
 
-    if not globals.multi_port:
-        context.outbound[globals.port] = Connections()
-        poolFrame(globals.listen_port,globals.pool_size)
-        
-    await sleepAsync(1200)
 
     echo &"Mode Server:   {globals.listen_addr} <-> ({globals.final_target_domain} with ip {globals.final_target_ip})"
-    asyncCheck start_server()
+    #just to make sure we always willing to connect to the peer
+    while true:
+        poolFrame()
+        await sleepAsync(5000)
+    # asyncCheck start_server()

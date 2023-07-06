@@ -64,4 +64,8 @@ proc normalSend*(data:var string) =
     encrypt data
 
 
+proc prepairUnTrustedRecv(data:string) = discard
+
+ 
+
 

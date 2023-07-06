@@ -1,5 +1,5 @@
 import overrides/[asyncnet]
-import std/[tables,sequtils, times,os , random, asyncdispatch, strutils, net, random]
+import std/[tables,sequtils, times,os , random, asyncdispatch,strformat, strutils, net, random]
 import globals
 
 type
@@ -7,30 +7,30 @@ type
         no, pending, yes
 
     Connection* = ref object
-        creation_time*: uint
-        action_start_time*: uint
-        id*: uint32
-        trusted*: TrustStatus
-        address*: string
-        socket*: AsyncSocket
-        estabilished*: bool
-        isfakessl*:bool
-        port*:uint32
-        
+        creation_time*: uint        #creation epochtime
+        action_start_time*: uint    #when recv/send action started (0 = idle)
+        register_start_time*: uint  #when the connection is added to the pool (0 = idle)
+        id*: uint32                 #global incremental id
+        trusted*: TrustStatus       #when fake handshake perfromed
+        socket*: AsyncSocket        #wrapped asyncsocket 
+        estabilished*: bool         #connection has started
+        port*:uint32                #the port the socket points to
+
     Connections* = object
-        connections*: Table[uint32, Connection]
+        connections*: seq[Connection]
 
 var allConnections:seq[Connection]
 
-
-var lgid: uint32 = 1
+var lgid: uint32 = 1 #last incremental global id 
 proc new_uid: uint32 =
     result = lgid
     inc lgid
-var et:uint = 0
+
+var et:uint = 0 #last epoch time
 
 proc isTrusted*(con: Connection): bool = con.trusted == TrustStatus.yes
 
+#send with a simple low cost timeout
 template send*(con: Connection, data: string): untyped = 
     con.action_start_time = et
     var result = con.socket.send(data)
@@ -39,6 +39,15 @@ template send*(con: Connection, data: string): untyped =
     )
     result
 
+template pureSend*(con: Connection, data: string): untyped = 
+    con.action_start_time = et
+    var result = send(con.socket.fd.AsyncFD, data, {SocketFlag.SafeDisconn})
+    result.addCallback(proc()=
+        con.action_start_time = 0
+    )
+    result
+
+#recv with a simple low cost timeout
 template recv*(con: Connection, data: SomeInteger): untyped = 
     con.action_start_time = et
     var result = con.socket.recv(data)
@@ -47,47 +56,36 @@ template recv*(con: Connection, data: SomeInteger): untyped =
     )
     result
 
-proc isClosed*(con: Connection): bool = con.socket.isClosed()
+
+proc pureRecv*(con: Connection, size: SomeInteger): Future[string] {.async.} = 
+    con.action_start_time = et
+    result = newString(size)
+    var fut = asyncdispatch.recvInto(con.socket.fd.AsyncFD, addr result[0], size, {SocketFlag.SafeDisconn})
+    fut.addCallback(proc()=
+        con.action_start_time = 0
+    )
+    result.setLen(await fut)
+    return result
+    
 
 
-proc prepairClose(con: Connection) = 
-    if con.isfakessl:
-        if con.isTrusted:
-            con.socket.isSsl = true
-template close*(con: Connection) = 
-    prepairClose(con)
+template isClosed*(con: Connection): bool = con.socket.isClosed()
+
+
+proc close*(con: Connection) = 
     con.socket.close()
     let i = allConnections.find(con)
     if i != -1:
         allConnections.del(i)
 
-# proc close*(cons: var Connections, con: Connection) =
-#     con.socket.close()
-#     if cons.connections.hasKey(con.id):
-#         cons.connections.del(con.id)
 
-
-proc takeRandom*(cons: Connections): Connection =
-    var chosen = rand(cons.connections.len()-1)
-    for k in cons.connections.keys:
-        if chosen == 0:
-            return cons.connections[k]
-        dec chosen
-
-    raise newException(ValueError, "could not take random conn")
-
-
-
-
-proc newConnection*(socket: AsyncSocket = nil, address: string, buffered: bool = globals.socket_buffered): Connection =
+proc newConnection*(socket: AsyncSocket = nil, buffered: bool = globals.socket_buffered): Connection =
     new(result)
-    # result.recv_buffer =  newStringOfCap(globals.connection_buf_cap)
-    # if id == 0 : result.id = new_uid()
-    result.id = 0
+    result.id = new_uid()
     result.creation_time = epochTime().uint32
     result.trusted = TrustStatus.pending
-    result.address = address
     result.action_start_time = 0
+    result.register_start_time = 0
 
     if socket == nil: result.socket = newAsyncSocket(buffered = buffered)
     else: result.socket = socket
@@ -96,36 +94,34 @@ proc newConnection*(socket: AsyncSocket = nil, address: string, buffered: bool =
         result.socket.setSockOpt(OptNoDelay, true)
     allConnections.add result
 
-# proc attachID*(con : var Connection)=
-#     if con.id == 0:
-#         con.id = new_uid()
-
 proc grab*(cons: var Connections):Connection=
     if cons.connections.len() == 0: return nil
-    for k in cons.connections.keys:
-        assert cons.connections.pop(k,result)
-        return result
+    result =  cons.connections[0]
+    cons.connections.del(0)
+    result.register_start_time = 0
 
-proc register*(cons: var Connections, con: Connection) =
-    if con.id == 0:
-        con.id = new_uid()
-    assert not cons.connections.hasKey con.id
-
-    cons.connections[con.id] = con
-
-
-
+proc register*(cons: var Connections, con: Connection) =  
+    con.register_start_time = et
+    cons.connections.add con
 
 proc startController*(){.async.}=
     while true:
         et = epochTime().uint
         await sleepAsync(1000)
+
+        # echo GC_getStatistics()
         allConnections.keepIf(
             proc(x: Connection):bool =
-                if x.action_start_time == 0: return true
-                if et - x.action_start_time > globals.max_idle_time :
-                    prepairClose(x)
-                    x.socket.close()
-                    return false
+                if x.action_start_time != 0:
+                    if et - x.action_start_time > globals.max_idle_time :
+                        x.socket.close()
+                        if globals.log_conn_destory: echo "[Controller] closed a idle connection"
+                        return false
+
+                if x.register_start_time != 0:
+                    if et - x.register_start_time > globals.max_pool_unused_time :
+                        x.socket.close()
+                        if globals.log_conn_destory: echo "[Controller] closed a unused connection"
+                        return false
                 return true
         )
