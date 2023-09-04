@@ -1,7 +1,9 @@
 import dns_resolve, hashes, print, parseopt, strutils, random, net, strutils, osproc , strformat
 import std/sha1
 
-const version = "11.3"
+export IpAddress
+
+const version = "1"
 
 type RunMode*{.pure.} = enum
     tunnel, server
@@ -9,17 +11,17 @@ type RunMode*{.pure.} = enum
 var mode*: RunMode = RunMode.tunnel
 
 # [Log Options]
-const log_data_len* = false
-const log_conn_create* = true
-const log_conn_destory* = true
+const log_data_len* = true
+const log_conn_create* = false
+const log_conn_destory* = false
 const log_conn_error* = true
 
 
 # [Connection]
 var trust_time*: uint = 3 #secs
-var pool_size*: uint = 16 #secs
+var pool_size*: uint = 16
 var max_idle_time*:uint = 240 #secs (default TCP RFC is 3600)
-var max_pool_unused_time*:uint = 15 #secs 
+var max_pool_unused_time*:uint = 30 #secs 
 const mux*: bool = false
 const socket_buffered* = false
 const chunk_size* = 4000 
@@ -29,10 +31,13 @@ const listen_addr* = "0.0.0.0"
 var listen_port*:uint32 = 0
 var next_route_addr* = ""
 var next_route_port*:uint32 = 0
+var from_addr* = ""
+var from_port*:uint32 = 0
+
 var final_target_domain* = ""
 var final_target_ip*: string
 const final_target_port* = 443 # port of the sni host (443 for tls handshake)
-var self_ip*: string
+var self_ip*: IpAddress
 
 
 # [passwords and hashes]
@@ -40,7 +45,9 @@ var password* = ""
 var password_hash*: string
 var sh1*: uint32
 var sh2*: uint32
-var sh3*: uint8
+var sh3*: uint32
+var sh4*: uint32
+var sh5*: uint8
 var random_600* = newString(len = 600)
 
 # [settings]
@@ -129,6 +136,16 @@ proc init*() =
                     of "toport":
                         next_route_port = parseInt(p.val).uint32
                         print next_route_port
+
+                    of "fromip":
+                        from_addr = (p.val)
+                        print from_addr
+                    of "fromport":
+                        from_port = parseInt(p.val).uint32
+                        print from_port
+
+
+
                     of "sni":
                         final_target_domain = (p.val)
                         print final_target_domain
@@ -171,10 +188,12 @@ proc init*() =
     
     final_target_ip = resolveIPv4(final_target_domain)
     print "\n"
-    self_ip = $(getPrimaryIPAddr(dest = parseIpAddress("8.8.8.8")))
+    self_ip = getPrimaryIPAddr(dest = parseIpAddress("8.8.8.8"))
     password_hash = $(secureHash(password))
     sh1 = hash(password_hash).uint32
     sh2 = hash(sh1).uint32
-    sh3 = (3 + (hash(sh2).uint32 mod 5)).uint8
+    sh3 = hash(sh2).uint32
+    sh4 = hash(sh3).uint32
+    sh5 = (3 + (hash(sh2).uint32 mod 5)).uint8
     print password, password_hash, sh1, sh2, sh3, pool_size
     print "\n"

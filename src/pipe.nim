@@ -5,11 +5,11 @@ const hsize = 8
 
 proc encrypt(data:var string) =
     for i in 0..<data.len():
-        data[i] = chr(rotateRightBits(uint8(data[i]), globals.sh3))
+        data[i] = chr(rotateRightBits(uint8(data[i]), globals.sh5))
 
 proc decrypt(data:var string) =
     for i in 0..<data.len():
-        data[i] = chr(rotateLeftBits(uint8(data[i]), globals.sh3))
+        data[i] = chr(rotateLeftBits(uint8(data[i]), globals.sh5))
 
 proc muxPack(cid: uint32,data: string): string =
     var datalen = len(data)

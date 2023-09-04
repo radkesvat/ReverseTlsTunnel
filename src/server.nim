@@ -14,12 +14,12 @@ type
 var context = ServerConnectionPoolContext()
 var ssl_ctx = newContext(verifyMode = CVerifyPeer)
 
-proc poolFrame(count: uint = 0){.gcsafe.}
+proc poolFrame(count: uint = 0)
 
-proc sslConnect(con: Connection, ip: string,  sni: string){.async.} =
+proc sslConnect(con: Connection, ip: string, sni: string){.async.} =
     con.socket.close()
     var fc = 0
-    echo "connecting..."
+    echo &"connecting to {ip}:{$con.port} (sni: {sni}) ..."
 
     while true:
         if fc > 3:
@@ -63,23 +63,32 @@ proc sslConnect(con: Connection, ip: string,  sni: string){.async.} =
 
 
     #AES default chunk size is 16 so use a multple of 16
-    let rlen = 16*(4+rand(4))
+    let rlen = 16*(10+rand(4))
     var random_trust_data: string
     random_trust_data.setLen(rlen)
 
     copyMem(unsafeAddr random_trust_data[0], unsafeAddr globals.sh1.uint32, 4)
     copyMem(unsafeAddr random_trust_data[4], unsafeAddr globals.sh2.uint32, 4)
+
+    case globals.self_ip.family:   ## the type of the IP address (IPv4 or IPv6)
+        of IpAddressFamily.IPv6:
+            random_trust_data[9] = 6.char
+            copyMem(unsafeAddr random_trust_data[10], unsafeAddr globals.self_ip.address_v6[0],globals.self_ip.address_v6.len)
+            copyMem(unsafeAddr random_trust_data[10+globals.self_ip.address_v6.len], unsafeAddr(globals.random_600[rand(250)]), rlen-8)
+
+        of IpAddressFamily.IPv4:
+            random_trust_data[9] = 4.char
+            copyMem(unsafeAddr random_trust_data[10], unsafeAddr globals.self_ip.address_v4[0],globals.self_ip.address_v4.len)
+            copyMem(unsafeAddr random_trust_data[10+globals.self_ip.address_v4.len], unsafeAddr(globals.random_600[rand(250)]), rlen-8)
+
+
     # if globals.multi_port:
     #     copyMem(unsafeAddr random_trust_data[8], unsafeAddr client_origin_port, 4)
-    copyMem(unsafeAddr random_trust_data[8], unsafeAddr(globals.random_600[rand(250)]), rlen-8)
 
+    echo "sent Trust data"
+    await con.unEncryptedSend(random_trust_data)
 
-    await con.pureSend(random_trust_data)
-
-    con.trusted = TrustStatus.yes
-
-
-
+    con.trusted = TrustStatus.pending
 
 
 
@@ -87,15 +96,16 @@ proc monitorData(data: string): tuple[trust: bool, port: uint32] =
     var port: uint32
     try:
         if len(data) < 16: return (false, port)
-        var sh1_c: uint32
-        var sh2_c: uint32
+        var sh3_c: uint32
+        var sh4_c: uint32
 
-        copyMem(unsafeAddr sh1_c, unsafeAddr data[0], 4)
-        copyMem(unsafeAddr sh2_c, unsafeAddr data[4], 4)
+        copyMem(unsafeAddr sh3_c, unsafeAddr data[0], 4)
+        copyMem(unsafeAddr sh4_c, unsafeAddr data[4], 4)
         copyMem(unsafeAddr port, unsafeAddr data[8], 4)
 
-        let chk1 = sh1_c == globals.sh1
-        let chk2 = sh2_c == globals.sh2
+
+        let chk1 = sh3_c == globals.sh3
+        let chk2 = sh4_c == globals.sh4
 
         return (chk1 and chk2, port)
     except:
@@ -103,10 +113,11 @@ proc monitorData(data: string): tuple[trust: bool, port: uint32] =
 
 
 
-proc processConnection(client_a: Connection) {.async.} =
-    # var remote: Connection
-    var client: Connection = client_a
+proc processConnection(client: Connection) {.async.} =
     var remote: Connection = nil
+    var data = ""
+
+    var remoteEstabilishment: Future[void] = nil
 
     proc proccessRemote() {.async.}
     proc proccessClient() {.async.}
@@ -118,12 +129,12 @@ proc processConnection(client_a: Connection) {.async.} =
         return new_remote
 
 
-    proc remoteUnTrusted(): Future[Connection]{.async.} =
-        var new_remote = newConnection()
-        new_remote.trusted = TrustStatus.no
-        await new_remote.socket.connect(globals.final_target_ip, globals.final_target_port.Port)
-        if globals.log_conn_create: echo "connected to ", globals.final_target_ip, ":", $globals.final_target_port
-        return new_remote
+    # proc remoteUnTrusted(): Future[Connection]{.async.} =
+    #     var new_remote = newConnection()
+    #     new_remote.trusted = TrustStatus.no
+    #     await new_remote.socket.connect(globals.final_target_ip, globals.final_target_port.Port)
+    #     if globals.log_conn_create: echo "connected to ", globals.final_target_ip, ":", $globals.final_target_port
+    #     return new_remote
 
     var closed = false
     proc close() =
@@ -135,106 +146,87 @@ proc processConnection(client_a: Connection) {.async.} =
                 remote.close()
 
     proc proccessRemote() {.async.} =
-        var data = ""
-        while not remote.isClosed:
-            try:
+        try:
+            while not remote.isClosed:
                 data = await remote.recv(globals.chunk_size)
                 if globals.log_data_len: echo &"[proccessRemote] {data.len()} bytes from remote"
-            except:
-                if client.isTrusted():
-                    if remote.estabilished:
-                        close()
-                        break
-                    else:
-                        if globals.log_conn_destory: echo "[processRemote] closed remote"
-                        break
-                else:
-                    close()
-                    break
-
-            if data.len() == 0:
-                close()
-                break
-            try:
+              
+  
                 if not client.isClosed():
                     if client.isTrusted():
                         normalSend(data)
-                    await client.send(data)
+                    await client.unEncryptedSend(data)
                     if globals.log_data_len: echo &"[proccessRemote] Sent {data.len()} bytes ->  client"
-            except:
-                close()
-                break
 
-
-
-
-
-
+                if data.len() == 0:
+                    break
+        except: discard
+        finally:
+            close()
 
     proc proccessClient() {.async.} =
-        var data = ""
-        while not client.isClosed:
-            try:
-                data = await client.recv(globals.chunk_size)
+        try:
+            while not client.isClosed:
+
+                data = await client.unEncryptedrecv(globals.chunk_size)
                 if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes from client"
-            except:
-                break
 
-            if data == "":
-                break
-            if (client.isTrusted()) and (not remote.estabilished):
-                remote.estabilished = true
-                try:
-                    await remote.socket.connect(globals.next_route_addr, client.port.Port)
-                    asyncCheck proccessRemote()
-                    let i = context.free_outbounds.connections.find(client)
-                    if i != -1: context.free_outbounds.connections.del(i)
-                    poolFrame()
-                except:
-                    break
+                if (client.isTrusted()) and (not remote.isNil() and not remote.estabilished):
+                    if remoteEstabilishment.isNil:
+                        remoteEstabilishment = remote.socket.connect(globals.next_route_addr, client.port.Port)
+                        await remoteEstabilishment
+                        asyncCheck proccessRemote()
+                        remote.estabilished = true
+                        let i = context.free_outbounds.connections.find(client)
+                        if i != -1: context.free_outbounds.connections.del(i)
+                        echo "established to remote, calling pool frame"
+                        poolFrame()
+
+                    elif not remoteEstabilishment.finished:
+                        await remoteEstabilishment
 
 
-            if client.trusted == TrustStatus.pending:
-                var (trust, port) = monitorData(data)
-                if trust:
-                    if globals.multi_port:
-                        echo "multi-port target:", port
-                        client.port = port
+
+                if client.trusted == TrustStatus.pending:
+                    var (trust, port) = monitorData(data)
+                    if trust:
+                        if globals.multi_port:
+                            echo "multi-port target:", port
+                            client.port = port
+                        else:
+                            client.port = globals.next_route_port.uint32
+                        client.trusted = TrustStatus.yes
+                        print "Fake Reverse Handshake Complete !"
+                        # remote.close()
+                        # asyncdispatch.poll()
+                        try:
+                            remote = await remoteTrusted()
+
+                        except:
+                            echo &"[Error] Failed to connect to the Target {globals.next_route_addr}:{globals.next_route_port}"
+                            raise
+
+                        continue
                     else:
-                        client.port = globals.next_route_port.uint32
-                    client.trusted = TrustStatus.yes
-                    print "Fake Reverse Handshake Complete !"
-                    # remote.close()
-                    # asyncdispatch.poll()
-                    try:
-                        remote = await remoteTrusted()
-
-                    except:
-                        echo &"[Error] Failed to connect to the Target {globals.next_route_addr}:{globals.next_route_port}"
+                        echo "[proccessClient] Target server was not a trusted tunnel client, closing..."
+                        client.trusted = TrustStatus.no
                         break
+                    # asyncCheck proccessRemote()
 
-                    continue
-                else:
-                    echo "[proccessClient] non-client connection detected! forwarding to real website."
-                    client.trusted = TrustStatus.no
-                    try:
-                        remote = await remoteUnTrusted()
-                    except:
-                        echo &"[Error] Failed to connect to the Target {globals.final_target_ip}:{globals.final_target_port}"
-                        break
-                asyncCheck proccessRemote()
 
-            try:
-                if client.isTrusted():
-                    normalRead(data)
+                normalRead(data)
 
                 if not remote.isClosed():
                     await remote.send(data)
                     if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote "
 
 
-            except: break
-        close()
+
+                if data.len() == 0:
+                    break
+        except: discard
+        finally:
+            close()
 
 
 
@@ -247,19 +239,20 @@ proc processConnection(client_a: Connection) {.async.} =
         echo "[Server] root level exception"
         print getCurrentExceptionMsg()
 
-proc poolFrame(count: uint = 0){.gcsafe.} =
+proc poolFrame(count: uint = 0) =
     proc create() =
         var con = newConnection()
-        con.port = globals.next_route_port.uint32
-        var fut = sslConnect(con, globals.next_route_addr, globals.final_target_domain)
+        con.port = globals.from_port.uint32
+        var fut = sslConnect(con, globals.from_addr, globals.final_target_domain)
 
         fut.addCallback(
-            proc() {.gcsafe.} =
-            if fut.failed:
-                if globals.log_conn_error: echo fut.error.msg
-            else:
-                if globals.log_conn_create: echo &"[createNewCon] registered a new connection to the pool"
-                asyncCheck processConnection(con)
+            proc() =
+            {.gcsafe.}:
+                if fut.failed:
+                    if globals.log_conn_error: echo fut.error.msg
+                else:
+                    if globals.log_conn_create: echo &"[createNewCon] registered a new connection to the pool"
+                    asyncCheck processConnection(con)
 
         )
 

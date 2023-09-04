@@ -15,6 +15,7 @@ type
         socket*: AsyncSocket        #wrapped asyncsocket 
         estabilished*: bool         #connection has started
         port*:uint32                #the port the socket points to
+        address*:IpAddress             #the address from socket options
 
     Connections* = object
         connections*: seq[Connection]
@@ -39,7 +40,7 @@ template send*(con: Connection, data: string): untyped =
     )
     result
 
-template pureSend*(con: Connection, data: string): untyped = 
+template unEncryptedSend*(con: Connection, data: string): untyped = 
     con.action_start_time = et
     var result = send(con.socket.fd.AsyncFD, data, {SocketFlag.SafeDisconn})
     result.addCallback(proc()=
@@ -57,7 +58,7 @@ template recv*(con: Connection, data: SomeInteger): untyped =
     result
 
 
-proc pureRecv*(con: Connection, size: SomeInteger): Future[string] {.async.} = 
+proc unEncryptedRecv*(con: Connection, size: SomeInteger): Future[string] {.async.} = 
     con.action_start_time = et
     result = newString(size)
     var fut = asyncdispatch.recvInto(con.socket.fd.AsyncFD, addr result[0], size, {SocketFlag.SafeDisconn})
@@ -79,14 +80,19 @@ proc close*(con: Connection) =
         allConnections.del(i)
 
 
-proc newConnection*(socket: AsyncSocket = nil, buffered: bool = globals.socket_buffered): Connection =
+proc newConnection*(socket: AsyncSocket = nil,address:string = "" ,buffered: bool = globals.socket_buffered): Connection =
     new(result)
     result.id = new_uid()
     result.creation_time = epochTime().uint32
     result.trusted = TrustStatus.pending
     result.action_start_time = 0
     result.register_start_time = 0
-
+    if not address.isEmptyOrWhitespace():
+        try:
+            var parsed = parseIpAddress(address)
+            result.address = parsed
+        except :
+            echo "could not parse ip address"
     if socket == nil: result.socket = newAsyncSocket(buffered = buffered)
     else: result.socket = socket
 
