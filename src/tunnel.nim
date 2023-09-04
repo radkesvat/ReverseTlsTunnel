@@ -60,7 +60,7 @@ proc monitorData(data: string): (bool,IpAddress) =
 proc processConnection(client: Connection) {.async.} =
     var remote: Connection = nil
     var data = ""
-
+    var processRemoteFuture:Future[void]
 
     var closed = false
     proc close() =
@@ -82,7 +82,7 @@ proc processConnection(client: Connection) {.async.} =
 
     proc processRemote() {.async.} =
         try:
-            while (not remote.isClosed) and (not client.isClosed):
+            while (not remote.isNil()) and (not remote.isClosed) and (not client.isClosed):
                 data = await remote.recv(globals.chunk_size)
                 if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
 
@@ -96,22 +96,14 @@ proc processConnection(client: Connection) {.async.} =
                 if data.len() == 0:
                     break
 
-        except: 
-            remote.close()
-
+        except: discard
+        
+        if not remote.isNil():remote.close()
+        if remote.isTrusted:
+            client.close()
 
     proc chooseRemote() {.async.} =
-        proc introduce() {.async.} =
-            let rlen = 16*(8+rand(8))
-            var random_trust_data: string
-            random_trust_data.setLen(rlen)
-            copyMem(unsafeAddr random_trust_data[0], unsafeAddr globals.sh3.uint32, 4)
-            copyMem(unsafeAddr random_trust_data[4], unsafeAddr globals.sh4.uint32, 4)
-            copyMem(unsafeAddr random_trust_data[8], unsafeAddr(globals.random_600[rand(250)]), rlen-8)
-
-            if globals.multi_port:
-                copyMem(unsafeAddr random_trust_data[8], unsafeAddr client.port, 4)
-            await remote.unEncryptedSend(random_trust_data)
+          
 
         for i in 0..<16:
             remote = context.peer_inbound.grab()
@@ -120,7 +112,6 @@ proc processConnection(client: Connection) {.async.} =
 
         if remote != nil:
             if globals.log_conn_create: echo &"[createNewCon][Succ] Associated a peer connection"
-            await introduce()
             asyncCheck processRemote()
         else:
             if globals.log_conn_destory: echo &"[createNewCon][Error] left without connection, closes forcefully."
@@ -141,6 +132,20 @@ proc processConnection(client: Connection) {.async.} =
                             context.peer_inbound.register(client)
                             context.peer_ips.add(ip)
                             remote.close() # close untrusted remote
+                            await processRemoteFuture
+
+                            block finish_handshake:
+                                let rlen = 16*(8+rand(8))
+                                var random_trust_data: string
+                                random_trust_data.setLen(rlen)
+                                copyMem(unsafeAddr random_trust_data[0], unsafeAddr globals.sh3.uint32, 4)
+                                copyMem(unsafeAddr random_trust_data[4], unsafeAddr globals.sh4.uint32, 4)
+                                copyMem(unsafeAddr random_trust_data[8], unsafeAddr(globals.random_600[rand(250)]), rlen-8)
+
+                                if globals.multi_port:
+                                    copyMem(unsafeAddr random_trust_data[8], unsafeAddr client.port, 4)
+                                await client.unEncryptedSend(random_trust_data)
+
                             return 
                         else:
                             if context.peer_ips.len > 0 and 
@@ -149,7 +154,9 @@ proc processConnection(client: Connection) {.async.} =
                                 echo "Real User connected !"
                                 client.trusted = TrustStatus.no
                                 remote.close()
-                                await sleepAsync(2)
+                                await processRemoteFuture
+                                # await sleepAsync(4)
+                                # asyncdispatch.poll()
                                 # context.user_inbound.register(client) not required
                                 await chooseRemote() #associate peer
                                 if remote == nil: break
@@ -176,8 +183,8 @@ proc processConnection(client: Connection) {.async.} =
 
     try:
         remote = await remoteUnTrusted()
+        processRemoteFuture = processRemote()
         asyncCheck processClient()
-        asyncCheck processRemote()
 
     except:
         printEx()

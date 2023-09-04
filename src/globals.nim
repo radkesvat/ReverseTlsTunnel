@@ -11,8 +11,8 @@ type RunMode*{.pure.} = enum
 var mode*: RunMode = RunMode.tunnel
 
 # [Log Options]
-const log_data_len* = true
-const log_conn_create* = false
+const log_data_len* = false
+const log_conn_create* = true
 const log_conn_destory* = false
 const log_conn_error* = true
 
@@ -24,7 +24,7 @@ var max_idle_time*:uint = 240 #secs (default TCP RFC is 3600)
 var max_pool_unused_time*:uint = 30 #secs 
 const mux*: bool = false
 const socket_buffered* = false
-const chunk_size* = 4000 
+const chunk_size* = 8192
 
 # [Routes]
 const listen_addr* = "0.0.0.0"
