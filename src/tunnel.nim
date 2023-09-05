@@ -85,12 +85,12 @@ proc processConnection(client: Connection) {.async.} =
             while (not remote.isNil()) and (not remote.isClosed) and (not client.isClosed):
                 data = await remote.recv(globals.chunk_size)
                 if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
-
+                if data.len() == 0:
+                    break
                 if remote.isTrusted:
                     unPackForRead(data)
 
-                if data.len() == 0:
-                    break
+                
 
                 if not client.isClosed:
                     await client.send(data)
@@ -122,7 +122,9 @@ proc processConnection(client: Connection) {.async.} =
         try:
             while not client.isClosed:
                     data = await client.recv(globals.chunk_size)
-                    echo &"[processClient] {data.len()} bytes from client {client.id}"
+                    if globals.log_data_len: echo &"[processClient] {data.len()} bytes from client {client.id}"
+                    if data.len() == 0: #user closed the connection
+                        break
 
                     if client.trusted == TrustStatus.pending:
                         var (trust,ip) = monitorData(data)
@@ -136,7 +138,7 @@ proc processConnection(client: Connection) {.async.} =
                             await processRemoteFuture
 
                             block finish_handshake:
-                                let rlen = 16*(8+rand(8))
+                                let rlen = 16*(6+rand(4))
                                 var random_trust_data: string
                                 random_trust_data.setLen(rlen)
                                 copyMem(unsafeAddr random_trust_data[0], unsafeAddr globals.sh3.uint32, 4)
@@ -166,9 +168,7 @@ proc processConnection(client: Connection) {.async.} =
                                 client.trusted = TrustStatus.no
                                 break
 
-                    if data.len() == 0: #user closed the connection
-                        break
-
+               
                     if not remote.isClosed:
                         if remote.isTrusted:
                             packForSend(data)

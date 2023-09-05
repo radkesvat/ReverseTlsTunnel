@@ -60,7 +60,7 @@ proc sslConnect(con: Connection, ip: string, sni: string){.async.} =
 
 
     #AES default chunk size is 16 so use a multple of 16
-    let rlen = 16*(10+rand(4))
+    let rlen = 16*(6+rand(4))
     var random_trust_data: string
     random_trust_data.setLen(rlen)
 
@@ -158,7 +158,7 @@ proc processConnection(client: Connection) {.async.} =
                     if client.isTrusted():
                         packForSend(data)
                     await client.unEncryptedSend(data)
-                    echo &"[proccessRemote] Sent {data.len()} bytes ->  client"
+                    if globals.log_data_len: echo &"[proccessRemote] Sent {data.len()} bytes ->  client"
 
         except: discard
         close()
@@ -169,6 +169,10 @@ proc processConnection(client: Connection) {.async.} =
 
                 data = await client.unEncryptedrecv(globals.chunk_size)
                 if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes from client"
+
+
+                if data.len() == 0:
+                    break
 
                 if (client.isTrusted()) and (not remote.isNil() and not remote.estabilished):
                     if remoteEstabilishment.isNil:
@@ -213,8 +217,7 @@ proc processConnection(client: Connection) {.async.} =
                     # asyncCheck proccessRemote()
 
 
-                if data.len() == 0:
-                    break
+
                 unPackForRead(data)
 
                 if not remote.isClosed():
