@@ -1,6 +1,6 @@
 import std/[asyncdispatch, nativesockets, strformat, strutils, net, tables, random, endians]
 import overrides/[asyncnet]
-import times, print, connection, pipe, openssl
+import times, print, connection, pipe, openssl,os
 from globals import nil
 
 when defined(windows):
@@ -87,17 +87,18 @@ proc processConnection(client: Connection) {.async.} =
                 if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
 
                 if remote.isTrusted:
-                    normalRead(data)
+                    unPackForRead(data)
+
+                if data.len() == 0:
+                    break
 
                 if not client.isClosed:
                     await client.send(data)
                     if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client "
 
-                if data.len() == 0:
-                    break
 
         except: discard
-        
+            
         if not remote.isNil():remote.close()
         if remote.isTrusted:
             client.close()
@@ -121,7 +122,7 @@ proc processConnection(client: Connection) {.async.} =
         try:
             while not client.isClosed:
                     data = await client.recv(globals.chunk_size)
-                    if globals.log_data_len: echo &"[processClient] {data.len()} bytes from client {client.id}"
+                    echo &"[processClient] {data.len()} bytes from client {client.id}"
 
                     if client.trusted == TrustStatus.pending:
                         var (trust,ip) = monitorData(data)
@@ -130,7 +131,7 @@ proc processConnection(client: Connection) {.async.} =
                             client.trusted = TrustStatus.yes
                             print "Peer Fake Handshake Complete ! ",ip
                             context.peer_inbound.register(client)
-                            context.peer_ips.add(ip)
+                            context.peer_ips.add(client.address)
                             remote.close() # close untrusted remote
                             await processRemoteFuture
 
@@ -155,8 +156,6 @@ proc processConnection(client: Connection) {.async.} =
                                 client.trusted = TrustStatus.no
                                 remote.close()
                                 await processRemoteFuture
-                                # await sleepAsync(4)
-                                # asyncdispatch.poll()
                                 # context.user_inbound.register(client) not required
                                 await chooseRemote() #associate peer
                                 if remote == nil: break
@@ -167,16 +166,17 @@ proc processConnection(client: Connection) {.async.} =
                                 client.trusted = TrustStatus.no
                                 break
 
+                    if data.len() == 0: #user closed the connection
+                        break
 
                     if not remote.isClosed:
                         if remote.isTrusted:
-                            normalSend(data)
+                            packForSend(data)
                         await remote.send(data)
                         if globals.log_data_len: echo &"{data.len} bytes -> Remote"
 
                     
-                    if data.len() == 0:
-                        break
+
 
         except: discard
         close()
@@ -247,8 +247,8 @@ proc start*(){.async.} =
 
 
     await sleepAsync(2500)
-    echo &"Mode Tunnel (usecase: IRAN server):  {globals.self_ip} <->  {globals.next_route_addr} handshake: {globals.final_target_domain}"
-    asyncCheck start_users_listener()
+    echo &"Mode Tunnel (used for iran servers):  {globals.self_ip} <->  {globals.next_route_addr} handshake: {globals.final_target_domain}"
+    # asyncCheck start_users_listener()
     asyncCheck start_server_listener()
 
 

@@ -3,6 +3,14 @@ import math,bitops,random
 
 const hsize = 8
 
+# proc encrypt(data:var string) =
+#     for i in 0..< data.len() div 4:
+#         (cast[ptr[uint32]](addr data[i]))[] = uint32(rotateRightBits((cast[ptr[uint32]](addr data[i]))[], globals.sh5))
+
+# proc decrypt(data:var string) =
+#     for i in 0..< data.len() div 4:
+#         (cast[ptr[uint32]](addr data[i]))[] = uint32(rotateLeftBits((cast[ptr[uint32]](addr data[i]))[], globals.sh5))
+
 proc encrypt(data:var string) =
     for i in 0..<data.len():
         data[i] = chr(rotateRightBits(uint8(data[i]), globals.sh5))
@@ -10,6 +18,7 @@ proc encrypt(data:var string) =
 proc decrypt(data:var string) =
     for i in 0..<data.len():
         data[i] = chr(rotateLeftBits(uint8(data[i]), globals.sh5))
+
 
 proc muxPack(cid: uint32,data: string): string =
     var datalen = len(data)
@@ -57,10 +66,10 @@ proc muxRead*(data:var string):  tuple[cid:uint32,data:string] =
     return (cid,buffer)
 
 
-proc normalRead*(data:var string) = 
+proc unPackForRead*(data:var string) = 
     decrypt data
 
-proc normalSend*(data:var string) = 
+proc packForSend*(data:var string) = 
     encrypt data
 
 

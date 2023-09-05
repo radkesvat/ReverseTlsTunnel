@@ -31,10 +31,13 @@ var et:uint = 0 #last epoch time
 
 proc isTrusted*(con: Connection): bool = con.trusted == TrustStatus.yes
 
+
 #send with a simple low cost timeout
 template send*(con: Connection, data: string): untyped = 
     con.action_start_time = et
+   
     var result = con.socket.send(data)
+
     result.addCallback(proc()=
         con.action_start_time = 0
     )

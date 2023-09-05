@@ -117,7 +117,7 @@ type
   # AsyncSocket* {.borrow: `.`.} = distinct Socket. But that doesn't work.
   AsyncSocketDesc = object
     fd*: SocketHandle
-    closed: bool     ## determines whether this socket has been closed
+    closed*: bool     ## determines whether this socket has been closed
     isBuffered: bool ## determines whether this socket is buffered.
     buffer: array[0..BufferSize, char]
     currPos: int     # current index in buffer
@@ -207,7 +207,7 @@ proc newAsyncSocket*(domain, sockType, protocol: cint,
                           Protocol(protocol), buffered, inheritable)
 
 when defineSsl:
-  proc getSslError(socket: AsyncSocket, err: cint): cint =
+  proc getSslError*(socket: AsyncSocket, err: cint): cint =
     assert socket.isSsl
     assert err < 0
     var ret = SSL_get_error(socket.sslHandle, err.cint)
