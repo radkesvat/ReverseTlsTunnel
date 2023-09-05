@@ -192,26 +192,26 @@ proc processConnection(client: Connection) {.async.} =
 proc start*(){.async.} =
     var pbuf = newString(len = 16)
 
-    proc start_server_listener(){.async.} =
+    # proc start_server_listener(){.async.} =
 
-        context.listener_server = newConnection()
-        context.listener_server.socket.setSockOpt(OptReuseAddr, true)
-        context.listener_server.socket.bindAddr(8093.Port, globals.listen_addr)
+    #     context.listener_server = newConnection()
+    #     context.listener_server.socket.setSockOpt(OptReuseAddr, true)
+    #     context.listener_server.socket.bindAddr(8093.Port, globals.listen_addr)
        
 
-        echo &"Started tcp server... {globals.listen_addr}:{globals.listen_port}"
-        context.listener_server.socket.listen()
+    #     echo &"Started tcp server... {globals.listen_addr}:{globals.listen_port}"
+    #     context.listener_server.socket.listen()
 
-        while true:
-            let (address, client) = await context.listener_server.socket.acceptAddr()
+    #     while true:
+    #         let (address, client) = await context.listener_server.socket.acceptAddr()
                   
-            var con = newConnection(client,"192.168.1.130")
+    #         var con = newConnection(client,"192.168.1.130")
            
-            con.port = globals.listen_port
-            if globals.log_conn_create: print "Connected reverse host: ", address
+    #         con.port = globals.listen_port
+    #         if globals.log_conn_create: print "Connected reverse host: ", address
 
-            asyncCheck processConnection(con)
-    proc start_users_listener(){.async.} =
+    #         asyncCheck processConnection(con)
+    proc start_listener(){.async.} =
 
         context.listener = newConnection()
         context.listener.socket.setSockOpt(OptReuseAddr, true)
@@ -248,8 +248,8 @@ proc start*(){.async.} =
 
     await sleepAsync(2500)
     echo &"Mode Tunnel (used for iran servers):  {globals.self_ip} <->  {globals.next_route_addr} handshake: {globals.final_target_domain}"
-    # asyncCheck start_users_listener()
-    asyncCheck start_server_listener()
+    asyncCheck start_listener()
+    # asyncCheck start_server_listener()
 
 
 
