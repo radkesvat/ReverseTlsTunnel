@@ -28,7 +28,7 @@ when defined(linux) and not defined(android):
             var limit = RLimit(rlim_cur:65000,rlim_max:66000)
             assert 0 == setrlimit(RLIMIT_NOFILE,limit)
         except :
-            echo getCurrentException()
+            echo getCurrentExceptionMsg()
             echo "Could not increase system max connection (file descriptors) limit."
             echo "Please run as root. or start with --keep-os-limit "
       
