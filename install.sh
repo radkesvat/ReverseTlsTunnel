@@ -1,8 +1,8 @@
 if [ "$EUID" -ne 0 ]
-  then echo "Please run as root"
+  then echo "Please run as root."
   exit
 fi
-echo nameserver 8.8.8.8 | sudo tee /etc/resolv.conf
+#echo nameserver 8.8.8.8 | sudo tee /etc/resolv.conf
 
 apt-get update -y
 
@@ -27,16 +27,16 @@ printf  "\n"
 printf  "\n"
 
 
-echo "downloading FakeTlsTunnel"
+echo "downloading ReverseTlsTunnel"
 
 printf  "\n"
 
 
 
-wget "https://github.com/radkesvat/FakeTlsTunnel/releases/download/V9/v9_linux_amd64.zip" -O v9_linux_amd64.zip
-unzip -o v9_linux_amd64.zip
+wget "https://github.com/radkesvat/ReverseTlsTunnel/releases/download/V1/v1_linux_amd64.zip" -O v1_linux_amd64.zip
+unzip -o v1_linux_amd64.zip
 chmod +x RTT
-rm v9_linux_amd64.zip
+rm v1_linux_amd64.zip
 
 echo "finished."
 
