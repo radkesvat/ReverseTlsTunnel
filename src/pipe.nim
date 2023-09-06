@@ -3,23 +3,22 @@ import math,bitops,random
 
 const hsize = 8 #mux header size
 
-proc encrypt(data:var string) =
-    for i in 0..< data.len() div 4:
-        (cast[ptr[uint32]](addr data[i]))[] = uint32(rotateRightBits((cast[ptr[uint32]](addr data[i]))[], globals.sh5))
-
-proc decrypt(data:var string) =
-    for i in 0..< data.len() div 4:
-        (cast[ptr[uint32]](addr data[i]))[] = uint32(rotateLeftBits((cast[ptr[uint32]](addr data[i]))[], globals.sh5))
-
-
-# per byte = consume more cpu
 # proc encrypt(data:var string) =
-#     for i in 0..<data.len():
-#         data[i] = chr(rotateRightBits(uint8(data[i]), globals.sh5))
+#     for i in 0..< data.len() div 4:
+#         (cast[ptr[uint32]](addr data[i]))[] = uint32(rotateRightBits((cast[ptr[uint32]](addr data[i]))[], globals.sh5))
 
 # proc decrypt(data:var string) =
-#     for i in 0..<data.len():
-#         data[i] = chr(rotateLeftBits(uint8(data[i]), globals.sh5))
+#     for i in 0..< data.len() div 4:
+#         (cast[ptr[uint32]](addr data[i]))[] = uint32(rotateLeftBits((cast[ptr[uint32]](addr data[i]))[], globals.sh5))
+
+# per byte = consume more cpu (testing)
+proc encrypt(data:var string) =
+    for i in 0..<data.len():
+        data[i] = chr(rotateRightBits(uint8(data[i]), globals.sh5))
+
+proc decrypt(data:var string) =
+    for i in 0..<data.len():
+        data[i] = chr(rotateLeftBits(uint8(data[i]), globals.sh5))
 
 
 proc muxPack(cid: uint32,data: string): string =
