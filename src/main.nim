@@ -16,8 +16,8 @@ if globals.multi_port and globals.reset_iptable and globals.mode == globals.RunM
 
 #increase systam maximum fds to be able to handle more than 1024 cons (650000 for now)
 when defined(linux) and not defined(android):
+    import std/posix
     if not globals.keep_system_limit:
-        import std/posix
         if not isAdmin():
             echo "Please run as root. or start with --keep-os-limit "
             quit(-1)
