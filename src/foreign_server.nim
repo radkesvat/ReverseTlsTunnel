@@ -12,7 +12,8 @@ type
 var context = ServerConnectionPoolContext()
 var ssl_ctx = newContext(verifyMode = CVerifyPeer)
 
-proc poolFrame(count: uint = 0)
+# [FWD]
+proc poolFrame(create_count: uint = 0) 
 
 proc sslConnect(con: Connection, ip: string, sni: string){.async.} =
     con.socket.close()
@@ -222,7 +223,9 @@ proc processConnection(client: Connection) {.async.} =
         echo "[Server] root level exception"
         print getCurrentExceptionMsg()
 
-proc poolFrame(count: uint = 0) =
+proc poolFrame(create_count: uint = 0) =
+    var count = create_count
+
     proc create() =
         var con = newConnection()
         con.port = globals.iran_port.uint32
@@ -247,8 +250,6 @@ proc poolFrame(count: uint = 0) =
             count = 2
         elif i < globals.pool_size:
             count = 1
-
-
     
     for i in 0..<count:
         create()
