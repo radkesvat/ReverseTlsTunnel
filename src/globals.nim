@@ -6,9 +6,9 @@ export IpAddress
 const version = "1"
 
 type RunMode*{.pure.} = enum
-    tunnel, server
+    iran, kharej
 
-var mode*: RunMode = RunMode.tunnel
+var mode*: RunMode = RunMode.iran
 
 # [Log Options]
 const log_data_len* = false
@@ -22,8 +22,8 @@ var trust_time*: uint = 3 #secs
 var pool_size*: uint = 16
 var max_idle_time*:uint = 240 #secs (default TCP RFC is 3600)
 var max_pool_unused_time*:uint = 30 #secs 
-const mux*: bool = false
-const socket_buffered* = false
+const mux*: bool = false #asia tech firewall detects mux (connection max age rqeuired, TODO)
+const socket_buffered* = false 
 const chunk_size* = 8192
 
 # [Routes]
@@ -31,8 +31,8 @@ const listen_addr* = "0.0.0.0"
 var listen_port*:uint32 = 0
 var next_route_addr* = ""
 var next_route_port*:uint32 = 0
-var from_addr* = ""
-var from_port*:uint32 = 0
+var iran_addr* = ""
+var iran_port*:uint32 = 0
 
 var final_target_domain* = ""
 var final_target_ip*: string
@@ -53,6 +53,7 @@ var random_600* = newString(len = 600)
 # [settings]
 var disable_ufw* = true
 var reset_iptable* = true
+var keep_system_limit* = false
 
 # [multiport]
 var multi_port* = false
@@ -64,7 +65,7 @@ const SO_ORIGINAL_DST* = 80
 const SOL_IP* = 0
 
 proc iptablesInstalled(): bool = 
-    execCmdEx("""dpkg-query -W --showformat='${Status}\n' $REQUIRED_PKG|grep "install ok install"""").output != ""
+    execCmdEx("""dpkg-query -W --showformat='${Status}\n' iptables|grep "install ok install"""").output != ""
 
 
 proc resetIptables*()=
@@ -83,7 +84,7 @@ proc init*() =
     for i in 0..<random_600.len():
         random_600[i] = rand(char.low .. char.high).char
 
-    var p = initOptParser(longNoVal = @["server", "tunnel","multiport", "keep-ufw", "keep-iptables"])
+    var p = initOptParser(longNoVal = @["kharej", "iran","multiport", "keep-ufw", "keep-iptables","keep-os-limit"])
     while true:
         p.next()
         case p.kind
@@ -91,11 +92,11 @@ proc init*() =
         of cmdShortOption, cmdLongOption:
             if p.val == "":
                 case p.key:
-                    of "server":
-                        mode = RunMode.server
+                    of "kharej":
+                        mode = RunMode.kharej
                         print mode
-                    of "tunnel":
-                        mode = RunMode.tunnel
+                    of "iran":
+                        mode = RunMode.iran
                         print mode
                     of "keep-ufw":
                         disable_ufw = false
@@ -103,6 +104,8 @@ proc init*() =
                         reset_iptable = false
                     of "multiport":
                         multiport = true
+                    of "keep-os-limit":
+                        keep_system_limit = true
                         
                     else:
                         echo "invalid option"
@@ -137,14 +140,12 @@ proc init*() =
                         next_route_port = parseInt(p.val).uint32
                         print next_route_port
 
-                    of "fromip":
-                        from_addr = (p.val)
-                        print from_addr
-                    of "fromport":
-                        from_port = parseInt(p.val).uint32
-                        print from_port
-
-
+                    of "iran-ip":
+                        iran_addr = (p.val)
+                        print iran_addr
+                    of "iran-port":
+                        iran_port = parseInt(p.val).uint32
+                        print iran_port
 
                     of "sni":
                         final_target_domain = (p.val)
@@ -165,25 +166,36 @@ proc init*() =
 
     var exit = false
 
-    if listen_port == 0 and not multi_port:
-        echo "specify the listen prot --lport:{port}"
-        exit = true
+    case mode :
+        of RunMode.kharej:
+            if iran_addr.isEmptyOrWhitespace():
+                echo "specify the ip address of the iran server --iran-addr:{ip}"
+                exit = true
+            if iran_port == 0 and not multi_port:
+                echo "specify the iran server prot --iran-port:{port}"
+                exit = true
 
-    if next_route_addr.isEmptyOrWhitespace():
-        echo "specify the next ip for routing --toip:{ip}"
-        exit = true
-    if next_route_port == 0:
-        echo "specify the port of the next ip for routing --toport:{port}"
-        exit = true
+            if next_route_addr.isEmptyOrWhitespace():
+                echo "specify the next ip for routing --toip:{ip} (usually 127.0.0.1)"
+                exit = true
+            if next_route_port == 0:
+                echo "specify the port of the next ip for routing --toport:{port} (the port of the config that x-ui shows you)"
+                exit = true
 
-    if next_route_addr.isEmptyOrWhitespace():
+        of RunMode.iran:
+            if listen_port == 0 and not multi_port:
+                echo "specify the listen prot --lport:{port}  (usually 443)"
+                exit = true
+
+   
+    if final_target_domain.isEmptyOrWhitespace():
         echo "specify the sni for routing --sni:{domain}"
         exit = true
     if password.isEmptyOrWhitespace():
         echo "specify the password  --password:{something}"
         exit = true
 
-    if exit: quit(-1)
+    if exit: quit("Application did not start due to above logs.")
 
     
     final_target_ip = resolveIPv4(final_target_domain)

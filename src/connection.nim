@@ -15,7 +15,7 @@ type
         socket*: AsyncSocket        #wrapped asyncsocket 
         estabilished*: bool         #connection has started
         port*:uint32                #the port the socket points to
-        address*:IpAddress             #the address from socket options
+        address*:IpAddress          #the address from socket level
 
     Connections* = object
         connections*: seq[Connection]
