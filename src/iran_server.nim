@@ -26,25 +26,25 @@ proc monitorData(data: string): (bool, IpAddress) =
         var sh1_c: uint32
         var sh2_c: uint32
 
-        copyMem(unsafeAddr sh1_c, unsafeAddr data[0], 4)
-        copyMem(unsafeAddr sh2_c, unsafeAddr data[4], 4)
-        # copyMem(unsafeAddr port, unsafeAddr data[8], 4)
+        copyMem(addr sh1_c, addr data[0], 4)
+        copyMem(addr sh2_c, addr data[4], 4)
+        # copyMem(addr port, addr data[8], 4)
 
         let chk1 = sh1_c == globals.sh1
         let chk2 = sh2_c == globals.sh2
 
         if (chk1 and chk2):
             var fm: char = 0.char
-            copyMem(unsafeAddr fm, unsafeAddr data[9], 1)
+            copyMem(addr fm, addr data[9], 1)
             if fm == 4.char:
                 if len(data) < 10+globals.self_ip.address_v4.len: return (false, ip)
 
-                copyMem(unsafeAddr ip.address_v4, unsafeAddr data[10], ip.address_v4.len)
+                copyMem(addr ip.address_v4, addr data[10], ip.address_v4.len)
 
             elif fm == 6.char:
                 if len(data) < 10+globals.self_ip.address_v6.len: return (false, ip)
 
-                copyMem(unsafeAddr ip.address_v6, unsafeAddr data[10], ip.address_v6.len)
+                copyMem(addr ip.address_v6, addr data[10], ip.address_v6.len)
 
             else:
                 return (false, ip)
@@ -56,6 +56,17 @@ proc monitorData(data: string): (bool, IpAddress) =
     except:
         return (false, ip)
 
+proc generateFinishHandShakeData(client_port: uint32):string=
+    let rlen = 16*(6+rand(4))
+    var random_trust_data: string
+    random_trust_data.setLen(rlen)
+    copyMem(addr random_trust_data[0], addr globals.sh3.uint32, 4)
+    copyMem(addr random_trust_data[4], addr globals.sh4.uint32, 4)
+    copyMem(addr random_trust_data[8], addr(globals.random_600[rand(250)]), rlen-8)
+
+    if globals.multi_port:
+        copyMem(addr random_trust_data[8], addr client_port, 4)
+    return random_trust_data
 
 proc processConnection(client: Connection) {.async.} =
     var remote: Connection = nil
@@ -132,17 +143,8 @@ proc processConnection(client: Connection) {.async.} =
                         remote.close() # close untrusted remote
                         await processRemoteFuture
 
-                        block finish_handshake:
-                            let rlen = 16*(6+rand(4))
-                            var random_trust_data: string
-                            random_trust_data.setLen(rlen)
-                            copyMem(unsafeAddr random_trust_data[0], unsafeAddr globals.sh3.uint32, 4)
-                            copyMem(unsafeAddr random_trust_data[4], unsafeAddr globals.sh4.uint32, 4)
-                            copyMem(unsafeAddr random_trust_data[8], unsafeAddr(globals.random_600[rand(250)]), rlen-8)
-
-                            if globals.multi_port:
-                                copyMem(unsafeAddr random_trust_data[8], unsafeAddr client.port, 4)
-                            await client.unEncryptedSend(random_trust_data)
+                        if not globals.multi_port:
+                            await client.unEncryptedSend(generateFinishHandShakeData(client.port))
 
                         return
                     else:
@@ -182,6 +184,9 @@ proc processConnection(client: Connection) {.async.} =
             await chooseRemote() #associate peer
             if remote != nil:
                 if globals.log_conn_create: echo &"[createNewCon][Succ] Associated a peer connection"
+                if  globals.multi_port:
+                    await remote.unEncryptedSend(generateFinishHandShakeData(client.port))
+
                 asyncCheck processRemote()
             else:
                 if globals.log_conn_destory: echo &"[createNewCon][Error] left without connection, closes forcefully."
