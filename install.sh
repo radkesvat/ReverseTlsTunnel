@@ -41,10 +41,10 @@ printf  "\n"
 
 
 
-wget "https://github.com/radkesvat/ReverseTlsTunnel/releases/download/V1/v1_linux_amd64.zip" -O v1_linux_amd64.zip
-unzip -o v1_linux_amd64.zip
+wget "https://github.com/radkesvat/ReverseTlsTunnel/releases/download/V1.1/v1.1_linux_amd64.zip" -O v1.1_linux_amd64.zip
+unzip -o v1.1_linux_amd64.zip
 chmod +x RTT
-rm v1_linux_amd64.zip
+rm v1.1_linux_amd64.zip
 
 echo "finished."
 
