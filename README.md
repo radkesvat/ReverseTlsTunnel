@@ -114,6 +114,10 @@ nohup ./RTT --iran  --lport:443  --sni:splus.ir --password:123 &
 اگر با خطای زیر مواجه شدین
 > Could not increase system max connection (file descriptors) limit.
 
+یا
+
+> sysctl: permission denied on key "fs.file-max"
+
 یعنی دسترسی کامل به root نداریم ؛ مثلا برای کانتینر ها این مشکل هست یا محیط های خاص ؛ اگه داخل سرور واقعی بودین که کافیه از sudo -i استفاده کنین ولی به هر حال اگر موفق نشدین ؛ داخل دستور اجرای برنامه از این سوییچ استفاده کنین
 > --keep-os-limit
 
