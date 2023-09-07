@@ -1,4 +1,4 @@
-import dns_resolve, hashes, print, parseopt, strutils, random, net, strutils, osproc , strformat
+import dns_resolve, hashes, print, parseopt,asyncdispatch, strutils, random, net, strutils, osproc , strformat
 import std/sha1
 
 export IpAddress
@@ -54,6 +54,7 @@ var random_600* = newString(len = 600)
 var disable_ufw* = true
 var reset_iptable* = true
 var keep_system_limit* = false
+var terminate_secs* = 0
 
 # [multiport]
 var multi_port* = false
@@ -153,12 +154,18 @@ proc init*() =
                     of "password":
                         password = (p.val)
                         print password
+
+                    of "terminate":
+                        terminate_secs = parseInt(p.val) * 60*60
+                        print terminate_secs
+
                     of "pool":
                         pool_size = parseInt(p.val).uint
                         print pool_size
                     of "trust_time":
                         trust_time = parseInt(p.val).uint
                         print trust_time
+                        
 
 
         of cmdArgument:
@@ -197,6 +204,12 @@ proc init*() =
 
     if exit: quit("Application did not start due to above logs.")
 
+    if terminate_secs != 0:
+        sleepAsync(terminate_secs*1000).addCallback(
+            proc() =
+                echo "Exiting due to termination timeout. (--terminate)"
+                quit(0)
+        )
     
     final_target_ip = resolveIPv4(final_target_domain)
     print "\n"

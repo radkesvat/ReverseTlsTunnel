@@ -3,7 +3,6 @@ import overrides/[asyncnet]
 import print, connection, pipe
 from globals import nil
 
-import os
 type
     ServerConnectionPoolContext = object
         free_outbounds: Connections
@@ -234,7 +233,6 @@ proc poolFrame(create_count: uint = 0) =
         fut.addCallback(
             proc() =
             {.gcsafe.}:
-                
                 if fut.failed:
                     if globals.log_conn_error: echo fut.error.msg
                 else:

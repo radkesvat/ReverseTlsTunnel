@@ -1,6 +1,6 @@
 import overrides/[asyncnet]
 import std/[tables,sequtils, times,os , random, asyncdispatch,strformat, strutils, net, random]
-import globals
+import globals,print
 
 type
     TrustStatus*{.pure.} = enum
@@ -134,3 +134,5 @@ proc startController*(){.async.}=
                         return false
                 return true
         )
+
+        echo "futures in list : " getFuturesInProgress().len()

@@ -1,6 +1,6 @@
 import std/[asyncdispatch, nativesockets, strformat, strutils, net, tables, random, endians]
 import overrides/[asyncnet]
-import times, print, connection, pipe, openssl,os
+import times, print, connection, pipe, openssl
 from globals import nil
 
 when defined(windows):
@@ -14,11 +14,13 @@ type
         listener: Connection
         user_inbound: Connections
         peer_inbound: Connections
-        peer_ips:seq[IpAddress]
+        peer_ips: seq[IpAddress]
+
+
 var context = TunnelConnectionPoolContext()
 
-proc monitorData(data: string): (bool,IpAddress) =
-    var ip = IpAddress(family : IpAddressFamily.IPv4)
+proc monitorData(data: string): (bool, IpAddress) =
+    var ip = IpAddress(family: IpAddressFamily.IPv4)
     try:
 
         var sh1_c: uint32
@@ -32,35 +34,33 @@ proc monitorData(data: string): (bool,IpAddress) =
         let chk2 = sh2_c == globals.sh2
 
         if (chk1 and chk2):
-            var fm :char = 0.char
+            var fm: char = 0.char
             copyMem(unsafeAddr fm, unsafeAddr data[9], 1)
-            if fm == 4.char :
-                if len(data) < 10+globals.self_ip.address_v4.len: return (false,ip)
+            if fm == 4.char:
+                if len(data) < 10+globals.self_ip.address_v4.len: return (false, ip)
 
                 copyMem(unsafeAddr ip.address_v4, unsafeAddr data[10], ip.address_v4.len)
 
             elif fm == 6.char:
-                if len(data) < 10+globals.self_ip.address_v6.len: return (false,ip)
+                if len(data) < 10+globals.self_ip.address_v6.len: return (false, ip)
 
                 copyMem(unsafeAddr ip.address_v6, unsafeAddr data[10], ip.address_v6.len)
 
             else:
-                return (false,ip)
+                return (false, ip)
 
-            return (true,ip)
+            return (true, ip)
         else:
-            return (false,ip)
+            return (false, ip)
 
     except:
-        return (false,ip)
-
-
+        return (false, ip)
 
 
 proc processConnection(client: Connection) {.async.} =
     var remote: Connection = nil
     var data = ""
-    var processRemoteFuture:Future[void]
+    var processRemoteFuture: Future[void]
 
     var closed = false
     proc close() =
@@ -69,7 +69,6 @@ proc processConnection(client: Connection) {.async.} =
             if globals.log_conn_destory: echo "[processRemote] closed client & remote"
             if remote != nil:
                 remote.close()
-
             client.close()
 
     proc remoteUnTrusted(): Future[Connection]{.async.} =
@@ -90,100 +89,102 @@ proc processConnection(client: Connection) {.async.} =
                 if remote.isTrusted:
                     unPackForRead(data)
 
-                
-
                 if not client.isClosed:
                     await client.send(data)
                     if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client "
 
 
         except: discard
-            
-        if not remote.isNil():remote.close()
+
+        if not remote.isNil(): remote.close()
         if remote.isTrusted:
             client.close()
 
     proc chooseRemote() {.async.} =
-          
-
         for i in 0..<16:
             remote = context.peer_inbound.grab()
             if remote != nil: break
             await sleepAsync(100)
 
-        if remote != nil:
-            if globals.log_conn_create: echo &"[createNewCon][Succ] Associated a peer connection"
-            asyncCheck processRemote()
-        else:
-            if globals.log_conn_destory: echo &"[createNewCon][Error] left without connection, closes forcefully."
-            client.close()
 
     proc processClient() {.async.} =
         try:
             while not client.isClosed:
-                    data = await client.recv(globals.chunk_size)
-                    if globals.log_data_len: echo &"[processClient] {data.len()} bytes from client {client.id}"
-                    if data.len() == 0: #user closed the connection
-                        break
+                data = await client.recv(globals.chunk_size)
+                if globals.log_data_len: echo &"[processClient] {data.len()} bytes from client {client.id}"
+                if data.len() == 0: #user closed the connection
+                    break
 
-                    if client.trusted == TrustStatus.pending:
-                        var (trust,ip) = monitorData(data)
-                        if trust:
-                            #peer connection
-                            client.trusted = TrustStatus.yes
-                            print "Peer Fake Handshake Complete ! ",ip
-                            context.peer_inbound.register(client)
-                            context.peer_ips.add(client.address)
-                            remote.close() # close untrusted remote
-                            await processRemoteFuture
 
-                            block finish_handshake:
-                                let rlen = 16*(6+rand(4))
-                                var random_trust_data: string
-                                random_trust_data.setLen(rlen)
-                                copyMem(unsafeAddr random_trust_data[0], unsafeAddr globals.sh3.uint32, 4)
-                                copyMem(unsafeAddr random_trust_data[4], unsafeAddr globals.sh4.uint32, 4)
-                                copyMem(unsafeAddr random_trust_data[8], unsafeAddr(globals.random_600[rand(250)]), rlen-8)
+                if client.trusted == TrustStatus.pending:
+                    var (trust, ip) = monitorData(data)
+                    if trust:
+                        #peer connection
+                        client.trusted = TrustStatus.yes
+                        print "Peer Fake Handshake Complete ! ", ip
+                        context.peer_inbound.register(client)
+                        context.peer_ips.add(client.address)
+                        remote.close() # close untrusted remote
+                        await processRemoteFuture
 
-                                if globals.multi_port:
-                                    copyMem(unsafeAddr random_trust_data[8], unsafeAddr client.port, 4)
-                                await client.unEncryptedSend(random_trust_data)
+                        block finish_handshake:
+                            let rlen = 16*(6+rand(4))
+                            var random_trust_data: string
+                            random_trust_data.setLen(rlen)
+                            copyMem(unsafeAddr random_trust_data[0], unsafeAddr globals.sh3.uint32, 4)
+                            copyMem(unsafeAddr random_trust_data[4], unsafeAddr globals.sh4.uint32, 4)
+                            copyMem(unsafeAddr random_trust_data[8], unsafeAddr(globals.random_600[rand(250)]), rlen-8)
 
-                            return 
-                        else:
-                            if context.peer_ips.len > 0 and 
-                             context.peer_ips[0] != client.address:
-                                #user connection
-                                echo "Real User connected !"
-                                client.trusted = TrustStatus.no
-                                remote.close()
-                                await processRemoteFuture
-                                # context.user_inbound.register(client) not required
-                                await chooseRemote() #associate peer
-                                if remote == nil: break
+                            if globals.multi_port:
+                                copyMem(unsafeAddr random_trust_data[8], unsafeAddr client.port, 4)
+                            await client.unEncryptedSend(random_trust_data)
 
-                            elif (epochTime().uint - client.creation_time) > globals.trust_time:
-                                #user connection but no peer connected yet
-                                #peer connection but couldnt finish handshake in time
-                                client.trusted = TrustStatus.no
-                                break
+                        return
+                    else:
+                        # if context.peer_ips.len > 0 and
+                        #  context.peer_ips[0] != client.address:
+                        #     #user connection
+                        #     echo "Real User connected !"
+                        #     client.trusted = TrustStatus.no
+                        #     remote.close()
+                        #     await processRemoteFuture
+                        #     # context.user_inbound.register(client) not required
+                        #     await chooseRemote() #associate peer
+                        #     if remote == nil: break
 
-               
-                    if not remote.isClosed:
-                        if remote.isTrusted:
-                            packForSend(data)
-                        await remote.send(data)
-                        if globals.log_data_len: echo &"{data.len} bytes -> Remote"
+                        if (epochTime().uint - client.creation_time) > globals.trust_time:
+                            #user connection but no peer connected yet
+                            #peer connection but couldnt finish handshake in time
+                            client.trusted = TrustStatus.no
+                            break
 
-                    
+
+                if not remote.isClosed:
+                    if remote.isTrusted:
+                        packForSend(data)
+                    await remote.send(data)
+                    if globals.log_data_len: echo &"{data.len} bytes -> Remote"
 
 
         except: discard
         close()
 
     try:
-        remote = await remoteUnTrusted()
-        processRemoteFuture = processRemote()
+        if context.peer_ips.len > 0 and
+            context.peer_ips[0] != client.address:
+            echo "Real User connected !"
+            client.trusted = TrustStatus.no
+            await chooseRemote() #associate peer
+            if remote != nil:
+                if globals.log_conn_create: echo &"[createNewCon][Succ] Associated a peer connection"
+                asyncCheck processRemote()
+            else:
+                if globals.log_conn_destory: echo &"[createNewCon][Error] left without connection, closes forcefully."
+                client.close()
+                return                
+        else:
+            remote = await remoteUnTrusted()
+            processRemoteFuture = processRemote()
         asyncCheck processClient()
 
     except:
@@ -200,8 +201,8 @@ proc start*(){.async.} =
     #     echo &"Started tcp server... {globals.listen_addr}:{globals.listen_port}"
     #     context.listener_server.socket.listen()
     #     while true:
-    #         let (address, client) = await context.listener_server.socket.acceptAddr()          
-    #         var con = newConnection(client,"192.168.1.130")  
+    #         let (address, client) = await context.listener_server.socket.acceptAddr()
+    #         var con = newConnection(client,"192.168.1.130")
     #         con.port = globals.listen_port
     #         if globals.log_conn_create: print "Connected reverse host: ", address
     #         asyncCheck processConnection(con)
@@ -220,8 +221,8 @@ proc start*(){.async.} =
 
         while true:
             let (address, client) = await context.listener.socket.acceptAddr()
-                  
-            var con = newConnection(client,address)
+
+            var con = newConnection(client, address)
             if globals.multi_port:
                 var origin_port: cushort
                 var size = 16.SockLen
