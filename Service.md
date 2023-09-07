@@ -53,5 +53,12 @@ WantedBy=multi-user.target
 > sudo systemctl enable tunnel.service
 
 
+اگه بعدا خواستین تونل رو استوپ کنین این دستور
+> service tunnel stop
+
+و یا
+
+> sudo systemctl stop tunnel.service
+
 
 
