@@ -205,8 +205,8 @@ proc init*() =
             if next_route_addr.isEmptyOrWhitespace():
                 echo "specify the next ip for routing --toip:{ip} (usually 127.0.0.1)"
                 exit = true
-            if next_route_port == 0:
-                echo "specify the port of the next ip for routing --toport:{port} (the port of the config that x-ui shows you)"
+            if next_route_port == 0 and not multi_port:
+                echo "specify the port of the next ip for routing --toport:{port} (the port of the config that panel shows you)"
                 exit = true
 
         of RunMode.iran:
