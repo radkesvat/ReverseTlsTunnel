@@ -127,13 +127,8 @@ proc init*() =
                                     if not iptablesInstalled():
                                         echo "multi listen port requires iptables to be installed."
                                         quit(-1)
-<<<<<<< HEAD
                                     assert(p.val[0] == '(')
                                     assert(p.val[^1] == ')')
-=======
-                                    assert(p.val[0] == "(")
-                                    assert(p.val[^1] == ")")
->>>>>>> 0d5b93beec11fd5b6e0526dd414e066323cbc715
                                     let port_range = p.val[1..^1]
 
                                     multi_port = true
