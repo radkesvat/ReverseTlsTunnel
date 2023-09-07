@@ -129,12 +129,12 @@ proc init*() =
                                         quit(-1)
                                     assert(p.val[0] == '(')
                                     assert(p.val[^1] == ')')
-                                    let port_range = p.val[1..^1]
+                                    let port_range_string = p.val[1..^1]
 
                                     multi_port = true
                                     listen_port = 0 # will take a random port
                                     pool_size = max(2.uint, pool_size div 2.uint)
-                                    let port_range = port_range.split('-')
+                                    let port_range = port_range_string.split('-')
                                     assert port_range.len == 2, "Invalid listen port range. !"
                                     pmin = max(1, port_range[0].parseInt)
                                     pmax = min(65535, port_range[1].parseInt)
