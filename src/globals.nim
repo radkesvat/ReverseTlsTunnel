@@ -1,9 +1,9 @@
-import dns_resolve, hashes, print, parseopt,asyncdispatch, strutils, random, net, strutils, osproc , strformat
+import dns_resolve, hashes, print, parseopt, asyncdispatch, strutils, random, net, strutils, osproc, strformat
 import std/sha1
 
 export IpAddress
 
-const version = "1"
+const version = "1.1"
 
 type RunMode*{.pure.} = enum
     iran, kharej
@@ -20,20 +20,19 @@ const log_conn_error* = true
 # [Connection]
 var trust_time*: uint = 3 #secs
 var pool_size*: uint = 16
-var max_idle_time*:uint = 240 #secs (default TCP RFC is 3600)
-var max_pool_unused_time*:uint = 30 #secs 
+var max_idle_time*: uint = 240 #secs (default TCP RFC is 3600)
+var max_pool_unused_time*: uint = 30 #secs
 const mux*: bool = false #asia tech firewall detects mux (connection max age rqeuired, TODO)
-const socket_buffered* = false 
+const socket_buffered* = false
 const chunk_size* = 8192
 
 # [Routes]
 const listen_addr* = "0.0.0.0"
-var listen_port*:uint32 = 0
+var listen_port*: uint32 = 0
 var next_route_addr* = ""
-var next_route_port*:uint32 = 0
+var next_route_port*: uint32 = 0
 var iran_addr* = ""
-var iran_port*:uint32 = 0
-
+var iran_port*: uint32 = 0
 var final_target_domain* = ""
 var final_target_ip*: string
 const final_target_port* = 443 # port of the sni host (443 for tls handshake)
@@ -55,27 +54,28 @@ var disable_ufw* = true
 var reset_iptable* = true
 var keep_system_limit* = false
 var terminate_secs* = 0
+var debug_info* = false
 
 # [multiport]
 var multi_port* = false
-var pmin:int
-var pmax:int
+var pmin: int
+var pmax: int
 
 # [posix constants]
 const SO_ORIGINAL_DST* = 80
 const SOL_IP* = 0
 
-proc iptablesInstalled(): bool = 
+proc iptablesInstalled(): bool =
     execCmdEx("""dpkg-query -W --showformat='${Status}\n' iptables|grep "install ok install"""").output != ""
 
 
-proc resetIptables*()=
+proc resetIptables*() =
     echo "reseting iptable nat"
     assert 0 == execCmdEx("iptables -t nat -F").exitCode
     assert 0 == execCmdEx("iptables -t nat -X").exitCode
 
-proc createIptablesRules*()=
-    if reset_iptable:resetIptables()
+proc createIptablesRules*() =
+    if reset_iptable: resetIptables()
     assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p tcp --dport {pmin}:{pmax} -j REDIRECT --to-port {listen_port}""").exitCode
 
 
@@ -85,7 +85,7 @@ proc init*() =
     for i in 0..<random_600.len():
         random_600[i] = rand(char.low .. char.high).char
 
-    var p = initOptParser(longNoVal = @["kharej", "iran","multiport", "keep-ufw", "keep-iptables","keep-os-limit"])
+    var p = initOptParser(longNoVal = @["kharej", "iran", "multiport", "keep-ufw", "keep-iptables", "keep-os-limit", "debug"])
     while true:
         p.next()
         case p.kind
@@ -107,7 +107,9 @@ proc init*() =
                         multiport = true
                     of "keep-os-limit":
                         keep_system_limit = true
-                        
+                    of "debug":
+                        debug_info = true
+
                     else:
                         echo "invalid option"
                         quit(-1)
@@ -116,30 +118,48 @@ proc init*() =
                     of "lport":
                         try:
                             listen_port = parseInt(p.val).uint32
-                        except : #multi port
+                        except: #multi port
                             when defined(windows) or defined(android):
                                 echo "multi listen port unsupported for windows."
                                 quit(-1)
                             else:
-                                if not iptablesInstalled():
-                                    echo "multi listen port requires iptables to be installed."
-                                    quit(-1)
-                                multi_port = true
-                                listen_port = 0 # will take a random port
-                                pool_size = max(2.uint ,pool_size div 2.uint)
-                                let port_range = p.val.split('-')
-                                assert port_range.len == 2 , "Invalid listen port range. !"
-                                pmin = max(1,port_range[0].parseInt)
-                                pmax = min(65535,port_range[1].parseInt)
-                                assert pmax-pmin >= 0, "port range is invalid!  use --lport:min-max"
+                                try:
+                                    if not iptablesInstalled():
+                                        echo "multi listen port requires iptables to be installed."
+                                        quit(-1)
+                                    assert(p.val[0] == "(")
+                                    assert(p.val[^1] == ")")
+                                    let port_range = p.val[1..^1]
+
+                                    multi_port = true
+                                    listen_port = 0 # will take a random port
+                                    pool_size = max(2.uint, pool_size div 2.uint)
+                                    let port_range = port_range.split('-')
+                                    assert port_range.len == 2, "Invalid listen port range. !"
+                                    pmin = max(1, port_range[0].parseInt)
+                                    pmax = min(65535, port_range[1].parseInt)
+                                    assert pmax-pmin >= 0, "port range is invalid!  use --lport:min-max"
+                                except:
+                                    quit("could not parse lport.")
 
                         print listen_port
                     of "toip":
                         next_route_addr = (p.val)
                         print next_route_addr
                     of "toport":
-                        next_route_port = parseInt(p.val).uint32
-                        print next_route_port
+                        try:
+                            next_route_port = parseInt(p.val).uint32
+                            print next_route_port
+
+                        except: #multi port
+                            try:
+                                assert(p.val == "multiport")
+
+                                multi_port = true
+                                print multi_port
+                            except:
+                                quit("could not parse toport.")
+                        
 
                     of "iran-ip":
                         iran_addr = (p.val)
@@ -165,7 +185,7 @@ proc init*() =
                     of "trust_time":
                         trust_time = parseInt(p.val).uint
                         print trust_time
-                        
+
 
 
         of cmdArgument:
@@ -173,7 +193,7 @@ proc init*() =
 
     var exit = false
 
-    case mode :
+    case mode:
         of RunMode.kharej:
             if iran_addr.isEmptyOrWhitespace():
                 echo "specify the ip address of the iran server --iran-addr:{ip}"
@@ -194,7 +214,7 @@ proc init*() =
                 echo "specify the listen prot --lport:{port}  (usually 443)"
                 exit = true
 
-   
+
     if final_target_domain.isEmptyOrWhitespace():
         echo "specify the sni for routing --sni:{domain}"
         exit = true
@@ -207,10 +227,10 @@ proc init*() =
     if terminate_secs != 0:
         sleepAsync(terminate_secs*1000).addCallback(
             proc() =
-                echo "Exiting due to termination timeout. (--terminate)"
-                quit(0)
+            echo "Exiting due to termination timeout. (--terminate)"
+            quit(0)
         )
-    
+
     final_target_ip = resolveIPv4(final_target_domain)
     print "\n"
     self_ip = getPrimaryIPAddr(dest = parseIpAddress("8.8.8.8"))

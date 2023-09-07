@@ -4,6 +4,14 @@ if [ "$EUID" -ne 0 ]
 fi
 #echo nameserver 8.8.8.8 | sudo tee /etc/resolv.conf
 
+
+if pgrep -x "RTT" > /dev/null; then
+	echo "Tunnel is running!. you must stop the tunnel before update. (pkill RTT)"
+	echo "update is canceled."
+fi
+
+
+
 apt-get update -y
 
 REQUIRED_PKG="unzip"

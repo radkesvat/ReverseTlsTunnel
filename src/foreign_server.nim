@@ -210,11 +210,8 @@ proc processConnection(client: Connection) {.async.} =
                     await remote.send(data)
                     if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote "
 
-
-
         except: discard
         close()
-
 
     try:
         asyncCheck proccessClient()
