@@ -3,6 +3,7 @@ import std/[random,os,osproc,asyncdispatch,exitprocs]
 from globals import nil
 import connection,iran_server,foreign_server,print
 
+
 randomize()
 globals.init()
 

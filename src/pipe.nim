@@ -14,11 +14,13 @@ const hsize = 8 #mux header size
 # per byte = consume more cpu (testing)
 proc encrypt(data:var string) =
     for i in 0..<data.len():
-        data[i] = chr(rotateRightBits(uint8(data[i]), globals.sh5))
+        # data[i] = chr(rotateRightBits(uint8(data[i]), globals.sh5))
+        data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
 
 proc decrypt(data:var string) =
     for i in 0..<data.len():
-        data[i] = chr(rotateLeftBits(uint8(data[i]), globals.sh5))
+        # data[i] = chr(rotateLeftBits(uint8(data[i]), globals.sh5))
+        data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
 
 
 proc muxPack(cid: uint32,data: string): string =

@@ -96,9 +96,14 @@ proc processConnection(client: Connection) {.async.} =
 
         except: discard
 
-        if not remote.isNil(): remote.close()
         if remote.isTrusted:
             client.close()
+        elif not remote.isNil() and not remote.isClosed():
+            client.close()
+            
+        if not remote.isNil(): remote.close()
+
+
 
     proc chooseRemote() {.async.} =
         for i in 0..<16:
