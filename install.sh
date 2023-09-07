@@ -8,6 +8,7 @@ fi
 if pgrep -x "RTT" > /dev/null; then
 	echo "Tunnel is running!. you must stop the tunnel before update. (pkill RTT)"
 	echo "update is canceled."
+  exit
 fi
 
 
