@@ -238,6 +238,7 @@ proc init*() =
     sh2 = hash(sh1).uint32
     sh3 = hash(sh2).uint32
     sh4 = hash(sh3).uint32
-    sh5 = (3 + (hash(sh2).uint32 mod 5)).uint8
+    # sh5 = (3 + (hash(sh2).uint32 mod 5)).uint8
+    sh5 = hash(sh4).uint8
     print password, password_hash, sh1, sh2, sh3, pool_size
     print "\n"
