@@ -4,7 +4,7 @@ import std/strformat
 import std/strutils
 
 
-const Release = false
+const Release = true
 
 
 const libs_dir = "libs"
@@ -23,24 +23,25 @@ template require(package: untyped) =
 
 task install, "install deps":
     require zippy
-    require nimAES
-    require stew
-    require jsony
-    require secp256k1
-    require ndns
+    require checksums
+    # require stew
+    # require jsony
+    # require secp256k1
+    # require ndns
 
 task build_server, "builds server":
-    let backend = "c"
+    let backend = "cpp"
     let output_dir_target = output_dir
     const output_file_name = "RTT"&(when defined(windows): ".exe" else: "")
 
     setCommand("c", src_dir&"/main.nim")
-    switch("nimblePath", nimble_path&"/pkgs")
+    switch("nimblePath", nimble_path&"/pkgs2")
 
     var output = output_dir_target /  output_file_name
     switch("mm", "orc")
     switch("threads", "off")
-    switch("exceptions", "quirky")
+    switch("exceptions", "cpp")
+    switch("warning", "HoleEnumConv:off")
     switch("warning", "BareExcept:off")
  
     # switch("cc", "clang")

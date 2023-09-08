@@ -1,4 +1,4 @@
-import std/[asyncdispatch, strformat, net, openssl, tables, random, times]
+import std/[asyncdispatch, strformat, net, openssl, random]
 import overrides/[asyncnet]
 import print, connection, pipe
 from globals import nil

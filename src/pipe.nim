@@ -1,5 +1,5 @@
 from globals import nil
-import math,bitops,random
+import random
 
 const hsize = 8 #mux header size
 
@@ -24,7 +24,6 @@ proc decrypt(data:var string) =
 
 
 proc muxPack(cid: uint32,data: string): string =
-    var datalen = len(data)
     result = newString(len= globals.chunk_size+8)
     var totake:uint32 = min(globals.chunk_size,data.len).uint32
     copyMem(unsafeAddr result[0], unsafeAddr cid, 4)
@@ -47,11 +46,9 @@ proc prepairTrustedSend*(cid: uint32, data: var string) =
     data = muxres
   
 
-proc prepairUnTrustedSend(data: var string) = discard
 
 proc muxRead*(data:var string):  tuple[cid:uint32,data:string] =
     decrypt data
-    var datalen = len(data)
     var buffer = newString(len=globals.chunk_size)
     var cid:uint32
     var dlen:uint32

@@ -1,6 +1,6 @@
-import std/[asyncdispatch, nativesockets, strformat, strutils, net, tables, random, endians]
+import std/[asyncdispatch, nativesockets, strformat, strutils, net, random, endians]
 import overrides/[asyncnet]
-import times, print, connection, pipe, openssl
+import times, print, connection, pipe
 from globals import nil
 
 when defined(windows):
@@ -56,7 +56,7 @@ proc monitorData(data: string): (bool, IpAddress) =
     except:
         return (false, ip)
 
-proc generateFinishHandShakeData(client_port: uint32):string=
+proc generateFinishHandShakeData(client_port: uint32): string =
     let rlen = 16*(6+rand(4))
     var random_trust_data: string
     random_trust_data.setLen(rlen)
@@ -111,7 +111,7 @@ proc processConnection(client: Connection) {.async.} =
             client.close()
         elif not remote.isNil() and not remote.isClosed():
             client.close()
-            
+
         if not remote.isNil(): remote.close()
 
 
@@ -184,14 +184,14 @@ proc processConnection(client: Connection) {.async.} =
             await chooseRemote() #associate peer
             if remote != nil:
                 if globals.log_conn_create: echo &"[createNewCon][Succ] Associated a peer connection"
-                if  globals.multi_port:
+                if globals.multi_port:
                     await remote.unEncryptedSend(generateFinishHandShakeData(client.port))
 
                 asyncCheck processRemote()
             else:
                 if globals.log_conn_destory: echo &"[createNewCon][Error] left without connection, closes forcefully."
                 client.close()
-                return                
+                return
         else:
             remote = await remoteUnTrusted()
             processRemoteFuture = processRemote()
@@ -222,8 +222,8 @@ proc start*(){.async.} =
         context.listener = newConnection()
         context.listener.socket.setSockOpt(OptReuseAddr, true)
         context.listener.socket.bindAddr(globals.listen_port.Port, globals.listen_addr)
-        if globals.multi_port:
-            globals.listen_port = getSockName(context.listener.socket.getFd().SocketHandle).uint32
+        if globals.multi_port :
+            globals.listen_port = getSockName(context.listener.socket.getFd()).uint32
             globals.createIptablesRules()
 
         echo &"Started tcp server... {globals.listen_addr}:{globals.listen_port}"
@@ -236,7 +236,7 @@ proc start*(){.async.} =
             if globals.multi_port:
                 var origin_port: cushort
                 var size = 16.SockLen
-                if getSockOpt(con.socket.getFd().SocketHandle, cint(globals.SOL_IP), cint(globals.SO_ORIGINAL_DST),
+                if getSockOpt(con.socket.getFd(), cint(globals.SOL_IP), cint(globals.SO_ORIGINAL_DST),
                 addr(pbuf[0]), addr(size)) < 0'i32:
                     echo "multiport failure getting origin port. !"
                     continue

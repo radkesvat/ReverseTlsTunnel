@@ -1,9 +1,9 @@
-import dns_resolve, hashes, print, parseopt, asyncdispatch, strutils, random, net, strutils, osproc, strformat
-import std/sha1
+import dns_resolve, hashes, print, parseopt, asyncdispatch, strutils, random, net , osproc, strformat
+import checksums/sha1
 
 export IpAddress
 
-const version = "1.1"
+const version = "1.2"
 
 type RunMode*{.pure.} = enum
     iran, kharej
@@ -64,10 +64,8 @@ var pmax: int
 # [posix constants]
 const SO_ORIGINAL_DST* = 80
 const SOL_IP* = 0
-
-proc iptablesInstalled(): bool =
+proc iptablesInstalled(): bool {.used.} =
     execCmdEx("""dpkg-query -W --showformat='${Status}\n' iptables|grep "install ok install"""").output != ""
-
 
 proc resetIptables*() =
     echo "reseting iptable nat"

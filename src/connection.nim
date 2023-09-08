@@ -1,6 +1,6 @@
 import overrides/[asyncnet]
-import std/[tables,sequtils, times,os , random, asyncdispatch,strformat, strutils, net, random]
-import globals,print
+import std/[tables,sequtils,times,asyncdispatch,strutils,net]
+import globals
 
 type
     TrustStatus*{.pure.} = enum

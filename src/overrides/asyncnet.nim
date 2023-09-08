@@ -949,7 +949,8 @@ proc recvFrom*(socket: AsyncSocket, size: int,
   data.mget().setLen(size)
   address.mget().setLen(46)
 
-  let read = await recvFrom(socket, data, size, address, port, flags)
+  # let read = await recvFrom(socket, data, size, address, port, flags)
+  discard await recvFrom(socket, data, size, address, port, flags)
 
   result = (data.mget(), address.mget(), port.mget())
 

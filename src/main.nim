@@ -1,7 +1,7 @@
 
-import std/[random,os,osproc,asyncdispatch,exitprocs]
+import std/[random,asyncdispatch,exitprocs]
 from globals import nil
-import connection,iran_server,foreign_server,print
+import connection,iran_server,foreign_server
 
 
 randomize()
@@ -11,7 +11,7 @@ globals.init()
 if globals.multi_port and globals.reset_iptable and globals.mode == globals.RunMode.iran:
     addExitProc do():
         globals.resetIptables() 
-    setControlCHook do:
+    setControlCHook do(){.noconv.}:
         quit() # that will call above hook
 
 
@@ -30,7 +30,7 @@ when defined(linux) and not defined(android):
             discard 0 == execShellCmd("sysctl -w fs.file-max=100000")
             var limit = RLimit(rlim_cur:65000,rlim_max:66000)
             assert 0 == setrlimit(RLIMIT_NOFILE,limit)
-        except :
+        except : # try may not be able to catch above exception, anyways
             echo getCurrentExceptionMsg()
             echo "Could not increase system max connection (file descriptors) limit."
             echo "Please run as root. or start with --keep-os-limit "
