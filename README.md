@@ -76,7 +76,7 @@ wget  "https://raw.githubusercontent.com/radkesvat/ReverseTlsTunnel/master/insta
 
 # مشکلات و دیباگ
 
-برای اینکه برنامه بعد از بسته شدن ssh ؛ بسته نشه و ران بمونه از nohup یا systemd service استفاده کنید 
+برای اینکه برنامه بعد از بسته شدن ssh ؛ بسته نشه و ران بمونه از nohup یا [service](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/Service.md) استفاده کنید 
 مثلا با nohup :
 دستوری که ران کردید رو اولش بنویسید nohup و آخرش یه & قرار بدین که یعنی:
 ```sh
@@ -96,6 +96,12 @@ nohup ./RTT --iran  --lport:443  --sni:splus.ir --password:123 &
 
 
 
+
+* * *
+پر شدن رم و بسته شدن برنامه 
+
+متاسفانه مشکلی که هست اینکه در سرور ایران بعد از مدتی بسته به میزان استفاده ممکنه رم برنامه پر بشه و برنامه توسط سیستم عامل بسته بشه ؛ پس برای اینکه مجبور نباشید برنامه رو دستی  ری استارت کنید بهتره به [شکل سرویس اجرا کنید ](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/Service.md)
+؛ همچنین گفته شده که چطور کاری کنیم اگر سرور شما به هر دلیلی ری استارت شد تونل اتومات اجرا بشه
 
 * * *
 
