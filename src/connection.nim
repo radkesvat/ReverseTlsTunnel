@@ -100,7 +100,7 @@ proc newConnection*(socket: AsyncSocket = nil,address:string = "" ,buffered: boo
     else: result.socket = socket
 
     when not defined(android):
-        result.socket.setSockOpt(OptNoDelay, true)
+        if not globals.keep_system_limit: result.socket.setSockOpt(OptNoDelay, true)
     allConnections.add result
 
 proc grab*(cons: var Connections):Connection=
