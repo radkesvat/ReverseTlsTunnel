@@ -224,7 +224,7 @@ proc start*(){.async.} =
         context.listener.socket.bindAddr(globals.listen_port.Port, globals.listen_addr)
         if globals.multi_port :
             globals.listen_port = getSockName(context.listener.socket.getFd()).uint32
-            globals.createIptablesRules()
+            globals.createIptablesForwardRules()
 
         echo &"Started tcp server... {globals.listen_addr}:{globals.listen_port}"
         context.listener.socket.listen()

@@ -58,8 +58,9 @@ var debug_info* = false
 
 # [multiport]
 var multi_port* = false
-var pmin: int
-var pmax: int
+var multi_port_min: int
+var multi_port_max: int
+var multi_port_additions: seq[uint32]
 
 # [posix constants]
 const SO_ORIGINAL_DST* = 80
@@ -72,9 +73,26 @@ proc resetIptables*() =
     assert 0 == execCmdEx("iptables -t nat -F").exitCode
     assert 0 == execCmdEx("iptables -t nat -X").exitCode
 
-proc createIptablesRules*() =
+
+
+proc createIptablesForwardRules*() =
     if reset_iptable: resetIptables()
-    assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p tcp --dport {pmin}:{pmax} -j REDIRECT --to-port {listen_port}""").exitCode
+    if not (multi_port_min == 0 or multi_port_max == 0 ):
+        assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p tcp --dport {multi_port_min}:{multi_port_max} -j REDIRECT --to-port {listen_port}""").exitCode
+
+    for port in multi_port_additions:
+        assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p tcp --dport {port} -j REDIRECT --to-port {listen_port}""").exitCode
+ 
+ 
+proc multiportSupported():bool=
+    when defined(windows) or defined(android):
+        echo "multi listen port unsupported for windows."
+        return false
+    else:
+        if not iptablesInstalled():
+            echo "multi listen port requires iptables to be installed."
+            return false
+        return true
 
 
 proc init*() =
@@ -113,36 +131,37 @@ proc init*() =
                         quit(-1)
             else:
                 case p.key:
+
                     of "lport":
                         try:
                             listen_port = parseInt(p.val).uint32
                         except: #multi port
-                            when defined(windows) or defined(android):
-                                echo "multi listen port unsupported for windows."
-                                quit(-1)
-                            else:
-                                try:
-                                    if not iptablesInstalled():
-                                        echo "multi listen port requires iptables to be installed."
-                                        quit(-1)
-
-                                    let port_range_string = p.val
-
-                                    multi_port = true
-                                    listen_port = 0 # will take a random port
-                                    pool_size = max(2.uint, pool_size div 2.uint)
-                                    let port_range = port_range_string.split('-')
-                                    assert port_range.len == 2, "Invalid listen port range. !"
-                                    pmin = max(1, port_range[0].parseInt)
-                                    pmax = min(65535, port_range[1].parseInt)
-                                    assert pmax-pmin >= 0, "port range is invalid!  use --lport:min-max"
-                                except:
-                                    quit("could not parse lport.")
+                            if not multiportSupported(): quit(-1)
+                            try:
+                                let port_range_string = p.val
+                                multi_port = true
+                                listen_port = 0 # will take a random port
+                                pool_size = max(2.uint, pool_size div 2.uint)
+                                let port_range = port_range_string.split('-')
+                                assert port_range.len == 2, "Invalid listen port range. !"
+                                multi_port_min = max(1, port_range[0].parseInt)
+                                multi_port_max = min(65535, port_range[1].parseInt)
+                                assert multi_port_max-multi_port_min >= 0, "port range is invalid!  use --lport:min-max"
+                            except:
+                                quit("could not parse lport.")
 
                         print listen_port
+                    of "add-port":
+                        if not multiportSupported(): quit(-1)
+                        if listen_port != 0:
+                            multi_port_additions.add listen_port
+                            listen_port = 0
+                        multi_port_additions.add p.val.parseInt().uint32               
+                    
                     of "toip":
                         next_route_addr = (p.val)
                         print next_route_addr
+
                     of "toport":
                         try:
                             next_route_port = parseInt(p.val).uint32
@@ -157,10 +176,10 @@ proc init*() =
                             except:
                                 quit("could not parse toport.")
                         
-
                     of "iran-ip":
                         iran_addr = (p.val)
                         print iran_addr
+
                     of "iran-port":
                         iran_port = parseInt(p.val).uint32
                         print iran_port
@@ -168,6 +187,7 @@ proc init*() =
                     of "sni":
                         final_target_domain = (p.val)
                         print final_target_domain
+
                     of "password":
                         password = (p.val)
                         print password
@@ -179,14 +199,20 @@ proc init*() =
                     of "pool":
                         pool_size = parseInt(p.val).uint
                         print pool_size
+
                     of "trust_time":
                         trust_time = parseInt(p.val).uint
                         print trust_time
-
+                    else:
+                        echo "Unkown argument ", p.key
+                        quit(-1)
 
 
         of cmdArgument:
-            echo "Argument: ", p.key
+            # echo "Argument: ", p.key
+            echo "invalid argument style: ",  p.key
+            quit(-1)
+
 
     var exit = false
 
