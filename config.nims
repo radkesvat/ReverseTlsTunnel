@@ -4,7 +4,7 @@ import std/strformat
 import std/strutils
 
 
-const Release = true
+const Release = false
 
 
 const libs_dir = "libs"
@@ -41,7 +41,6 @@ task build_server, "builds server":
     switch("mm", "orc")
     switch("threads", "off")
     switch("warning", "BareExcept:off")
-    switch("d", "futureLogging")
 
     # switch("cc", "clang")
 
@@ -78,6 +77,8 @@ task build_server, "builds server":
         # switch("passL", " -static")
         # switch("passL", " -static-libgcc")
         # switch("passL", " -static-libstdc++")
+    else:
+        switch("d", "futureLogging")
 
 
     switch("backend", backend)

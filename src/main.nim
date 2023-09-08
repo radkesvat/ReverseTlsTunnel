@@ -22,9 +22,11 @@ when defined(linux) and not defined(android):
         if not isAdmin():
             echo "Please run as root. or start with --keep-os-limit "
             quit(-1)
+
+        if globals.disable_ufw:
+            discard 0 == execShellCmd("sudo ufw disable")
         try:    
-            if globals.disable_ufw:
-                discard 0 == execShellCmd("sudo ufw disable")
+           
             discard 0 == execShellCmd("sysctl -w fs.file-max=100000")
             var limit = RLimit(rlim_cur:65000,rlim_max:66000)
             assert 0 == setrlimit(RLIMIT_NOFILE,limit)
@@ -32,7 +34,7 @@ when defined(linux) and not defined(android):
             echo getCurrentExceptionMsg()
             echo "Could not increase system max connection (file descriptors) limit."
             echo "Please run as root. or start with --keep-os-limit "
-      
+            quit(-1)
 
 
 

@@ -20,8 +20,8 @@ const log_conn_error* = true
 # [Connection]
 var trust_time*: uint = 3 #secs
 var pool_size*: uint = 16
-var max_idle_time*: uint = 240 #secs (default TCP RFC is 3600)
-var max_pool_unused_time*: uint = 30 #secs
+var max_idle_time*: uint = 600 #secs (default TCP RFC is 3600)
+var max_pool_unused_time*: uint = 60 #secs
 const mux*: bool = false #asia tech firewall detects mux (connection max age rqeuired, TODO)
 const socket_buffered* = false
 const chunk_size* = 8192

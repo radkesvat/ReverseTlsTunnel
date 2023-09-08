@@ -134,5 +134,7 @@ proc startController*(){.async.}=
                         return false
                 return true
         )
-        if globals.debug_info:
-            echo "futures in list : ", getFuturesInProgress().len()
+
+        when not defined release:
+            if globals.debug_info:
+                echo "futures in list : ", getFuturesInProgress().len()
