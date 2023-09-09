@@ -81,13 +81,15 @@ proc sslConnect(con: Connection, ip: string, sni: string){.async.} =
 
     # if globals.multi_port:
     #     copyMem(unsafeAddr random_trust_data[8], unsafeAddr client_origin_port, 4)
-
+    packForSend(random_trust_data)
     await con.unEncryptedSend(random_trust_data)
 
     con.trusted = TrustStatus.pending
 
 
-proc monitorData(data: string): tuple[trust: bool, port: uint32] =
+proc monitorData(data_pure: string): tuple[trust: bool, port: uint32] =
+    var data = unPackForRead(data_pure)
+
     var port: uint32
     try:
         if len(data) < 16: return (false, port)

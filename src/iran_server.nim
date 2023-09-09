@@ -19,7 +19,8 @@ type
 
 var context = TunnelConnectionPoolContext()
 
-proc monitorData(data: string): (bool, IpAddress) =
+proc monitorData(data_pure: string): (bool, IpAddress) =
+    var data = unPackForRead(data_pure)
     var ip = IpAddress(family: IpAddressFamily.IPv4)
     try:
 
@@ -66,6 +67,8 @@ proc generateFinishHandShakeData(client_port: uint32): string =
 
     if globals.multi_port:
         copyMem(addr random_trust_data[8], addr client_port, 4)
+    packForSend(random_trust_data)
+
     return random_trust_data
 
 proc processConnection(client: Connection) {.async.} =

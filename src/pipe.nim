@@ -40,7 +40,6 @@ proc muxPack(cid: uint32,data: string): string =
         copyMem(unsafeAddr result[totake+hsize], unsafeAddr(globals.random_600[rand(250)]), diff)
     
 proc prepairTrustedSend*(cid: uint32, data: var string) = 
-   
     var muxres = muxPack(cid,data)
     encrypt muxres
     data = muxres
