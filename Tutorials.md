@@ -7,7 +7,7 @@
 
 
 آموزش ویدویی کانال Alisna
-(لینک )[https://www.youtube.com/watch?v=AFzbnn7SrWc]
+[لینک](https://www.youtube.com/watch?v=AFzbnn7SrWc)
 
 
 </div>
