@@ -40,9 +40,14 @@ echo "downloading ReverseTlsTunnel"
 
 printf  "\n"
 
+URL = ""
+case $(uname -m) in
+    x86_64) URL="https://github.com/radkesvat/ReverseTlsTunnel/releases/download/V1.2/v1.2_linux_amd64.zip" ;;
+    arm)    URL="https://github.com/radkesvat/ReverseTlsTunnel/releases/download/V1.2/v1.2_linux_arm4.zip" ;;
+esac
 
 
-wget "https://github.com/radkesvat/ReverseTlsTunnel/releases/download/V1.2/v1.2_linux_amd64.zip" -O v1.2_linux_amd64.zip
+wget  $URL -O v1.2_linux_amd64.zip
 unzip -o v1.2_linux_amd64.zip
 chmod +x RTT
 rm v1.2_linux_amd64.zip
