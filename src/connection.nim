@@ -83,20 +83,24 @@ proc close*(con: Connection) =
         allConnections.del(i)
 
 
-proc newConnection*(socket: AsyncSocket = nil,address:string = "" ,buffered: bool = globals.socket_buffered): Connection =
+proc newConnection*(socket:AsyncSocket = nil,address:string = "" ,create_socket:bool = true,buffered: bool = globals.socket_buffered): Connection =
     new(result)
     result.id = new_uid()
     result.creation_time = epochTime().uint32
     result.trusted = TrustStatus.pending
     result.action_start_time = 0
     result.register_start_time = 0
+
+
     if not address.isEmptyOrWhitespace():
         try:
             var parsed = parseIpAddress(address)
             result.address = parsed
         except :
             echo "could not parse ip address"
-    if socket == nil: result.socket = newAsyncSocket(buffered = buffered)
+            
+    if socket == nil:
+        if create_socket: result.socket = newAsyncSocket(buffered = buffered)
     else: result.socket = socket
 
     when not defined(android):
@@ -112,6 +116,10 @@ proc grab*(cons: var Connections):Connection=
 proc register*(cons: var Connections, con: Connection) =  
     con.register_start_time = et
     cons.connections.add con
+
+proc setBuffered*(con : Connection)=
+  con.socket.isBuffered = true
+  con.socket.currPos = 0
 
 proc startController*(){.async.}=
     while true:

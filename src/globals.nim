@@ -1,4 +1,4 @@
-import dns_resolve, hashes, print, parseopt, asyncdispatch, strutils, random, net , osproc, strformat
+import dns_resolve, hashes, print, parseopt, asyncdispatch, strutils, random, net, osproc, strformat
 import checksums/sha1
 
 export IpAddress
@@ -22,9 +22,13 @@ var trust_time*: uint = 3 #secs
 var pool_size*: uint = 16
 var max_idle_time*: uint = 600 #secs (default TCP RFC is 3600)
 var max_pool_unused_time*: uint = 60 #secs
-const mux*: bool = false #asia tech firewall detects mux (connection max age rqeuired, TODO)
-const socket_buffered* = false
 const chunk_size* = 8192
+
+const mux*: bool = false
+let tls13_record_layer* = "\x17\x03\x03" # followed by 2 bytes len
+let mux_header_size* = tls13_record_layer.len() + 2
+let mux_packet_size* = 1024-mux_header_size
+let socket_buffered* = false # when using mux, it depends
 
 # [Routes]
 const listen_addr* = "0.0.0.0"
@@ -47,7 +51,7 @@ var sh2*: uint32
 var sh3*: uint32
 var sh4*: uint32
 var sh5*: uint8
-var random_600* = newString(len = 600)
+var random_str* = newString(len = 2000)
 
 # [settings]
 var disable_ufw* = true
@@ -77,14 +81,14 @@ proc resetIptables*() =
 
 proc createIptablesForwardRules*() =
     if reset_iptable: resetIptables()
-    if not (multi_port_min == 0 or multi_port_max == 0 ):
+    if not (multi_port_min == 0 or multi_port_max == 0):
         assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p tcp --dport {multi_port_min}:{multi_port_max} -j REDIRECT --to-port {listen_port}""").exitCode
 
     for port in multi_port_additions:
         assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p tcp --dport {port} -j REDIRECT --to-port {listen_port}""").exitCode
- 
- 
-proc multiportSupported():bool=
+
+
+proc multiportSupported(): bool =
     when defined(windows) or defined(android):
         echo "multi listen port unsupported for windows."
         return false
@@ -98,8 +102,8 @@ proc multiportSupported():bool=
 proc init*() =
     print version
 
-    for i in 0..<random_600.len():
-        random_600[i] = rand(char.low .. char.high).char
+    for i in 0..<random_str.len():
+        random_str[i] = rand(char.low .. char.high).char
 
     var p = initOptParser(longNoVal = @["kharej", "iran", "multiport", "keep-ufw", "keep-iptables", "keep-os-limit", "debug"])
     while true:
@@ -153,11 +157,12 @@ proc init*() =
                         print listen_port
                     of "add-port":
                         if not multiportSupported(): quit(-1)
+                        multi_port = true
                         if listen_port != 0:
                             multi_port_additions.add listen_port
                             listen_port = 0
-                        multi_port_additions.add p.val.parseInt().uint32               
-                    
+                        multi_port_additions.add p.val.parseInt().uint32
+
                     of "toip":
                         next_route_addr = (p.val)
                         print next_route_addr
@@ -175,7 +180,7 @@ proc init*() =
                                 print multi_port
                             except:
                                 quit("could not parse toport.")
-                        
+
                     of "iran-ip":
                         iran_addr = (p.val)
                         print iran_addr
@@ -210,7 +215,7 @@ proc init*() =
 
         of cmdArgument:
             # echo "Argument: ", p.key
-            echo "invalid argument style: ",  p.key
+            echo "invalid argument style: ", p.key
             quit(-1)
 
 
@@ -264,5 +269,9 @@ proc init*() =
     sh4 = hash(sh3).uint32
     # sh5 = (3 + (hash(sh2).uint32 mod 5)).uint8
     sh5 = hash(sh4).uint8
+    while sh5 <= 2.uint32 or sh5 >= 223.uint32:
+        sh5 = hash(sh5).uint8
+
+
     print password, password_hash, sh1, sh2, sh3, pool_size
     print "\n"

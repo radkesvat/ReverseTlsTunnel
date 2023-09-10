@@ -118,10 +118,10 @@ type
   AsyncSocketDesc = object
     fd*: SocketHandle
     closed*: bool     ## determines whether this socket has been closed
-    isBuffered: bool ## determines whether this socket is buffered.
-    buffer: array[0..BufferSize, char]
-    currPos: int     # current index in buffer
-    bufLen: int      # current length of buffer
+    isBuffered*: bool ## determines whether this socket is buffered.
+    buffer*: array[0..BufferSize, char]
+    currPos*: int     # current index in buffer
+    bufLen*: int      # current length of buffer
     isSsl*: bool
     when defineSsl:
       sslHandle*: SslPtr

@@ -37,7 +37,7 @@ proc muxPack(cid: uint32,data: string): string =
     copyMem(unsafeAddr check, unsafeAddr result[0], 4)
     let diff = (globals.chunk_size) - totake 
     if diff > 0 : 
-        copyMem(unsafeAddr result[totake+hsize], unsafeAddr(globals.random_600[rand(250)]), diff)
+        copyMem(unsafeAddr result[totake+hsize], unsafeAddr(globals.random_str[rand(250)]), diff)
     
 proc prepairTrustedSend*(cid: uint32, data: var string) = 
     var muxres = muxPack(cid,data)
@@ -65,10 +65,12 @@ proc muxRead*(data:var string):  tuple[cid:uint32,data:string] =
     return (cid,buffer)
 
 
-proc unPackForRead*(data:var string) = 
+proc unPackForRead*(data:var string):uint32 = 
     decrypt data
-
-proc packForSend*(data:var string) = 
-    encrypt data
-
+    result = muxRead(data)
+proc packForSend*(cid: uint32,data:var string) = 
+    var muxres = muxPack(cid,data)
+    encrypt muxres
+    data = muxres
+  
 

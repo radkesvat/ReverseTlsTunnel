@@ -12,10 +12,10 @@ var context = ServerConnectionPoolContext()
 var ssl_ctx = newContext(verifyMode = CVerifyPeer)
 
 # [FWD]
-proc poolFrame(create_count: uint = 0) 
+proc poolFrame(create_count: uint = 0)
 
 proc sslConnect(con: Connection, ip: string, sni: string){.async.} =
-    con.socket.close()
+    # con.socket.close()
     var fc = 0
     echo &"connecting to {ip}:{$con.port} (sni: {sni}) ..."
 
@@ -60,45 +60,50 @@ proc sslConnect(con: Connection, ip: string, sni: string){.async.} =
 
 
     #AES default chunk size is 16 so use a multple of 16
-    let rlen = 16*(6+rand(4))
+    let rlen: uint16 = uint16(16*(6+rand(4)))
     var random_trust_data: string
     random_trust_data.setLen(rlen)
 
-    copyMem(unsafeAddr random_trust_data[0], unsafeAddr globals.sh1.uint32, 4)
-    copyMem(unsafeAddr random_trust_data[4], unsafeAddr globals.sh2.uint32, 4)
 
-    case globals.self_ip.family:   # the type of the IP address (IPv4 or IPv6)
+    copyMem(addr random_trust_data[0], addr(globals.random_str[rand(250)]), rlen)
+    copyMem(addr random_trust_data[0], addr globals.tls13_record_layer[0], 3) #tls header
+    copyMem(addr random_trust_data[3], addr rlen, 2) #tls len
+
+
+
+    let base = 5 + 7 + `mod`(globals.sh5, 7.uint8)
+    copyMem(unsafeAddr random_trust_data[base+0], unsafeAddr globals.sh1.uint32, 4)
+    copyMem(unsafeAddr random_trust_data[base+4], unsafeAddr globals.sh2.uint32, 4)
+
+    case globals.self_ip.family: # the type of the IP address (IPv4 or IPv6)
         of IpAddressFamily.IPv6:
-            random_trust_data[9] = 6.char
-            copyMem(unsafeAddr random_trust_data[10], unsafeAddr globals.self_ip.address_v6[0],globals.self_ip.address_v6.len)
-            copyMem(unsafeAddr random_trust_data[10+globals.self_ip.address_v6.len], unsafeAddr(globals.random_600[rand(250)]), rlen-8)
+            random_trust_data[base+9] = 6.char
+            copyMem(unsafeAddr random_trust_data[base+10], unsafeAddr globals.self_ip.address_v6[0], globals.self_ip.address_v6.len)
 
         of IpAddressFamily.IPv4:
-            random_trust_data[9] = 4.char
-            copyMem(unsafeAddr random_trust_data[10], unsafeAddr globals.self_ip.address_v4[0],globals.self_ip.address_v4.len)
-            copyMem(unsafeAddr random_trust_data[10+globals.self_ip.address_v4.len], unsafeAddr(globals.random_600[rand(250)]), rlen-8)
+            random_trust_data[base+9] = 4.char
+            copyMem(unsafeAddr random_trust_data[base+10], unsafeAddr globals.self_ip.address_v4[0], globals.self_ip.address_v4.len)
 
 
     # if globals.multi_port:
     #     copyMem(unsafeAddr random_trust_data[8], unsafeAddr client_origin_port, 4)
-    packForSend(random_trust_data)
     await con.unEncryptedSend(random_trust_data)
 
     con.trusted = TrustStatus.pending
 
 
-proc monitorData(data_pure: string): tuple[trust: bool, port: uint32] =
-    var data = unPackForRead(data_pure)
-
+proc monitorData(data: string): tuple[trust: bool, port: uint32] =
     var port: uint32
     try:
         if len(data) < 16: return (false, port)
+        let base = 5 + 7 + `mod`(globals.sh5, 7.uint8)
+
         var sh3_c: uint32
         var sh4_c: uint32
 
-        copyMem(unsafeAddr sh3_c, unsafeAddr data[0], 4)
-        copyMem(unsafeAddr sh4_c, unsafeAddr data[4], 4)
-        copyMem(unsafeAddr port, unsafeAddr data[8], 4)
+        copyMem(unsafeAddr sh3_c, unsafeAddr data[base+0], 4)
+        copyMem(unsafeAddr sh4_c, unsafeAddr data[base+4], 4)
+        copyMem(unsafeAddr port, unsafeAddr data[base+8], 4)
 
 
         let chk1 = sh3_c == globals.sh3
@@ -139,10 +144,10 @@ proc processConnection(client: Connection) {.async.} =
             while not remote.isClosed:
                 data = await remote.recv(globals.chunk_size)
                 if globals.log_data_len: echo &"[proccessRemote] {data.len()} bytes from remote"
-              
+
 
                 if data.len() == 0:
-                    break 
+                    break
 
                 if not client.isClosed():
                     if client.isTrusted():
@@ -225,7 +230,7 @@ proc poolFrame(create_count: uint = 0) =
     var count = create_count
 
     proc create() =
-        var con = newConnection()
+        var con = newConnection(create_socket = false)
         con.port = globals.iran_port.uint32
         var fut = sslConnect(con, globals.iran_addr, globals.final_target_domain)
 
@@ -247,10 +252,10 @@ proc poolFrame(create_count: uint = 0) =
             count = 2
         elif i < globals.pool_size:
             count = 1
-    
+
     for i in 0..<count:
         create()
-            
+
 proc start*(){.async.} =
 
     echo &"Mode Foreign Server:  {globals.listen_addr} <-> ({globals.final_target_domain} with ip {globals.final_target_ip})"

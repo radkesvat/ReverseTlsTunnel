@@ -1,6 +1,6 @@
 import std/[asyncdispatch, nativesockets, strformat, strutils, net, random, endians]
 import overrides/[asyncnet]
-import times, print, connection, pipe
+import times, print, connection, pipe, math
 from globals import nil
 
 when defined(windows):
@@ -19,16 +19,16 @@ type
 
 var context = TunnelConnectionPoolContext()
 
-proc monitorData(data_pure: string): (bool, IpAddress) =
-    var data = unPackForRead(data_pure)
+proc monitorData(data: string): (bool, IpAddress) =
     var ip = IpAddress(family: IpAddressFamily.IPv4)
     try:
+        let base = 5 + 7 + `mod`(globals.sh5,7.uint8)
 
         var sh1_c: uint32
         var sh2_c: uint32
 
-        copyMem(addr sh1_c, addr data[0], 4)
-        copyMem(addr sh2_c, addr data[4], 4)
+        copyMem(addr sh1_c, addr data[base+0], 4)
+        copyMem(addr sh2_c, addr data[base+4], 4)
         # copyMem(addr port, addr data[8], 4)
 
         let chk1 = sh1_c == globals.sh1
@@ -36,16 +36,16 @@ proc monitorData(data_pure: string): (bool, IpAddress) =
 
         if (chk1 and chk2):
             var fm: char = 0.char
-            copyMem(addr fm, addr data[9], 1)
+            copyMem(addr fm, addr data[base+9], 1)
             if fm == 4.char:
                 if len(data) < 10+globals.self_ip.address_v4.len: return (false, ip)
 
-                copyMem(addr ip.address_v4, addr data[10], ip.address_v4.len)
+                copyMem(addr ip.address_v4, addr data[base+10], ip.address_v4.len)
 
             elif fm == 6.char:
                 if len(data) < 10+globals.self_ip.address_v6.len: return (false, ip)
 
-                copyMem(addr ip.address_v6, addr data[10], ip.address_v6.len)
+                copyMem(addr ip.address_v6, addr data[base+10], ip.address_v6.len)
 
             else:
                 return (false, ip)
@@ -58,16 +58,19 @@ proc monitorData(data_pure: string): (bool, IpAddress) =
         return (false, ip)
 
 proc generateFinishHandShakeData(client_port: uint32): string =
-    let rlen = 16*(6+rand(4))
+    let rlen: uint16 = uint16(16*(6+rand(4)))
     var random_trust_data: string
     random_trust_data.setLen(rlen)
-    copyMem(addr random_trust_data[0], addr globals.sh3.uint32, 4)
-    copyMem(addr random_trust_data[4], addr globals.sh4.uint32, 4)
-    copyMem(addr random_trust_data[8], addr(globals.random_600[rand(250)]), rlen-8)
 
+    copyMem(addr random_trust_data[0], addr(globals.random_str[rand(250)]), rlen)
+    copyMem(addr random_trust_data[0], addr globals.tls13_record_layer[0], 3) #tls header
+    copyMem(addr random_trust_data[3], addr rlen, 2) #tls len
+
+    let base = 5 + 7 + `mod`(globals.sh5, 7.uint8)
+    copyMem(addr random_trust_data[base+0], addr globals.sh3.uint32, 4)
+    copyMem(addr random_trust_data[base+4], addr globals.sh4.uint32, 4)
     if globals.multi_port:
-        copyMem(addr random_trust_data[8], addr client_port, 4)
-    packForSend(random_trust_data)
+        copyMem(addr random_trust_data[base+8], addr client_port, 4)
 
     return random_trust_data
 
@@ -151,17 +154,7 @@ proc processConnection(client: Connection) {.async.} =
 
                         return
                     else:
-                        # if context.peer_ips.len > 0 and
-                        #  context.peer_ips[0] != client.address:
-                        #     #user connection
-                        #     echo "Real User connected !"
-                        #     client.trusted = TrustStatus.no
-                        #     remote.close()
-                        #     await processRemoteFuture
-                        #     # context.user_inbound.register(client) not required
-                        #     await chooseRemote() #associate peer
-                        #     if remote == nil: break
-
+   
                         if (epochTime().uint - client.creation_time) > globals.trust_time:
                             #user connection but no peer connected yet
                             #peer connection but couldnt finish handshake in time
@@ -225,7 +218,7 @@ proc start*(){.async.} =
         context.listener = newConnection()
         context.listener.socket.setSockOpt(OptReuseAddr, true)
         context.listener.socket.bindAddr(globals.listen_port.Port, globals.listen_addr)
-        if globals.multi_port :
+        if globals.multi_port:
             globals.listen_port = getSockName(context.listener.socket.getFd()).uint32
             globals.createIptablesForwardRules()
 
