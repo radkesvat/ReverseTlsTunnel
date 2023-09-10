@@ -10,4 +10,9 @@
 [لینک](https://www.youtube.com/watch?v=AFzbnn7SrWc)
 
 
+آموزش ویدویی کانال IR_TECH که لطف کردن یک اسکریپت برای نصب آسان و مدیریت ساده تر ارایه کردن.
+[لینک](https://www.youtube.com/watch?v=1mj1fhA2X6s)
+
+
+
 </div>
