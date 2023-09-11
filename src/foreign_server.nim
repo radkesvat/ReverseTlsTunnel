@@ -183,7 +183,7 @@ proc processConnection(client: Connection) {.async.} =
             while not client.isClosed:
 
                 data = await client.recv(if mux: globals.mux_chunk_size else: globals.chunk_size)
-                # echo &"[proccessClient] {data.len()} bytes from client"
+                if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes from client"
 
 
                 if data.len() == 0:
