@@ -26,7 +26,7 @@ const chunk_size* = 8192
 
 var mux*: bool = false
 let tls13_record_layer* = "\x17\x03\x03" 
-let mux_header_size*:uint32 = tls13_record_layer.len().uint32 + 2 + 4 # followed by 2 bytes len and 4 bytes cid
+let mux_header_size*:uint32 = tls13_record_layer.len().uint32 + 2 +2 + 4 # followed by 2 bytes len +2 port+and 4 bytes cid
 let mux_payload_size*:uint32 = 1024 
 let mux_chunk_size*:uint32 = mux_payload_size + mux_header_size
 
