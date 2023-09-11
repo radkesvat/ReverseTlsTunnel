@@ -14,5 +14,7 @@
 [لینک](https://www.youtube.com/watch?v=1mj1fhA2X6s)
 
 
+آموزش ویدویی کانال Arash Rauf 
+[لینک](https://www.youtube.com/watch?v=TcC-Btxpjk0)
 
 </div>
