@@ -62,7 +62,7 @@ proc sslConnect(con: Connection, ip: string, sni: string){.async.} =
     if globals.log_conn_create: print "[SslConnect] conencted !"
 
 
-    SSL_free(socket.sslHandle)
+    SSL_free(con.socket.sslHandle)
     con.socket.isSsl = false
     #AES default chunk size is 16 so use a multple of 16
     let rlen: uint16 = uint16(16*(6+rand(4)))
