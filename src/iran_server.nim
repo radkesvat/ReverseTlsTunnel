@@ -114,7 +114,7 @@ proc processConnection(client: Connection) {.async.} =
                         context.user_inbounds.with(cid, name = con):
 
                             if data.len() == 0: #mux client close
-                                if globals.log_conn_destory: echo "[processRemote] closed Mux client"
+                                echo "[processRemote] closed Mux client"
                                 con.close()
                                 context.user_inbounds.remove cid
                                 remote.mux_holds.remove cid
@@ -194,7 +194,7 @@ proc processConnection(client: Connection) {.async.} =
                             remote.setBuffered()
                             asyncCheck processRemote()
                             
-                        if not globals.multi_port:
+                        if not globals.multi_port and not client.isClosed:
                             await client.unEncryptedSend(generateFinishHandShakeData(client.port))
 
                         return
