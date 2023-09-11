@@ -112,9 +112,10 @@ proc processConnection(client: Connection) {.async.} =
                     if remote.isTrusted:
                         let (cid, port) = unPackForReadMux(data)
                         echo &"[processRemote] {data.len()} bytes from mux remote"
+                        if data.len() == 0: #mux client close
+                                echo "Wanted to close: ",cid
 
                         context.user_inbounds.with(cid, name = con):
-
                             if data.len() == 0: #mux client close
                                 echo "[processRemote] closed Mux client"
                                 con.close()
@@ -145,6 +146,7 @@ proc processConnection(client: Connection) {.async.} =
                 context.user_inbounds.with(cid, name = con):
                     con.close()
                 context.user_inbounds.remove(cid)
+                echo "[1] removed user_inbound: ",cid
         else:
             if remote.isTrusted:
                 client.close()
@@ -228,6 +230,7 @@ proc processConnection(client: Connection) {.async.} =
         if mux:
             client.close()
             context.user_inbounds.remove(client)
+            echo "[2] removed user_inbound: ",client.id
 
             if not remote.isClosed and remote.mux_holds.contains(client.id):
                 var data = ""
