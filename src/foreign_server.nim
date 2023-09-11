@@ -300,6 +300,7 @@ proc poolFrame(create_count: uint = 0) =
                     if globals.log_conn_error: echo fut.error.msg
                 else:
                     if globals.log_conn_create: echo &"[createNewCon] registered a new connection to the pool"
+                    con.socket.setSockOpt(OptNoDelay, true)
                     asyncCheck processConnection(con)
 
         )

@@ -24,10 +24,7 @@ when defined(linux) and not defined(android):
             echo "Please run as root. or start with --keep-os-limit "
             quit(-1)
 
-        if globals.disable_ufw:
-            discard 0 == execShellCmd("sudo ufw disable")
-        try:    
-           
+        try:               
             discard 0 == execShellCmd("sysctl -w fs.file-max=1000000")
             var limit = RLimit(rlim_cur:650000,rlim_max:660000)
             assert 0 == setrlimit(RLIMIT_NOFILE,limit)
@@ -39,11 +36,10 @@ when defined(linux) and not defined(android):
 
     if globals.disable_ufw:
         if not isAdmin():
-            echo "Disabling ufw requires root,"
+            echo "Disabling ufw requires root. !"
             echo "Please run as root. or start with --keep-ufw "
             quit(-1)
-        if globals.disable_ufw:
-            discard 0 == execShellCmd("sudo ufw disable")
+        discard 0 == execShellCmd("sudo ufw disable")
 
 
 
