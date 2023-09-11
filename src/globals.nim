@@ -3,7 +3,7 @@ import checksums/sha1
 
 export IpAddress
 
-const version = "1.2"
+const version = "2"
 
 type RunMode*{.pure.} = enum
     iran, kharej
@@ -24,11 +24,14 @@ var max_idle_time*: uint = 600 #secs (default TCP RFC is 3600)
 var max_pool_unused_time*: uint = 60 #secs
 const chunk_size* = 8192
 
-const mux*: bool = false
-let tls13_record_layer* = "\x17\x03\x03" # followed by 2 bytes len
-let mux_header_size* = tls13_record_layer.len() + 2
-let mux_packet_size* = 1024-mux_header_size
+var mux*: bool = false
+let tls13_record_layer* = "\x17\x03\x03" 
+let mux_header_size*:uint32 = tls13_record_layer.len().uint32 + 2 + 4 # followed by 2 bytes len and 4 bytes cid
+let mux_payload_size*:uint32 = 1024 
+let mux_chunk_size*:uint32 = mux_payload_size + mux_header_size
+
 let socket_buffered* = false # when using mux, it depends
+var mux_capacity*:uint32 = 4
 
 # [Routes]
 const listen_addr* = "0.0.0.0"
@@ -105,7 +108,7 @@ proc init*() =
     for i in 0..<random_str.len():
         random_str[i] = rand(char.low .. char.high).char
 
-    var p = initOptParser(longNoVal = @["kharej", "iran", "multiport", "keep-ufw", "keep-iptables", "keep-os-limit", "debug"])
+    var p = initOptParser(longNoVal = @["kharej", "iran", "multiport", "keep-ufw", "keep-iptables", "keep-os-limit", "mux", "debug"])
     while true:
         p.next()
         case p.kind
@@ -129,6 +132,8 @@ proc init*() =
                         keep_system_limit = true
                     of "debug":
                         debug_info = true
+                    of "mux":
+                        mux = true
 
                     else:
                         echo "invalid option"
