@@ -7,18 +7,18 @@ type
         no, pending, yes
 
     Connection* = ref object
-        creation_time*: uint       #creation epochtime
-        action_start_time*: uint   #when recv/send action started (0 = idle)
-        register_start_time*: uint #when the connection is added to the pool (0 = idle)
-        id*: uint32                #global incremental id
-        trusted*: TrustStatus      #when fake handshake perfromed
-        socket*: AsyncSocket       #wrapped asyncsocket
-        estabilished*: Future[void]#connection has started
-        port*: uint32              #the port the socket points to
-        address*: IpAddress        #the address from socket level
-        mux_capacity*: uint32      #how many connections can be multiplexed into this
-        mux_holds*: seq[uint32]    #how many connections  multiplexed into this
-        mux_closes*: uint32        #how many connections have been closed
+        creation_time*: uint        #creation epochtime
+        action_start_time*: uint    #when recv/send action started (0 = idle)
+        register_start_time*: uint  #when the connection is added to the pool (0 = idle)
+        id*: uint32                 #global incremental id
+        trusted*: TrustStatus       #when fake handshake perfromed
+        socket*: AsyncSocket        #wrapped asyncsocket
+        estabilished*: Future[void] #connection has started
+        port*: uint32               #the port the socket points to
+        address*: IpAddress         #the address from socket level
+        mux_capacity*: uint32       #how many connections can be multiplexed into this
+        mux_holds*: seq[uint32]     #how many connections  multiplexed into this
+        mux_closes*: uint32         #how many connections have been closed
         in_use*: bool
 
     Connections* = seq[Connection]
@@ -34,7 +34,7 @@ var et: uint = 0 #last epoch time
 
 proc isTrusted*(con: Connection): bool = con.trusted == TrustStatus.yes
 
-proc hasID*(cons: var Connections, id: uint32):bool =
+proc hasID*(cons: var Connections, id: uint32): bool =
     for el in cons:
         if el.id == id:
             return true
@@ -52,11 +52,11 @@ proc remove*(cons: var Connections, con: Connection or uint32) =
     when con is Connection:
         for i, el in cons:
             if el.id == con.id:
-                index=i
+                index = i
     when con is uint32:
         for i, el in cons:
             if el.id == con:
-                index=i
+                index = i
     if index != -1:
         cons.del index
 proc remove*(cons: var seq[uint32], id: uint32) =
@@ -109,7 +109,8 @@ template isClosed*(con: Connection): bool = con.socket.isClosed()
 
 
 proc close*(con: Connection) =
-    con.socket.close()
+    if con.socket != nil:
+        con.socket.close()
     let i = allConnections.find(con)
     if i != -1:
         allConnections.del(i)
@@ -178,13 +179,13 @@ proc startController*(){.async.} =
             proc(x: Connection): bool =
             if x.action_start_time != 0:
                 if et - x.action_start_time > globals.max_idle_time:
-                    x.socket.close()
+                    if x.socket != nil: x.socket.close()
                     if globals.log_conn_destory: echo "[Controller] closed a idle connection"
                     return false
 
             if x.register_start_time != 0:
                 if et - x.register_start_time > globals.max_pool_unused_time:
-                    x.socket.close()
+                    if x.socket != nil: x.socket.close()
                     if globals.log_conn_destory: echo "[Controller] closed a unused connection"
                     return false
             return true
