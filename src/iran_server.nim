@@ -103,9 +103,9 @@ proc processConnection(client: Connection) {.async.} =
            
             while not remote.isNil and not remote.isClosed:
                 data = await remote.recv(if mux: globals.mux_chunk_size else: globals.chunk_size)
-                if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
+                echo &"[processRemote] {data.len()} bytes from remote"
 
-                if data.len() == 0: #full connection close
+                if data.len() == 0: 
                     break
 
                 if mux:

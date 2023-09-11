@@ -139,11 +139,11 @@ proc processConnection(client: Connection) {.async.} =
             if remote != nil:
                 remote.close()
 
-    proc proccessRemote(remote: Connection) {.async.} =
+    proc processRemote(remote: Connection) {.async.} =
         try:
             while not remote.isClosed:
                 data = await remote.recv(if mux: globals.mux_payload_size else: globals.chunk_size)
-                echo &"[proccessRemote] {data.len()} bytes from remote"
+                echo &"[processRemote] {data.len()} bytes from remote"
 
 
                 if data.len() == 0:
@@ -153,7 +153,7 @@ proc processConnection(client: Connection) {.async.} =
                     if mux: packForSendMux(remote.id, remote.port.uint16, data) else: packForSend(data)
 
                     await client.unEncryptedSend(data)
-                    echo &"[proccessRemote] Sent {data.len()} bytes ->  client"
+                    echo &"[processRemote] Sent {data.len()} bytes ->  client"
 
         except: discard
         if mux:
@@ -196,11 +196,13 @@ proc processConnection(client: Connection) {.async.} =
                             new_remote.id = cid
                             new_remote.port = port
                             client.mux_holds.add(new_remote.id)
+                            if client.mux_holds.len.uint32 > client.mux_capacity:
+                                echo "[ERROR] this mux connection is taking more than capacity"
                             context.outbound.register new_remote
                             new_remote.estabilished = new_remote.socket.connect(globals.next_route_addr, port.Port)
                             await new_remote.estabilished
                             echo "connected to the remote core"
-                            asyncCheck proccessRemote(new_remote)
+                            asyncCheck processRemote(new_remote)
 
                         context.outbound.with(cid, name = con):
                             if not con.estabilished.finished:
@@ -229,7 +231,7 @@ proc processConnection(client: Connection) {.async.} =
                         if remote.estabilished.isNil:
                             remote.estabilished = remote.socket.connect(globals.next_route_addr, client.port.Port)
                             await remote.estabilished
-                            asyncCheck proccessRemote(remote)
+                            asyncCheck processRemote(remote)
 
                             let i = context.free_peer_outbounds.find(client)
                             if i != -1: context.free_peer_outbounds.del(i)
@@ -264,7 +266,7 @@ proc processConnection(client: Connection) {.async.} =
                             echo "[proccessClient] Target server was not a trusted tunnel client, closing..."
                             client.trusted = TrustStatus.no
                             break
-                        # asyncCheck proccessRemote()
+                        # asyncCheck processRemote()
 
 
                     unPackForRead(data)
