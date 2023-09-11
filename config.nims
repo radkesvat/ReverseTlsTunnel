@@ -4,7 +4,7 @@ import std/strformat
 import std/strutils
 
 
-const Release = false
+const Release = true
 
 
 const libs_dir = "libs"

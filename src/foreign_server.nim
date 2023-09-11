@@ -61,9 +61,10 @@ proc sslConnect(con: Connection, ip: string, sni: string){.async.} =
 
     if globals.log_conn_create: print "[SslConnect] conencted !"
 
-
+    
     SSL_free(con.socket.sslHandle)
     con.socket.isSsl = false
+
     #AES default chunk size is 16 so use a multple of 16
     let rlen: uint16 = uint16(16*(6+rand(4)))
     var random_trust_data: string
@@ -145,7 +146,7 @@ proc processConnection(client: Connection) {.async.} =
         try:
             while not remote.isClosed:
                 data = await remote.recv(if mux: globals.mux_payload_size else: globals.chunk_size)
-                # echo &"[processRemote] {data.len()} bytes from remote"
+                if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
 
 
                 if data.len() == 0:
@@ -155,7 +156,7 @@ proc processConnection(client: Connection) {.async.} =
                     if mux: packForSendMux(remote.id, remote.port.uint16, data) else: packForSend(data)
 
                     await client.unEncryptedSend(data)
-                    # echo &"[processRemote] Sent {data.len()} bytes ->  client"
+                    if globals.log_data_len: echo &"[processRemote] Sent {data.len()} bytes ->  client"
 
         except: discard
         if mux:
@@ -182,7 +183,7 @@ proc processConnection(client: Connection) {.async.} =
             while not client.isClosed:
 
                 data = await client.recv(if mux: globals.mux_chunk_size else: globals.chunk_size)
-                echo &"[proccessClient] {data.len()} bytes from client"
+                # echo &"[proccessClient] {data.len()} bytes from client"
 
 
                 if data.len() == 0:
