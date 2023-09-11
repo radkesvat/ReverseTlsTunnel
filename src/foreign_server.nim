@@ -189,6 +189,7 @@ proc processConnection(client: Connection) {.async.} =
                 if mux:
                     if client.isTrusted:
                         let (cid, port) = unPackForReadMux(data)
+                        print cid,port
                         if not context.outbound.hasID(cid):
                             let new_remote = remoteTrusted()
                             new_remote.id = cid
