@@ -14,7 +14,7 @@ type
         listener: Connection
         user_inbounds: Connections
         peer_inbounds: Connections
-        peer_ips: seq[IpAddress]
+        peer_ip: IpAddress
 
 
 var context = TunnelConnectionPoolContext()
@@ -30,7 +30,6 @@ proc monitorData(data: string): (bool, IpAddress) =
 
         copyMem(addr sh1_c, addr data[base+0], 4)
         copyMem(addr sh2_c, addr data[base+4], 4)
-        # copyMem(addr port, addr data[8], 4)
 
         let chk1 = sh1_c == globals.sh1
         let chk2 = sh2_c == globals.sh2
@@ -97,14 +96,12 @@ proc processConnection(client: Connection) {.async.} =
         return new_remote
 
 
-    proc processRemote() {.async.} =
-        if remote.in_use: return
-        remote.in_use = true
+    proc processRemote(remote: Connection) {.async.} =
+        # if remote.in_use: return
+        # remote.in_use = true
         try:
-            if mux and remote.isTrusted:
-                remote.setBuffered()
-
-            while (not remote.isNil()) and (not remote.isClosed) and (not client.isClosed):
+           
+            while not remote.isNil and not remote.isClosed:
                 data = await remote.recv(if mux: globals.mux_chunk_size else: globals.chunk_size)
                 if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
 
@@ -189,7 +186,10 @@ proc processConnection(client: Connection) {.async.} =
                         client.trusted = TrustStatus.yes
                         print "Peer Fake Handshake Complete ! ", ip
                         context.peer_inbounds.register(client)
-                        context.peer_ips.add(client.address)
+                        context.peer_ip = client.address
+                        if mux: 
+                            client.setBuffered()
+                            asyncCheck processRemote(client)
                         remote.close() # close untrusted remote
                         await processRemoteFuture
 
@@ -241,8 +241,8 @@ proc processConnection(client: Connection) {.async.} =
 
 
     try:
-        if context.peer_ips.len > 0 and
-            context.peer_ips[0] != client.address:
+        if context.peer_ip != IpAddress() and
+            context.peer_ip != client.address:
             echo "Real User connected !"
             context.user_inbounds.register(client)
             client.trusted = TrustStatus.no
@@ -252,14 +252,14 @@ proc processConnection(client: Connection) {.async.} =
                 if globals.multi_port:
                     await remote.unEncryptedSend(generateFinishHandShakeData(client.port))
 
-                asyncCheck processRemote()
+                if not mux: asyncCheck processRemote(remote) # mux already called this
             else:
                 if globals.log_conn_destory: echo &"[createNewCon][Error] left without connection, closes forcefully."
                 client.close()
                 return
         else:
             remote = await remoteUnTrusted()
-            processRemoteFuture = processRemote()
+            processRemoteFuture = processRemote(remote)
         asyncCheck processClient()
 
     except:

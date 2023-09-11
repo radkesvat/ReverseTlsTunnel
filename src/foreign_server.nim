@@ -45,6 +45,7 @@ proc sslConnect(con: Connection, ip: string, sni: string){.async.} =
             raise newException(ValueError, "[SslConnect] dial timed-out")
 
     try:
+        if not globals.keep_system_limit: con.socket.setSockOpt(OptNoDelay, true)
 
         ssl_ctx.wrapConnectedSocket(
             con.socket, handshakeAsClient, sni)
@@ -300,7 +301,6 @@ proc poolFrame(create_count: uint = 0) =
                     if globals.log_conn_error: echo fut.error.msg
                 else:
                     if globals.log_conn_create: echo &"[createNewCon] registered a new connection to the pool"
-                    con.socket.setSockOpt(OptNoDelay, true)
                     asyncCheck processConnection(con)
 
         )
