@@ -48,15 +48,17 @@ template with*(cons: Connections, cid: uint32, name: untyped, action: untyped) =
                 action
 
 proc remove*(cons: var Connections, con: Connection or uint32) =
+    var index = -1
     when con is Connection:
         for i, el in cons:
             if el.id == con.id:
-                cons.del i
+                index=i
     when con is uint32:
         for i, el in cons:
             if el.id == con:
-                cons.del i
-
+                index=i
+    if i != -1:
+        cons.del i
 proc remove*(cons: var seq[uint32], id: uint32) =
     let i = cons.find(id)
     if i != -1:
