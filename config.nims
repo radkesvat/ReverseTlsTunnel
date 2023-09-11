@@ -92,7 +92,7 @@ task build_server, "builds server":
 task build, "builds all":
 
     # echo staticExec "pkill RTT"
-    echo staticExec "taskkill /IM RTT.exe /F"
+    # echo staticExec "taskkill /IM RTT.exe /F"
     
     exec "nim build_server"
     # withDir(output_dir):
