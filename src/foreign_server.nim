@@ -143,7 +143,7 @@ proc processConnection(client: Connection) {.async.} =
         try:
             while not remote.isClosed:
                 data = await remote.recv(if mux: globals.mux_payload_size else: globals.chunk_size)
-                if globals.log_data_len: echo &"[proccessRemote] {data.len()} bytes from remote"
+                echo &"[proccessRemote] {data.len()} bytes from remote"
 
 
                 if data.len() == 0:
@@ -153,7 +153,7 @@ proc processConnection(client: Connection) {.async.} =
                     if mux: packForSendMux(remote.id, remote.port.uint16, data) else: packForSend(data)
 
                     await client.unEncryptedSend(data)
-                    if globals.log_data_len: echo &"[proccessRemote] Sent {data.len()} bytes ->  client"
+                    echo &"[proccessRemote] Sent {data.len()} bytes ->  client"
 
         except: discard
         if mux:
@@ -179,7 +179,7 @@ proc processConnection(client: Connection) {.async.} =
             while not client.isClosed:
 
                 data = await client.unEncryptedrecv(if mux: globals.mux_chunk_size else: globals.chunk_size)
-                if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes from client"
+                echo &"[proccessClient] {data.len()} bytes from client"
 
 
                 if data.len() == 0:
@@ -197,6 +197,7 @@ proc processConnection(client: Connection) {.async.} =
                             context.outbound.register new_remote
                             new_remote.estabilished = new_remote.socket.connect(globals.next_route_addr, port.Port)
                             await new_remote.estabilished
+                            echo "connected to the remote core"
                             asyncCheck proccessRemote(new_remote)
 
                         context.outbound.with(cid, name = con):
@@ -205,7 +206,7 @@ proc processConnection(client: Connection) {.async.} =
 
                             if not con.isClosed():
                                 await con.send(data)
-                                if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote "
+                                echo &"[proccessClient] {data.len()} bytes -> remote "
 
                     if client.trusted == TrustStatus.pending:
                         var (trust, _) = monitorData(data)

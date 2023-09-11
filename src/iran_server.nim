@@ -96,7 +96,7 @@ proc processConnection(client: Connection) {.async.} =
         return new_remote
 
 
-    proc processRemote(remote: Connection) {.async.} =
+    proc processRemote() {.async.} =
         # if remote.in_use: return
         # remote.in_use = true
         try:
@@ -187,12 +187,12 @@ proc processConnection(client: Connection) {.async.} =
                         print "Peer Fake Handshake Complete ! ", ip
                         context.peer_inbounds.register(client)
                         context.peer_ip = client.address
+                        remote.close() # close untrusted remote
+                        await processRemoteFuture
                         if mux: 
                             client.setBuffered()
                             asyncCheck processRemote(client)
-                        remote.close() # close untrusted remote
-                        await processRemoteFuture
-
+                            
                         if not globals.multi_port:
                             await client.unEncryptedSend(generateFinishHandShakeData(client.port))
 
@@ -252,14 +252,14 @@ proc processConnection(client: Connection) {.async.} =
                 if globals.multi_port:
                     await remote.unEncryptedSend(generateFinishHandShakeData(client.port))
 
-                if not mux: asyncCheck processRemote(remote) # mux already called this
+                if not mux: asyncCheck processRemote() # mux already called this
             else:
                 if globals.log_conn_destory: echo &"[createNewCon][Error] left without connection, closes forcefully."
                 client.close()
                 return
         else:
             remote = await remoteUnTrusted()
-            processRemoteFuture = processRemote(remote)
+            processRemoteFuture = processRemote()
         asyncCheck processClient()
 
     except:
