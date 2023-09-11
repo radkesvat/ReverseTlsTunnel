@@ -167,7 +167,7 @@ proc processConnection(client: Connection) {.async.} =
                 inc client.mux_closes
                 var data = ""
                 echo "sending mux client close .... ", remote.id
-                packForSendMux(client.id, client.port.uint16, data)
+                packForSendMux(remote.id, remote.port.uint16, data)
                 await client.send(data)
 
             if client.mux_closes >= client.mux_capacity:
