@@ -187,9 +187,11 @@ proc processConnection(client: Connection) {.async.} =
                         #peer connection
                         client.trusted = TrustStatus.yes
                         print "Peer Fake Handshake Complete ! ", ip
+                        context.user_inbounds.remove(client)
                         context.peer_inbounds.register(client)
                         context.peer_ip = client.address
                         remote.close() # close untrusted remote
+
                         await processRemoteFuture
                         if mux: 
                             remote = client
@@ -247,10 +249,10 @@ proc processConnection(client: Connection) {.async.} =
         if context.peer_ip != IpAddress() and
             context.peer_ip != client.address:
             echo "Real User connected !"
-            context.user_inbounds.register(client)
             client.trusted = TrustStatus.no
             await chooseRemote() #associate peer
             if remote != nil:
+                context.user_inbounds.register(client)
                 if globals.log_conn_create: echo &"[createNewCon][Succ] Associated a peer connection"
                 if globals.multi_port:
                     await remote.unEncryptedSend(generateFinishHandShakeData(client.port))

@@ -164,7 +164,7 @@ proc processConnection(client: Connection) {.async.} =
                 client.mux_holds.remove(remote.id)
                 inc client.mux_closes
                 var data = ""
-                echo "sending mux client close...."
+                echo "sending mux client close .... ", remote.id
                 packForSendMux(client.id, client.port.uint16, data)
                 await client.send(data)
 
