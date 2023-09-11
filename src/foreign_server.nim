@@ -145,17 +145,17 @@ proc processConnection(client: Connection) {.async.} =
         try:
             while not remote.isClosed:
                 data = await remote.recv(if mux: globals.mux_payload_size else: globals.chunk_size)
-                echo &"[processRemote] {data.len()} bytes from remote"
+                # echo &"[processRemote] {data.len()} bytes from remote"
 
 
                 if data.len() == 0:
                     break
-
+                
                 if not client.isClosed():
                     if mux: packForSendMux(remote.id, remote.port.uint16, data) else: packForSend(data)
 
                     await client.unEncryptedSend(data)
-                    echo &"[processRemote] Sent {data.len()} bytes ->  client"
+                    # echo &"[processRemote] Sent {data.len()} bytes ->  client"
 
         except: discard
         if mux:
@@ -211,7 +211,13 @@ proc processConnection(client: Connection) {.async.} =
                             if not con.estabilished.finished:
                                 await con.estabilished
 
-                            if not con.isClosed():
+                            if data.len() == 0: #mux remote close
+                                echo "[processRemote] closed Mux remote"
+                                con.close()
+                                context.outbound.remove cid
+                                client.mux_holds.remove cid
+                                inc client.mux_closes
+                            elif not con.isClosed():
                                 await con.send(data)
                                 echo &"[proccessClient] {data.len()} bytes -> remote "
 
