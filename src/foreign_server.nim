@@ -188,8 +188,9 @@ proc processConnection(client: Connection) {.async.} =
 
                 if mux:
                     if client.isTrusted:
-                        let (cid, port) = unPackForReadMux(data)
-                        print cid,port
+                        var (cid, port) = unPackForReadMux(data)
+                        if not globals.multi_port: port = globals.next_route_port.uint16
+                        print cid, port
                         if not context.outbound.hasID(cid):
                             let new_remote = remoteTrusted()
                             new_remote.id = cid
@@ -229,7 +230,7 @@ proc processConnection(client: Connection) {.async.} =
                             remote.estabilished = remote.socket.connect(globals.next_route_addr, client.port.Port)
                             await remote.estabilished
                             asyncCheck proccessRemote(remote)
-                            
+
                             let i = context.free_peer_outbounds.find(client)
                             if i != -1: context.free_peer_outbounds.del(i)
                             echo "established to remote, calling pool frame"
