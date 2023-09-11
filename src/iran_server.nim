@@ -190,8 +190,9 @@ proc processConnection(client: Connection) {.async.} =
                         remote.close() # close untrusted remote
                         await processRemoteFuture
                         if mux: 
-                            client.setBuffered()
-                            asyncCheck processRemote(client)
+                            remote = client
+                            remote.setBuffered()
+                            asyncCheck processRemote()
                             
                         if not globals.multi_port:
                             await client.unEncryptedSend(generateFinishHandShakeData(client.port))
