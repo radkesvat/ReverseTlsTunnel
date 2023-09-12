@@ -223,7 +223,8 @@ proc processConnection(client: Connection) {.async.} =
 
                     await remote.send(data)
                     if globals.log_data_len: echo &"{data.len} bytes -> Remote"
-
+                else:
+                    break
 
         except: discard
 
