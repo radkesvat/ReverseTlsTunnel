@@ -40,7 +40,7 @@ task build_server, "builds server":
     var output = output_dir_target /  output_file_name
     switch("mm", "orc")
     switch("threads", "off")
-    # switch("exceptions", "cpp")
+    switch("exceptions", "cpp")
     switch("warning", "HoleEnumConv:off")
     switch("warning", "BareExcept:off")
  
