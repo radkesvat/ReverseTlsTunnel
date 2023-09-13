@@ -161,28 +161,28 @@ proc processClient(client: Connection, remote: Connection, processRemoteFuture: 
             # data = await client.recv(if mux: globals.mux_payload_size else: globals.chunk_size)
             data.setlen await client.reader.readOnce(addr data[0], globals.chunk_size)
             if globals.log_data_len: echo &"[processClient] {data.len()} bytes from client {client.id}"
-            if data.len() == 0: #user closed the connection
-                break
-            if client.trusted == TrustStatus.pending:
-                var trust = monitorData(data)
-                if trust:
-                    echo "Trusted the connection !"
-                    #peer connection
-                    client.trusted = TrustStatus.yes
-                    print "Peer Fake Handshake Complete ! ", ip
-                    if mux: context.user_inbounds.remove(client)
-                    context.peer_inbounds.register(client)
-                    context.peer_ip = client.transp.remoteAddress
-                    await remote.closeWait() # close untrusted remote
-                    await processRemoteFuture
-                    if mux:
-                        discard
-                        # remote = client
-                        # remote.setBuffered()
-                        # asyncCheck processRemote()
-                    if not globals.multi_port and not client.closed:
-                        await client.writer.write(generateFinishHandShakeData(client.port))
-                    return
+            # if data.len() == 0: #user closed the connection
+            #     break
+            # if client.trusted == TrustStatus.pending:
+            #     var trust = monitorData(data)
+            #     if trust:
+            #         echo "Trusted the connection !"
+            #         #peer connection
+            #         client.trusted = TrustStatus.yes
+            #         print "Peer Fake Handshake Complete ! ", ip
+            #         if mux: context.user_inbounds.remove(client)
+            #         context.peer_inbounds.register(client)
+            #         context.peer_ip = client.transp.remoteAddress
+            #         await remote.closeWait() # close untrusted remote
+            #         await processRemoteFuture
+            #         if mux:
+            #             discard
+            #             # remote = client
+            #             # remote.setBuffered()
+            #             # asyncCheck processRemote()
+            #         if not globals.multi_port and not client.closed:
+            #             await client.writer.write(generateFinishHandShakeData(client.port))
+            #         return
                 # else:
                 #     if (epochTime().uint - client.creation_time) > globals.trust_time:
                 #         #user connection but no peer connected yet
