@@ -80,7 +80,7 @@ proc generateFinishHandShakeData(client_port: Port): string =
 
 proc processConnection(client: Connection) {.async.} =
     var remote: Connection = nil
-    var data = newStringOfCap(globals.chunk_size)
+    var data = newString(len = globals.chunk_size)
     var processRemoteFuture: Future[void]
 
     var closed = false
