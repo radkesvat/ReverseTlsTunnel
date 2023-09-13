@@ -97,7 +97,7 @@ proc processConnection(client: Connection) {.async.} =
         let address = initTAddress(globals.final_target_ip, globals.final_target_port)
         var new_remote:Connection = await connection.connect(address)
         new_remote.trusted = TrustStatus.no
-        # if globals.log_conn_create: echo "connected to ", globals.final_target_domain, ":", $globals.final_target_port
+        if globals.log_conn_create: echo "connected to ", globals.final_target_domain, ":", $globals.final_target_port
         return new_remote
 
 
@@ -181,6 +181,7 @@ proc processConnection(client: Connection) {.async.} =
     proc processClient() {.async.} =
         try:
             while not client.closed:
+                echo "read try"
                 # data = await client.recv(if mux: globals.mux_payload_size else: globals.chunk_size)
                 var data = cast[string](await client.reader.read())
                 if globals.log_data_len: echo &"[processClient] {data.len()} bytes from client {client.id}"
