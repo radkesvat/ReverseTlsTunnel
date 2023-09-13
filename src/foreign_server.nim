@@ -327,6 +327,7 @@ proc poolFrame(create_count: uint = 0) =
         try:
             var con = await connect(initTAddress(globals.iran_addr,globals.iran_port),SocketScheme.Secure,globals.final_target_domain)
             await con.twriter.write(generateFinishHandShakeData())
+            echo "ssl handsahke complete"
             asyncCheck processConnection(con)
 
         except CatchableError as e:
