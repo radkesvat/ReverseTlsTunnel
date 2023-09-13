@@ -193,13 +193,15 @@ proc processClient(client: Connection, remote: Connection, processRemoteFuture: 
                             return
                         else:
                             break
+
+            await client.writer.write(data)
+            continue
             if not remote.closed:
                 if remote.isTrusted:
                     if mux: packForSendMux(client.id, client.port.uint16, data) else: packForSend(data)
                 await remote.writer.write(data)
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
-            else:
-                break
+ 
     except:
         echo getCurrentExceptionMsg()
     echo "loop broke"
@@ -244,8 +246,9 @@ proc processConnection(client: Connection) {.async.} =
                 await client.closeWait()
                 return
         else:
-            remote = await remoteUnTrusted()
-            processRemoteFuture = processRemote(client,remote)
+            discard
+            # remote = await remoteUnTrusted()
+            # processRemoteFuture = processRemote(client,remote)
         await processClient(client, remote, processRemoteFuture)
 
     except:
