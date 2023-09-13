@@ -325,13 +325,25 @@ proc poolFrame(create_count: uint = 0) =
 
     proc create() {.async.} =
         try:
-            var con = await connect(initTAddress(globals.iran_addr,globals.iran_port),SocketScheme.Secure,globals.final_target_domain)
-            await con.twriter.write(generateFinishHandShakeData())
+            var conn = await connect(initTAddress(globals.iran_addr,globals.iran_port),SocketScheme.Secure,globals.final_target_domain)
+            await conn.twriter.write(generateFinishHandShakeData())
             echo "ssl handsahke complete"
-            if con.state == SocketState.Ready:
-                asyncCheck processConnection(con)
+
+            let pending =
+                block:
+                    var res: seq[Future[void]]
+                    if not(isNil(conn.reader)) and not(conn.reader.closed()):
+                        res.add(conn.reader.closeWait())
+                    if not(isNil(conn.writer)) and not(conn.writer.closed()):
+                        res.add(conn.writer.closeWait())
+                    res
+            if len(pending) > 0: await allFutures(pending)
+
+            
+            if conn.state == SocketState.Ready:
+                asyncCheck processConnection(conn)
             else:
-                print "Handshake error, ", con.state
+                print "Handshake error, ", conn.state
 
 
         except CatchableError as e:
