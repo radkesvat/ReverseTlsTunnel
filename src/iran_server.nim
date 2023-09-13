@@ -23,11 +23,10 @@ type
 var context = TunnelConnectionPoolContext()
 var mux = false
 
-proc monitorData(data: string): (bool, TransportAddress) =
-    var ip = TransportAddress(family: AddressFamily.IPv4)
+proc monitorData(data: var string): bool =
     try:
         let base = 5 + 7 + `mod`(globals.sh5, 7.uint8)
-
+        if data.high.uint8 < base + 4 : return false
         var sh1_c: uint32
         var sh2_c: uint32
 
@@ -38,27 +37,27 @@ proc monitorData(data: string): (bool, TransportAddress) =
         let chk2 = sh2_c == globals.sh2
 
         if (chk1 and chk2):
-            var fm: char = 0.char
-            copyMem(addr fm, addr data[base+9], 1)
-            if fm == 4.char:
-                if len(data) < 10+globals.self_ip.address_v4.len: return (false, ip)
+            # var fm: char = 0.char
+            # copyMem(addr fm, addr data[base+9], 1)
+            # if fm == 4.char:
+            #     # if len(data) < base+10+globals.self_ip.address_v4.len: return (false, ip)
 
-                copyMem(addr ip.address_v4, addr data[base+10], ip.address_v4.len)
+            #     copyMem(addr ip.address_v4, addr data[base+10], ip.address_v4.len)
 
-            elif fm == 6.char:
-                if len(data) < 10+globals.self_ip.address_v6.len: return (false, ip)
+            # elif fm == 6.char:
+            #     # if len(data) < base+10+globals.self_ip.address_v6.len: return (false, ip)
 
-                copyMem(addr ip.address_v6, addr data[base+10], ip.address_v6.len)
+            #     copyMem(addr ip.address_v6, addr data[base+10], ip.address_v6.len)
 
-            else:
-                return (false, ip)
+            # else:
+            #     return (false, ip)
 
-            return (true, ip)
+            return true
         else:
-            return (false, ip)
+            return false
 
     except:
-        return (false, ip)
+        return false
 
 proc generateFinishHandShakeData(client_port: Port): string =
     let rlen: uint16 = uint16(16*(6+rand(4)))
@@ -105,7 +104,7 @@ proc processConnection(client: Connection) {.async.} =
         try:
             while not remote.isNil and not remote.closed:
                 # data = await remote.recv(if mux: globals.mux_chunk_size else: globals.chunk_size)
-                data.setlen await remote.reader.readOnce(addr data[0],globals.chunk_size)
+                data.setlen await remote.reader.readOnce(addr data[0], globals.chunk_size)
                 if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
 
                 if data.len() == 0:
@@ -185,8 +184,8 @@ proc processConnection(client: Connection) {.async.} =
             while not client.closed:
                 echo "read try"
                 # data = await client.recv(if mux: globals.mux_payload_size else: globals.chunk_size)
-                data.setlen await client.reader.readOnce(addr data[0],globals.chunk_size)
-                
+                data.setlen await client.reader.readOnce(addr data[0], globals.chunk_size)
+
                 if globals.log_data_len: echo &"[processClient] {data.len()} bytes from client {client.id}"
 
                 if data.len() == 0: #user closed the connection
@@ -194,7 +193,7 @@ proc processConnection(client: Connection) {.async.} =
 
 
                 if client.trusted == TrustStatus.pending:
-                    var (trust, ip) = monitorData(data)
+                    var trust = monitorData(data)
                     if trust:
                         echo "Trusted the connection !"
                         #peer connection
@@ -237,7 +236,7 @@ proc processConnection(client: Connection) {.async.} =
                 else:
                     break
 
-        except: 
+        except:
             echo getCurrentExceptionMsg()
         echo "loop broke"
         if mux:

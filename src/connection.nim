@@ -292,6 +292,7 @@ proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketSc
                 res.state = SocketState.Ready
             res
     conn.creation_time = et
+    conn.trusted = TrustStatus.pending
     if conn.state == SocketState.Ready:
         return conn
 
