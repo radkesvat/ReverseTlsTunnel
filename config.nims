@@ -48,7 +48,7 @@ task build_server, "builds server":
     
     
     switch("d", "useMalloc")
-    # switch("exceptions", "setjmp")
+    switch("exceptions", "quirky")
 
     switch("d", "asyncBackend=chronos")
     switch("d", "asyncBackend:chronos")
