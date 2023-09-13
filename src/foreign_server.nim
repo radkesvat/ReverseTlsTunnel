@@ -328,7 +328,11 @@ proc poolFrame(create_count: uint = 0) =
             var con = await connect(initTAddress(globals.iran_addr,globals.iran_port),SocketScheme.Secure,globals.final_target_domain)
             await con.twriter.write(generateFinishHandShakeData())
             echo "ssl handsahke complete"
-            asyncCheck processConnection(con)
+            if con.state = SocketState.ready:
+                asyncCheck processConnection(con)
+            else:
+                print "Handshake error, ", con.state
+
 
         except CatchableError as e:
             echo "could not connect to iran server and perform handshake, info:"
