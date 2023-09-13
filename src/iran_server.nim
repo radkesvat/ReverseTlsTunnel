@@ -88,7 +88,9 @@ proc processRemote(client: Connection, remote: Connection) {.async.} =
             data.setlen await remote.reader.readOnce(addr data[0], globals.chunk_size)
             if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
             if data.len() == 0:
-                break
+                await close(client,remote) #end full connection
+
+                return
             if mux:
                 if remote.isTrusted:
                     let (cid, port) = unPackForReadMux(data)
