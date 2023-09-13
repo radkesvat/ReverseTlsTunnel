@@ -1,13 +1,13 @@
-import std/[strformat, strutils, net, random, endians]
+import std/[strformat, strutils, random, endians]
 import chronos
 # import overrides/[asyncnet]
 import times, print, connection, pipe
 from globals import nil
 
-when defined(windows):
-    from winlean import getSockOpt
-else:
-    from posix import getSockOpt
+# when defined(windows):
+#     from winlean import getSockOpt
+# else:
+#     from posix import getSockOpt
 
 type
     TunnelConnectionPoolContext = object
@@ -86,13 +86,14 @@ proc processConnection(client: Connection) {.async.} =
             closed = true
             if globals.log_conn_destory: echo "[processRemote] closed client & remote"
             if remote != nil:
-                remote.close()
-            client.close()
+                remote.closeWait()
+            client.closeWait()
 
     proc remoteUnTrusted(): Future[Connection]{.async.} =
+        initTAddress(globals.final_target_ip, globals.final_target_port)
         var new_remote = newConnection()
         new_remote.trusted = TrustStatus.no
-        await new_remote.socket.connect(globals.final_target_ip, globals.final_target_port.Port)
+        await new_remote.socket.connect()
         # if globals.log_conn_create: echo "connected to ", globals.final_target_domain, ":", $globals.final_target_port
         return new_remote
 
@@ -293,37 +294,80 @@ proc start*(){.async.} =
 
     proc start_listener(){.async.} =
 
-        context.listener = newConnection()
-        context.listener.socket.setSockOpt(OptReuseAddr, true)
-        context.listener.socket.bindAddr(globals.listen_port.Port, globals.listen_addr)
-        if globals.multi_port:
-            globals.listen_port = getSockName(context.listener.socket.getFd()).uint32
-            globals.createIptablesForwardRules()
-
-        echo &"Started tcp server... {globals.listen_addr}:{globals.listen_port}"
-        context.listener.socket.listen()
-
-        while true:
-            let (address, client) = await context.listener.socket.acceptAddr()
-
-            var con = newConnection(client, address)
+        proc serveStreamClient(server: StreamServer,
+                         transp: StreamTransport) {.async.} =
+            
+            let con = Connection.new(transp)
             if globals.multi_port:
                 var origin_port: cushort
                 var size = 16.SockLen
-                if getSockOpt(con.socket.getFd(), cint(globals.SOL_IP), cint(globals.SO_ORIGINAL_DST),
+                if getSockOpt(con.sock cint(globals.SOL_IP), cint(globals.SO_ORIGINAL_DST),
                 addr(pbuf[0]), addr(size)) < 0'i32:
                     echo "multiport failure getting origin port. !"
                     continue
                 bigEndian16(addr origin_port, addr pbuf[2])
 
                 con.port = origin_port
-                if globals.log_conn_create: print "Connected client: ", address, " : ", con.port
+                if globals.log_conn_create: print "Connected client: ", transp.lodal, " multiport: ", con.port
             else:
-                con.port = globals.listen_port
-
-                if globals.log_conn_create: print "Connected client: ", address
+                con.port = server.local.port
+                if globals.log_conn_create: print "Connected client: ", transp.lodal
 
             asyncCheck processConnection(con)
+            
+
+        var address = initTAddress(globals.listen_addr,globals.listen_port.Port)
+
+        let server:StreamServer = 
+            try:
+                createStreamServer(address,serveStreamClient,{ReuseAddr})
+            except TransportOsError as exc:
+                print exc
+                quit(-1)
+            except CatchableError as exc:
+                print exc
+                quit(-1)
+
+        if globals.multi_port:
+            localAddress
+            globals.listen_port = server.localAddress().port
+            globals.createIptablesForwardRules()
+        
+        server.start()
+        echo &"Started tcp server... {globals.listen_addr}:{globals.listen_port}"
+
+
+        # context.listener = newConnection()
+        # context.listener.socket.setSockOpt(OptReuseAddr, true)
+        # context.listener.socket.bindAddr(globals.listen_port.Port, globals.listen_addr)
+        # if globals.multi_port:
+        #     globals.listen_port = getSockName(context.listener.socket.getFd()).uint32
+        #     globals.createIptablesForwardRules()
+
+        # echo &"Started tcp server... {globals.listen_addr}:{globals.listen_port}"
+        # context.listener.socket.listen()
+
+        # while true:
+        #     let (address, client) = await context.listener.socket.acceptAddr()
+
+        #     var con = newConnection(client, address)
+        #     if globals.multi_port:
+        #         var origin_port: cushort
+        #         var size = 16.SockLen
+        #         if getSockOpt(con.socket.getFd(), cint(globals.SOL_IP), cint(globals.SO_ORIGINAL_DST),
+        #         addr(pbuf[0]), addr(size)) < 0'i32:
+        #             echo "multiport failure getting origin port. !"
+        #             continue
+        #         bigEndian16(addr origin_port, addr pbuf[2])
+
+        #         con.port = origin_port
+        #         if globals.log_conn_create: print "Connected client: ", address, " : ", con.port
+        #     else:
+        #         con.port = globals.listen_port
+
+        #         if globals.log_conn_create: print "Connected client: ", address
+
+        #     asyncCheck processConnection(con)
 
     mux = globals.mux
     await sleepAsync(2500)

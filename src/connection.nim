@@ -9,29 +9,29 @@ type
     TrustStatus*{.pure.} = enum
         no, pending, yes
     SocketScheme* {.pure.} = enum
-        NonSecure,                ## Non-secure connection
-        Secure                    ## Secure TLS connection
+        NonSecure, ## Non-secure connection
+        Secure     ## Secure TLS connection
 
     SimpleAddress* = object
         id*: string
         hostname*: string
         port*: uint16
-    
+
     SocketState* {.pure.} = enum
-        Closed                    ## Connection has been closed
-        Closing,                  ## Connection is closing
-        Resolving,                ## Resolving remote hostname
-        Connecting,               ## Connecting to remote server
-        Ready,                    ## Connected to remote server
-        Acquired,                 ## Connection is acquired for use
-        Error                     ## Error happens
+        Closed      ## Connection has been closed
+        Closing,    ## Connection is closing
+        Resolving,  ## Resolving remote hostname
+        Connecting, ## Connecting to remote server
+        Ready,      ## Connected to remote server
+        Acquired,   ## Connection is acquired for use
+        Error       ## Error happens
 
 
     Connection* = ref object
         # creation_time*: uint        #creation epochtime
         # action_start_time*: uint    #when recv/send action started (0 = idle)
         # register_start_time*: uint  #when the connection is added to the pool (0 = idle)
-        id*: uint32                   #global incremental id
+        id*: uint32 #global incremental id
         case kind*: SocketScheme
         of SocketScheme.NonSecure:
             discard
@@ -42,18 +42,22 @@ type
         transp*: StreamTransport
         reader*: AsyncStreamReader
         writer*: AsyncStreamWriter
-        remoteHostname*: string    # sni
-        state* : SocketState
+        remoteHostname*: string # sni
+        state*: SocketState
 
-        trusted*: TrustStatus       #when fake handshake perfromed
+        trusted*: TrustStatus #when fake handshake perfromed
         # socket*: AsyncSocket        #wrapped asyncsocket
+
         estabilished*: Future[void] #connection has started
-        port*: uint32               #the port the socket points to
-        address*: IpAddress         #the address from socket level
-        mux_capacity*: uint32       #how many connections can be multiplexed into this
-        mux_holds*: seq[uint32]     #how many connections  multiplexed into this
-        mux_closes*: uint32         #how many connections have been closed
+
+        port*: Port #the port the socket points to
         
+        
+        # address*: IpAddress #the address from socket level
+        mux_capacity*: uint32 #how many connections can be multiplexed into this
+        mux_holds*: seq[uint32] #how many connections  multiplexed into this
+        mux_closes*: uint32 #how many connections have been closed
+
 
     Connections* = seq[Connection]
 
@@ -205,9 +209,9 @@ proc register*(cons: var Connections, con: Connection) =
 
 
 proc closeWait(conn: Connection) {.async.} =
-  ## Close HttpClientConnectionRef instance ``conn`` and free all the resources.
-  if conn.state notin {SocketState.Closing,
-                       SocketState.Closed}:
+    ## Close HttpClientConnectionRef instance ``conn`` and free all the resources.
+    if conn.state notin {SocketState.Closing,
+                         SocketState.Closed}:
         conn.state = SocketState.Closing
         let pending =
             block:
@@ -227,24 +231,12 @@ proc closeWait(conn: Connection) {.async.} =
         conn.state = SocketState.Closed
 
 
-proc connectClient*(address:TransportAddress,scheme:SocketScheme, 
-    hostname:string): Future[Connection] {.async.} =
-
+proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketScheme = SocketScheme.NonSecure, hostname: string = ""): Future[Connection] {.async.} =
     if scheme == SocketScheme.Secure:
         assert not hostname.isEmptyOrWhitespace(), "hostname was empty for secure socket!"
-
-    let transp =
-        try:
-            await connect(address, 
-                        flags = {SocketFlags.TcpNoDelay,SocketFlags.ReuseAddr})
-        except CancelledError as exc:
-            raise exc
-        except CatchableError:
-            nil
-    if not(isNil(transp)):
-      let conn =
+    let conn =
         block:
-            let res = 
+            let res =
                 case scheme
                 of SocketScheme.NonSecure:
                     let res = Connection(
@@ -261,9 +253,9 @@ proc connectClient*(address:TransportAddress,scheme:SocketScheme,
                     let treader = newAsyncStreamReader(transp)
                     let twriter = newAsyncStreamWriter(transp)
                     # let flags:set[TLSFlags] =  {TLSFlags.NoVerifyHost,TLSFlags.NoVerifyServerName}
-                    let flags:set[TLSFlags] = {}
+                    let flags: set[TLSFlags] = {}
 
-                    let tls = newTLSClientAsyncStream(treader, twriter, hostname,flags=flags)
+                    let tls = newTLSClientAsyncStream(treader, twriter, hostname, flags = flags)
                     let res = Connection(
                     id: new_uid(),
                     kind: SocketScheme.Secure,
@@ -292,11 +284,28 @@ proc connectClient*(address:TransportAddress,scheme:SocketScheme,
             of SocketScheme.Nonsecure:
                 res.state = SocketState.Ready
             res
-      if conn.state == SocketState.Ready:
+    if conn.state == SocketState.Ready:
         return conn
 
-
-
+proc connect*(address: TransportAddress, scheme: SocketScheme,
+    hostname: string): Future[Connection] {.async.} =
+    let transp =
+        try:
+            var flags = {SocketFlags.TcpNoDelay, SocketFlags.ReuseAddr}
+            if globals.keep_system_limit:
+                flags.excl SocketFlags.TcpNoDelay
+            await connect(address, flags = flags)
+        except CancelledError as exc:
+            raise exc
+        except CatchableError:
+            nil
+    if not(isNil(transp)):
+        result = await Connection.new(transp, scheme, hostname)
+        result.port = address.port
+        return 
+    # If all attempts to connect to the remote host have failed.
+    raise newException(TransportAbortedError,
+                               "Transport was nil !")
 
 
 

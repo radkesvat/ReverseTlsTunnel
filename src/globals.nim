@@ -1,9 +1,10 @@
-import dns_resolve, hashes, print, parseopt, asyncdispatch, strutils, random, net, osproc, strformat
+import chronos
+import dns_resolve, hashes, print, parseopt,strutils, random, net, osproc, strformat
 import checksums/sha1
 
-export IpAddress
+# export IpAddress
 
-const version = "2"
+const version = "2.1"
 
 type RunMode*{.pure.} = enum
     iran, kharej
@@ -34,16 +35,16 @@ let socket_buffered* = false # when using mux, it depends
 var mux_capacity*:uint32 = 4
 
 # [Routes]
-const listen_addr* = "0.0.0.0"
-var listen_port*: uint32 = 0
+var listen_addr* = "0.0.0.0"
+var listen_port*: Port = 0.Port
 var next_route_addr* = ""
-var next_route_port*: uint32 = 0
+var next_route_port*: Port = 0.Port
 var iran_addr* = ""
-var iran_port*: uint32 = 0
+var iran_port*: Port = 0.Port
 var final_target_domain* = ""
 var final_target_ip*: string
-const final_target_port* = 443 # port of the sni host (443 for tls handshake)
-var self_ip*: IpAddress
+const final_target_port*:Port = 443.Port # port of the sni host (443 for tls handshake)
+var self_ip*: string
 
 
 # [passwords and hashes]
@@ -65,9 +66,9 @@ var debug_info* = false
 
 # [multiport]
 var multi_port* = false
-var multi_port_min: int
-var multi_port_max: int
-var multi_port_additions: seq[uint32]
+var multi_port_min: Port
+var multi_port_max: Port
+var multi_port_additions: seq[Port]
 
 # [posix constants]
 const SO_ORIGINAL_DST* = 80
@@ -84,11 +85,11 @@ proc resetIptables*() =
 
 proc createIptablesForwardRules*() =
     if reset_iptable: resetIptables()
-    if not (multi_port_min == 0 or multi_port_max == 0):
-        assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p tcp --dport {multi_port_min}:{multi_port_max} -j REDIRECT --to-port {listen_port}""").exitCode
+    if not (multi_port_min == 0.Port or multi_port_max == 0.Port):
+        assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p tcp --dport {multi_port_min}:{multi_port_max} -j REDIRECT --to-destination:127.0.0.1:{listen_port}""").exitCode
 
     for port in multi_port_additions:
-        assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p tcp --dport {port} -j REDIRECT --to-port {listen_port}""").exitCode
+        assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p tcp --dport {port} -j REDIRECT  --to-destination:127.0.0.1:{listen_port}""").exitCode
 
 
 proc multiportSupported(): bool =
@@ -143,18 +144,18 @@ proc init*() =
 
                     of "lport":
                         try:
-                            listen_port = parseInt(p.val).uint32
+                            listen_port = parseInt(p.val).Port
                         except: #multi port
                             if not multiportSupported(): quit(-1)
                             try:
                                 let port_range_string = p.val
                                 multi_port = true
-                                listen_port = 0 # will take a random port
+                                listen_port = 0.Port # will take a random port
                                 pool_size = max(2.uint, pool_size div 2.uint)
                                 let port_range = port_range_string.split('-')
                                 assert port_range.len == 2, "Invalid listen port range. !"
-                                multi_port_min = max(1, port_range[0].parseInt)
-                                multi_port_max = min(65535, port_range[1].parseInt)
+                                multi_port_min = max(1.uint16, port_range[0].parseInt.uint16).Port
+                                multi_port_max = min(65535.uint16, port_range[1].parseInt.uint16).Port
                                 assert multi_port_max-multi_port_min >= 0, "port range is invalid!  use --lport:min-max"
                             except:
                                 quit("could not parse lport.")
@@ -163,9 +164,9 @@ proc init*() =
                     of "add-port":
                         if not multiportSupported(): quit(-1)
                         multi_port = true
-                        if listen_port != 0:
-                            multi_port_additions.add listen_port
-                            listen_port = 0
+                        if listen_port != 0.Port:
+                            multi_port_additions.add listen_port.uint16
+                            listen_port = 0.Port
                         multi_port_additions.add p.val.parseInt().uint32
 
                     of "toip":
@@ -213,6 +214,10 @@ proc init*() =
                     of "trust_time":
                         trust_time = parseInt(p.val).uint
                         print trust_time
+                    
+                     of "listen":
+                        listen_addr = (p.val)
+                        print listen_addr
                     else:
                         echo "Unkown argument ", p.key
                         quit(-1)
@@ -264,9 +269,12 @@ proc init*() =
             quit(0)
         )
 
+    if multi_port and listen_addr == "0.0.0.0":
+        listen_addr = "127.0.0.1"
+
     final_target_ip = resolveIPv4(final_target_domain)
     print "\n"
-    self_ip = getPrimaryIPAddr(dest = parseIpAddress("8.8.8.8"))
+    self_ip = $getPrimaryIPAddr(dest = parseIpAddress("8.8.8.8"))
     password_hash = $(secureHash(password))
     sh1 = hash(password_hash).uint32
     sh2 = hash(sh1).uint32
