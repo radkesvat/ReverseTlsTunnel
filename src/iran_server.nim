@@ -184,7 +184,7 @@ proc processConnection(client: Connection) {.async.} =
                         echo "Trusted the connection !"
                         #peer connection
                         client.trusted = TrustStatus.yes
-                        print "Peer Fake Handshake Complete ! ", ip
+                        print "Peer Fake Handshake Complete ! ", client.transp.remoteAddress()
                         if mux: context.user_inbounds.remove(client)
                         context.peer_inbounds.register(client)
                         context.peer_ip = client.transp.remoteAddress

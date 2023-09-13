@@ -161,7 +161,7 @@ proc processConnection(client: Connection) {.async.} =
     proc close(client: Connection,remote:Connection) {.async.} =
         if not closed:
             closed = true
-            if globals.log_conn_destory: echo "[processRemote] closed client & remote"
+            if globals.log_conn_destory: echo "closed client & remote"
             if remote != nil:
                 await (remote.closeWait() and client.closeWait())
             else:
@@ -186,7 +186,8 @@ proc processConnection(client: Connection) {.async.} =
                     await client.twriter.write(data)
                     if globals.log_data_len: echo &"[processRemote] Sent {data.len()} bytes ->  client"
 
-        except: discard
+        except: 
+            echo getCurrentExceptionMsg()
         if mux:
             await remote.closeWait()
             context.outbound.remove(remote)
@@ -302,7 +303,8 @@ proc processConnection(client: Connection) {.async.} =
                         await remote.writer.write(data)
                         if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote "
 
-        except: discard
+        except: 
+            echo getCurrentExceptionMsg()
         if mux:
             await client.closeWait()
             for cid in client.mux_holds:
