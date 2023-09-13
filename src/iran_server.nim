@@ -183,16 +183,16 @@ proc processClient(client: Connection, remote: Connection, processRemoteFuture: 
                     if not globals.multi_port and not client.closed:
                         await client.writer.write(generateFinishHandShakeData(client.port))
                     return
-                else:
-                    if (epochTime().uint - client.creation_time) > globals.trust_time:
-                        #user connection but no peer connected yet
-                        #peer connection but couldnt finish handshake in time
-                        client.trusted = TrustStatus.no
-                        if mux:
-                            await close(client,remote)
-                            return
-                        else:
-                            break
+                # else:
+                #     if (epochTime().uint - client.creation_time) > globals.trust_time:
+                #         #user connection but no peer connected yet
+                #         #peer connection but couldnt finish handshake in time
+                #         client.trusted = TrustStatus.no
+                #         if mux:
+                #             await close(client,remote)
+                #             return
+                #         else:
+                #             break
 
             await client.writer.write(data)
             continue
