@@ -40,7 +40,8 @@ task build_server, "builds server":
     switch("nimblePath", nimble_path&"/pkgs2")
 
     var output = output_dir_target /  output_file_name
-    switch("mm", "orc")
+    # switch("mm", "orc") not for chronos
+    switch("mm", "refc")
     switch("threads", "off")
     # switch("exceptions", "setjmp")
     switch("warning", "HoleEnumConv:off")
@@ -48,7 +49,6 @@ task build_server, "builds server":
     
     
     switch("d", "useMalloc")
-    # switch("exceptions", "quirky")
 
     switch("d", "asyncBackend=chronos")
     switch("d", "asyncBackend:chronos")
