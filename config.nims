@@ -24,6 +24,8 @@ template require(package: untyped) =
 task install, "install deps":
     require zippy
     require checksums
+    require chronos
+
     # require stew
     # require jsony
     # require secp256k1
@@ -46,6 +48,8 @@ task build_server, "builds server":
     
     
     switch("d", "useMalloc")
+    switch("d", "asyncBackend=chronos")
+    switch("d", "asyncBackend:chronos")
  
     # switch("cc", "clang")
 

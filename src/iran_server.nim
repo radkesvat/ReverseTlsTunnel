@@ -1,5 +1,6 @@
-import std/[asyncdispatch, nativesockets, strformat, strutils, net, random, endians]
-import overrides/[asyncnet]
+import std/[strformat, strutils, net, random, endians]
+import chronos
+# import overrides/[asyncnet]
 import times, print, connection, pipe
 from globals import nil
 
@@ -97,10 +98,7 @@ proc processConnection(client: Connection) {.async.} =
 
 
     proc processRemote() {.async.} =
-        # if remote.in_use: return
-        # remote.in_use = true
         try:
-           
             while not remote.isNil and not remote.isClosed:
                 data = await remote.recv(if mux: globals.mux_chunk_size else: globals.chunk_size)
                 if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
@@ -168,8 +166,10 @@ proc processConnection(client: Connection) {.async.} =
                 await sleepAsync(100)
         else:
             for i in 0..<16:
-                remote = context.peer_inbounds.grab()
-                if remote != nil: break
+                remote = context.peer_inbounds.grab()               
+                if remote != nil:
+                    if remote.isClosed:continue
+                    break
                 await sleepAsync(100)
 
 
@@ -189,7 +189,7 @@ proc processConnection(client: Connection) {.async.} =
                         #peer connection
                         client.trusted = TrustStatus.yes
                         print "Peer Fake Handshake Complete ! ", ip
-                        context.user_inbounds.remove(client)
+                        if mux:context.user_inbounds.remove(client)
                         context.peer_inbounds.register(client)
                         context.peer_ip = client.address
                         remote.close() # close untrusted remote
@@ -256,7 +256,7 @@ proc processConnection(client: Connection) {.async.} =
             client.trusted = TrustStatus.no
             await chooseRemote() #associate peer
             if remote != nil:
-                context.user_inbounds.register(client)
+                if mux:context.user_inbounds.register(client)
                 if globals.log_conn_create: echo &"[createNewCon][Succ] Associated a peer connection"
                 if globals.multi_port:
                     await remote.unEncryptedSend(generateFinishHandShakeData(client.port))
