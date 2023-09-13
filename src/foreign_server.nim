@@ -187,7 +187,7 @@ proc processConnection(client: Connection) {.async.} =
                     if globals.log_data_len: echo &"[processRemote] Sent {data.len()} bytes ->  client"
 
         except: 
-            echo getCurrentExceptionMsg()
+            if globals.log_conn_error: echo getCurrentExceptionMsg()
         if mux:
             await remote.closeWait()
             context.outbound.remove(remote)
@@ -304,7 +304,7 @@ proc processConnection(client: Connection) {.async.} =
                         if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote "
 
         except: 
-            echo getCurrentExceptionMsg()
+            if globals.log_conn_error: echo getCurrentExceptionMsg()
         if mux:
             await client.closeWait()
             for cid in client.mux_holds:
