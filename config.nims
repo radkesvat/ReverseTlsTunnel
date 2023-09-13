@@ -59,7 +59,7 @@ task build_server, "builds server":
 
     switch("nimcache", "build"/hostOS/hostCPU)
     # switch("define", "logGC")
-    switch("define", "ssl")
+    # switch("define", "ssl")
 
     when Release:
         switch("opt", "speed")
@@ -86,8 +86,7 @@ task build_server, "builds server":
         # switch("passL", " -static")
         # switch("passL", " -static-libgcc")
         # switch("passL", " -static-libstdc++")
-    else:
-        switch("d", "futureLogging")
+ 
 
 
     switch("backend", backend)
