@@ -44,7 +44,7 @@ var iran_port*: Port = 0.Port
 var final_target_domain* = ""
 var final_target_ip*: string
 const final_target_port*:Port = 443.Port # port of the sni host (443 for tls handshake)
-var self_ip*: string
+var self_ip*: TransportAddress
 
 
 # [passwords and hashes]
@@ -156,7 +156,7 @@ proc init*() =
                                 assert port_range.len == 2, "Invalid listen port range. !"
                                 multi_port_min = max(1.uint16, port_range[0].parseInt.uint16).Port
                                 multi_port_max = min(65535.uint16, port_range[1].parseInt.uint16).Port
-                                assert multi_port_max-multi_port_min >= 0, "port range is invalid!  use --lport:min-max"
+                                assert multi_port_max.uint16 - multi_port_min.uint16 >= 0, "port range is invalid!  use --lport:min-max"
                             except:
                                 quit("could not parse lport.")
 
@@ -165,9 +165,9 @@ proc init*() =
                         if not multiportSupported(): quit(-1)
                         multi_port = true
                         if listen_port != 0.Port:
-                            multi_port_additions.add listen_port.uint16
+                            multi_port_additions.add listen_port.Port
                             listen_port = 0.Port
-                        multi_port_additions.add p.val.parseInt().uint32
+                        multi_port_additions.add p.val.parseInt().Port
 
                     of "toip":
                         next_route_addr = (p.val)
@@ -175,7 +175,7 @@ proc init*() =
 
                     of "toport":
                         try:
-                            next_route_port = parseInt(p.val).uint32
+                            next_route_port = parseInt(p.val).Port
                             print next_route_port
 
                         except: #multi port
@@ -192,7 +192,7 @@ proc init*() =
                         print iran_addr
 
                     of "iran-port":
-                        iran_port = parseInt(p.val).uint32
+                        iran_port = parseInt(p.val).Port
                         print iran_port
 
                     of "sni":
@@ -215,7 +215,7 @@ proc init*() =
                         trust_time = parseInt(p.val).uint
                         print trust_time
                     
-                     of "listen":
+                    of "listen":
                         listen_addr = (p.val)
                         print listen_addr
                     else:
@@ -236,19 +236,19 @@ proc init*() =
             if iran_addr.isEmptyOrWhitespace():
                 echo "specify the ip address of the iran server --iran-addr:{ip}"
                 exit = true
-            if iran_port == 0 and not multi_port:
+            if iran_port == 0.Port and not multi_port:
                 echo "specify the iran server prot --iran-port:{port}"
                 exit = true
 
             if next_route_addr.isEmptyOrWhitespace():
                 echo "specify the next ip for routing --toip:{ip} (usually 127.0.0.1)"
                 exit = true
-            if next_route_port == 0 and not multi_port:
+            if next_route_port == 0.Port and not multi_port:
                 echo "specify the port of the next ip for routing --toport:{port} (the port of the config that panel shows you)"
                 exit = true
 
         of RunMode.iran:
-            if listen_port == 0 and not multi_port:
+            if listen_port == 0.Port and not multi_port:
                 echo "specify the listen prot --lport:{port}  (usually 443)"
                 exit = true
 
@@ -264,7 +264,7 @@ proc init*() =
 
     if terminate_secs != 0:
         sleepAsync(terminate_secs*1000).addCallback(
-            proc() =
+            proc(arg: pointer) =
             echo "Exiting due to termination timeout. (--terminate)"
             quit(0)
         )
@@ -274,7 +274,7 @@ proc init*() =
 
     final_target_ip = resolveIPv4(final_target_domain)
     print "\n"
-    self_ip = $getPrimaryIPAddr(dest = parseIpAddress("8.8.8.8"))
+    self_ip =  initTAddress($ getPrimaryIPAddr(dest = parseIpAddress("8.8.8.8")))
     password_hash = $(secureHash(password))
     sh1 = hash(password_hash).uint32
     sh2 = hash(sh1).uint32

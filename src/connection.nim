@@ -28,7 +28,7 @@ type
 
 
     Connection* = ref object
-        # creation_time*: uint        #creation epochtime
+        creation_time*: uint        #creation epochtime
         # action_start_time*: uint    #when recv/send action started (0 = idle)
         # register_start_time*: uint  #when the connection is added to the pool (0 = idle)
         id*: uint32 #global incremental id
@@ -207,8 +207,15 @@ proc register*(cons: var Connections, con: Connection) =
 #     con.socket.currPos = 0
 
 
+proc closed*(conn: Connection):bool=
+    case conn.kind 
+    of SocketScheme.NonSecure:
+        return conn.reader.closed and conn.writer.closed
+    of SocketScheme.Secure:
+        return conn.reader.closed and conn.writer.closed and 
+            conn.treader.closed and conn.twriter.closed 
 
-proc closeWait(conn: Connection) {.async.} =
+proc closeWait*(conn: Connection) {.async.} =
     ## Close HttpClientConnectionRef instance ``conn`` and free all the resources.
     if conn.state notin {SocketState.Closing,
                          SocketState.Closed}:
@@ -284,11 +291,12 @@ proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketSc
             of SocketScheme.Nonsecure:
                 res.state = SocketState.Ready
             res
+    conn.creation_time = et
     if conn.state == SocketState.Ready:
         return conn
 
-proc connect*(address: TransportAddress, scheme: SocketScheme,
-    hostname: string): Future[Connection] {.async.} =
+proc connect*(address: TransportAddress, scheme: SocketScheme = SocketScheme.NonSecure,
+    hostname: string = ""): Future[Connection] {.async.} =
     let transp =
         try:
             var flags = {SocketFlags.TcpNoDelay, SocketFlags.ReuseAddr}
