@@ -105,7 +105,7 @@ proc processConnection(client: Connection) {.async.} =
         try:
             while not remote.isNil and not remote.closed:
                 # data = await remote.recv(if mux: globals.mux_chunk_size else: globals.chunk_size)
-                data.setlen await remote.reader.readOnce(data,addr data[0],globals.chunk_size)
+                data.setlen await remote.reader.readOnce(addr data[0],globals.chunk_size)
                 if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
 
                 if data.len() == 0:
@@ -183,7 +183,7 @@ proc processConnection(client: Connection) {.async.} =
             while not client.closed:
                 echo "read try"
                 # data = await client.recv(if mux: globals.mux_payload_size else: globals.chunk_size)
-                data.setlen await client.reader.readOnce(data,addr data[0],globals.chunk_size)
+                data.setlen await client.reader.readOnce(addr data[0],globals.chunk_size)
                 
                 if globals.log_data_len: echo &"[processClient] {data.len()} bytes from client {client.id}"
 
