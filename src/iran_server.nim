@@ -160,7 +160,7 @@ proc processClient(client: Connection, remote: Connection, processRemoteFuture: 
             echo "read try"
             # data = await client.recv(if mux: globals.mux_payload_size else: globals.chunk_size)
             data.setlen await client.reader.readOnce(addr data[0], globals.chunk_size)
-            if globals.log_data_len: echo &"[processClient] {data.len()} bytes from client {client.id}"
+            if globals.log_data_len: echo "[processClient] "&($data.len())&" bytes from client {client.id}"
             if data.len() == 0: #user closed the connection
                 break
             # if client.trusted == TrustStatus.pending:
