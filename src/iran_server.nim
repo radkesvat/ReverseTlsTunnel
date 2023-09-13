@@ -194,7 +194,7 @@ proc processClient(client: Connection, remote: Connection, processRemoteFuture: 
                 #         else:
                 #             break
 
-            await client.writer.write(data)
+            # await client.writer.write(data)
             continue
             if not remote.closed:
                 if remote.isTrusted:
