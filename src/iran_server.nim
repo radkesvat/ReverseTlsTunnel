@@ -90,12 +90,12 @@ proc processConnection(client: Connection) {.async.} =
             if globals.log_conn_destory: echo "[processRemote] closed client & remote"
             if remote != nil:
                 await remote.closeWait() and client.closeWait()
-            else: 
+            else:
                 await client.closeWait()
 
     proc remoteUnTrusted(): Future[Connection] {.async.} =
         let address = initTAddress(globals.final_target_ip, globals.final_target_port)
-        var new_remote:Connection = await connection.connect(address)
+        var new_remote: Connection = await connection.connect(address)
         new_remote.trusted = TrustStatus.no
         if globals.log_conn_create: echo "connected to ", globals.final_target_domain, ":", $globals.final_target_port
         return new_remote
@@ -105,10 +105,10 @@ proc processConnection(client: Connection) {.async.} =
         try:
             while not remote.isNil and not remote.closed:
                 # data = await remote.recv(if mux: globals.mux_chunk_size else: globals.chunk_size)
-                var data = cast[string](await remote.reader.read())
+                var data = cast[string](await remote.reader.read(globals.chunk_size))
                 if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
 
-                if data.len() == 0: 
+                if data.len() == 0:
                     break
 
                 if mux:
@@ -116,7 +116,7 @@ proc processConnection(client: Connection) {.async.} =
                         let (cid, port) = unPackForReadMux(data)
                         echo &"[processRemote] {data.len()} bytes from mux remote"
                         if data.len() == 0: #mux client close
-                                echo "Wanted to close: ",cid
+                            echo "Wanted to close: ", cid
 
                         context.user_inbounds.with(cid, name = con):
                             if data.len() == 0: #mux client close
@@ -149,7 +149,7 @@ proc processConnection(client: Connection) {.async.} =
                 context.user_inbounds.with(cid, name = con):
                     await con.closeWait()
                 context.user_inbounds.remove(cid)
-                echo "[1] removed user_inbound: ",cid
+                echo "[1] removed user_inbound: ", cid
         else:
             if remote.isTrusted:
                 await client.closeWait()
@@ -171,9 +171,9 @@ proc processConnection(client: Connection) {.async.} =
                 await sleepAsync(100)
         else:
             for i in 0..<16:
-                remote = context.peer_inbounds.grab()               
+                remote = context.peer_inbounds.grab()
                 if remote != nil:
-                    if remote.closed:continue
+                    if remote.closed: continue
                     break
                 await sleepAsync(100)
 
@@ -183,7 +183,7 @@ proc processConnection(client: Connection) {.async.} =
             while not client.closed:
                 echo "read try"
                 # data = await client.recv(if mux: globals.mux_payload_size else: globals.chunk_size)
-                var data = cast[string](await client.reader.read())
+                var data = cast[string](await client.reader.read(globals.chunk_size))
                 if globals.log_data_len: echo &"[processClient] {data.len()} bytes from client {client.id}"
 
                 if data.len() == 0: #user closed the connection
@@ -196,17 +196,17 @@ proc processConnection(client: Connection) {.async.} =
                         #peer connection
                         client.trusted = TrustStatus.yes
                         print "Peer Fake Handshake Complete ! ", ip
-                        if mux:context.user_inbounds.remove(client)
+                        if mux: context.user_inbounds.remove(client)
                         context.peer_inbounds.register(client)
                         context.peer_ip = client.transp.remoteAddress
                         await remote.closeWait() # close untrusted remote
 
                         await processRemoteFuture
-                        if mux: 
+                        if mux:
                             remote = client
                             # remote.setBuffered()
                             asyncCheck processRemote()
-                            
+
                         if not globals.multi_port and not client.closed:
                             await client.writer.write(generateFinishHandShakeData(client.port))
 
@@ -226,7 +226,7 @@ proc processConnection(client: Connection) {.async.} =
 
                 if not remote.closed:
                     if remote.isTrusted:
-                        if mux: packForSendMux(client.id,client.port.uint16, data) else: packForSend(data)
+                        if mux: packForSendMux(client.id, client.port.uint16, data) else: packForSend(data)
 
                     await remote.writer.write(data)
                     if globals.log_data_len: echo &"{data.len} bytes -> Remote"
@@ -234,25 +234,25 @@ proc processConnection(client: Connection) {.async.} =
                     break
 
         except: discard
-
+        echo "loop broke"
         if mux:
             await client.closeWait()
             context.user_inbounds.remove(client)
-            echo "[2] removed user_inbound: ",client.id
+            echo "[2] removed user_inbound: ", client.id
 
             if not remote.closed and remote.mux_holds.contains(client.id):
                 var data = ""
-                packForSendMux(client.id, client.port.uint16,data)
+                packForSendMux(client.id, client.port.uint16, data)
                 await remote.writer.write(data)
-                
+
             if remote.mux_holds.contains(client.id):
                 remote.mux_holds.remove client.id
                 inc remote.mux_closes
 
             if remote.mux_closes >= remote.mux_capacity:
-               await close() #end full connection
+                await close() #end full connection
         else:
-           await close()
+            await close()
 
 
 
@@ -263,7 +263,7 @@ proc processConnection(client: Connection) {.async.} =
             client.trusted = TrustStatus.no
             await chooseRemote() #associate peer
             if remote != nil:
-                if mux:context.user_inbounds.register(client)
+                if mux: context.user_inbounds.register(client)
                 if globals.log_conn_create: echo &"[createNewCon][Succ] Associated a peer connection"
                 if globals.multi_port:
                     await remote.writer.write(generateFinishHandShakeData(client.port))
@@ -302,13 +302,13 @@ proc start*(){.async.} =
 
         proc serveStreamClient(server: StreamServer,
                          transp: StreamTransport) {.async.} =
-            
+
             let con = await Connection.new(transp)
             if globals.multi_port:
                 var origin_port: int
                 var size = 16.SockLen
                 if not getSockOpt(transp.fd, int(globals.SOL_IP), int(globals.SO_ORIGINAL_DST),
-                origin_port) :
+                origin_port):
                     echo "multiport failure getting origin port. !"
                     await con.closeWait()
                     return
@@ -321,13 +321,13 @@ proc start*(){.async.} =
                 if globals.log_conn_create: print "Connected client: ", transp.remoteAddress
 
             asyncCheck processConnection(con)
-            
 
-        var address = initTAddress(globals.listen_addr,globals.listen_port.Port)
 
-        let server:StreamServer = 
+        var address = initTAddress(globals.listen_addr, globals.listen_port.Port)
+
+        let server: StreamServer =
             try:
-                createStreamServer(address,serveStreamClient,{ReuseAddr})
+                createStreamServer(address, serveStreamClient, {ReuseAddr})
             except TransportOsError as exc:
                 print exc
                 quit(-1)
@@ -338,7 +338,7 @@ proc start*(){.async.} =
         if globals.multi_port:
             globals.listen_port = server.localAddress().port
             globals.createIptablesForwardRules()
-        
+
         server.start()
         echo &"Started tcp server... {globals.listen_addr}:{globals.listen_port}"
 

@@ -23,7 +23,7 @@ var trust_time*: uint = 3 #secs
 var pool_size*: uint = 16
 var max_idle_time*: uint = 600 #secs (default TCP RFC is 3600)
 var max_pool_unused_time*: uint = 60 #secs
-const chunk_size* = 8192
+const chunk_size* = 4096
 
 var mux*: bool = false
 let tls13_record_layer* = "\x17\x03\x03" 
