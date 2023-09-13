@@ -257,7 +257,7 @@ proc processConnection(client: Connection) {.async.} =
 
     try:
         if context.peer_ip != TransportAddress() and
-            context.peer_ip != client.transp.remoteAddress:
+            context.peer_ip.address != client.transp.remoteAddress.address:
             echo "Real User connected !"
             client.trusted = TrustStatus.no
             await chooseRemote() #associate peer
