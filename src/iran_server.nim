@@ -80,7 +80,6 @@ proc generateFinishHandShakeData(client_port: Port): string =
 
 proc processConnection(client: Connection) {.async.} =
     var remote: Connection = nil
-    var data = newString(len = globals.chunk_size)
     var processRemoteFuture: Future[void]
 
     var closed = false
@@ -102,6 +101,7 @@ proc processConnection(client: Connection) {.async.} =
 
 
     proc processRemote() {.async.} =
+        var data = newString(len = globals.chunk_size)
         try:
             while not remote.isNil and not remote.closed:
                 # data = await remote.recv(if mux: globals.mux_chunk_size else: globals.chunk_size)
@@ -179,6 +179,8 @@ proc processConnection(client: Connection) {.async.} =
 
 
     proc processClient() {.async.} =
+        var data = newString(len = globals.chunk_size)
+
         try:
             while not client.closed:
                 echo "read try"
@@ -194,6 +196,7 @@ proc processConnection(client: Connection) {.async.} =
                 if client.trusted == TrustStatus.pending:
                     var (trust, ip) = monitorData(data)
                     if trust:
+                        echo "Trusted the connection !"
                         #peer connection
                         client.trusted = TrustStatus.yes
                         print "Peer Fake Handshake Complete ! ", ip
