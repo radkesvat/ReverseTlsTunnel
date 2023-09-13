@@ -274,7 +274,7 @@ proc init*() =
 
     final_target_ip = resolveIPv4(final_target_domain)
     print "\n"
-    self_ip =  initTAddress($ getPrimaryIPAddr(dest = parseIpAddress("8.8.8.8")))
+    self_ip =  initTAddress(getPrimaryIPAddr(dest = parseIpAddress("8.8.8.8")),0.Port)
     password_hash = $(secureHash(password))
     sh1 = hash(password_hash).uint32
     sh2 = hash(sh1).uint32
