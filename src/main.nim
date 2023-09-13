@@ -2,7 +2,7 @@
 import chronos
 import std/[random,exitprocs]
 from globals import nil
-import connection,iran_server
+import connection,iran_server,foreign_server
 
 
 randomize()
@@ -51,6 +51,7 @@ asyncCheck startController()
 if globals.mode == globals.RunMode.iran:
     asyncCheck iran_server.start()
 else:
-    discard
+    asyncCheck foreign_server.start()
+
 
 runForever()

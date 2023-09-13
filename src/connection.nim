@@ -312,9 +312,10 @@ proc connect*(address: TransportAddress, scheme: SocketScheme = SocketScheme.Non
         result = await Connection.new(transp, scheme, hostname)
         result.port = address.port
         return 
-    # If all attempts to connect to the remote host have failed.
+    # If all attempts to connect to the remote host have failed.\
+    echo "[connect] connection to the remote host has failed."
     raise newException(TransportAbortedError,
-                               "Transport was nil !")
+                               "Transport was nil!")
 
 
 

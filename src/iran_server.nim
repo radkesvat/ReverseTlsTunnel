@@ -14,7 +14,7 @@ from globals import nil
 type
     TunnelConnectionPoolContext = object
         # listener_server: Connection # for testing on local pc
-        listener: Connection
+        listener: StreamServer
         user_inbounds: Connections
         peer_inbounds: Connections
         peer_ip: TransportAddress
@@ -73,7 +73,7 @@ proc processConnection(client: Connection) {.async.} =
             closed = true
             if globals.log_conn_destory: echo "[processRemote] closed client & remote"
             if remote != nil:
-                await remote.closeWait() and client.closeWait()
+                await (remote.closeWait() and client.closeWait())
             else:
                 await client.closeWait()
 
@@ -169,7 +169,6 @@ proc processConnection(client: Connection) {.async.} =
 
         try:
             while not client.closed:
-                echo "read try"
                 # data = await client.recv(if mux: globals.mux_payload_size else: globals.chunk_size)
                 data.setlen await client.reader.readOnce(addr data[0], globals.chunk_size)
 
@@ -217,15 +216,12 @@ proc processConnection(client: Connection) {.async.} =
                 if not remote.closed:
                     if remote.isTrusted:
                         if mux: packForSendMux(client.id, client.port.uint16, data) else: packForSend(data)
-
                     await remote.writer.write(data)
                     if globals.log_data_len: echo &"{data.len} bytes -> Remote"
                 else:
                     break
 
-        except:
-            echo getCurrentExceptionMsg()
-        echo "loop broke"
+        except:discard
         if mux:
             await client.closeWait()
             context.user_inbounds.remove(client)
@@ -306,11 +302,10 @@ proc start*(){.async.} =
             try:
                 createStreamServer(address, serveStreamClient, {ReuseAddr})
             except TransportOsError as exc:
-                print exc
-                quit(-1)
+                raise exc
             except CatchableError as exc:
-                print exc
-                quit(-1)
+                raise exc
+        context.listener = server
 
         if globals.multi_port:
             globals.listen_port = server.localAddress().port

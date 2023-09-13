@@ -1,4 +1,5 @@
-import std/[asyncdispatch, strformat, net, openssl, random]
+import chronos
+import std/[strformat, net, openssl, random]
 import overrides/[asyncnet]
 import print, connection, pipe
 from globals import nil
@@ -10,92 +11,117 @@ type
         outbound: Connections
 
 var context = ServerConnectionPoolContext()
-var ssl_ctx = newContext(verifyMode = CVerifyPeer)
 var mux = false
 
 # [FWD]
 proc poolFrame(create_count: uint = 0)
 
-proc sslConnect(con: Connection, ip: string, sni: string){.async.} =
-    # con.socket.close()
-    var fc = 0
-    echo &"connecting to {ip}:{$con.port} (sni: {sni}) ..."
 
-    while true:
-        if fc > 3:
-            con.close()
-            raise newException(ValueError, "[SslConnect] could not connect, all retires failed")
-
-        # var fut = con.socket.connect(ip, con.port.Port, sni = sni)
-        var fut = asyncnet.dial(ip, Port(con.port), buffered = false)
-
-        var timeout = withTimeout(fut, 3000)
-        yield timeout
-        if timeout.failed():
-            inc fc
-            if globals.log_conn_error: echo timeout.error.msg
-            if globals.log_conn_error: echo &"[SslConnect] retry in {min(1000,fc*200)} ms"
-            await sleepAsync(min(1000, fc*200))
-            continue
-        if timeout.read() == true:
-            con.socket = fut.read()
-            break
-        if timeout.read() == false:
-            con.close()
-            raise newException(ValueError, "[SslConnect] dial timed-out")
-
-    try:
-        if not globals.keep_system_limit: con.socket.setSockOpt(OptNoDelay, true)
-
-        ssl_ctx.wrapConnectedSocket(
-            con.socket, handshakeAsClient, sni)
-        let flags = {SocketFlag.SafeDisconn}
-
-        block handshake:
-            sslLoop(con.socket, flags, sslDoHandshake(con.socket.sslHandle))
-
-    except:
-        echo "[SslConnect] handshake error!"
-        con.close()
-        raise getCurrentException()
-
-    if globals.log_conn_create: print "[SslConnect] conencted !"
-
-    
-    SSL_free(con.socket.sslHandle)
-    con.socket.isSsl = false
-
+proc generateFinishHandShakeData(): string =
     #AES default chunk size is 16 so use a multple of 16
     let rlen: uint16 = uint16(16*(6+rand(4)))
     var random_trust_data: string
     random_trust_data.setLen(rlen)
 
-
     copyMem(addr random_trust_data[0], addr(globals.random_str[rand(250)]), rlen)
     copyMem(addr random_trust_data[0], addr globals.tls13_record_layer[0], 3) #tls header
     copyMem(addr random_trust_data[3], addr rlen, 2) #tls len
-
-
 
     let base = 5 + 7 + `mod`(globals.sh5, 7.uint8)
     copyMem(unsafeAddr random_trust_data[base+0], unsafeAddr globals.sh1.uint32, 4)
     copyMem(unsafeAddr random_trust_data[base+4], unsafeAddr globals.sh2.uint32, 4)
 
-    case globals.self_ip.family: # the type of the IP address (IPv4 or IPv6)
-        of IpAddressFamily.IPv6:
-            random_trust_data[base+9] = 6.char
-            copyMem(unsafeAddr random_trust_data[base+10], unsafeAddr globals.self_ip.address_v6[0], globals.self_ip.address_v6.len)
+    # case globals.self_ip.family: # the type of the IP address (IPv4 or IPv6)
+    #     of IpAddressFamily.IPv6:
+    #         random_trust_data[base+9] = 6.char
+    #         copyMem(unsafeAddr random_trust_data[base+10], unsafeAddr globals.self_ip.address_v6[0], globals.self_ip.address_v6.len)
 
-        of IpAddressFamily.IPv4:
-            random_trust_data[base+9] = 4.char
-            copyMem(unsafeAddr random_trust_data[base+10], unsafeAddr globals.self_ip.address_v4[0], globals.self_ip.address_v4.len)
+    #     of IpAddressFamily.IPv4:
+    #         random_trust_data[base+9] = 4.char
+    #         copyMem(unsafeAddr random_trust_data[base+10], unsafeAddr globals.self_ip.address_v4[0], globals.self_ip.address_v4.len)
+
+    return random_trust_data
+
+# proc sslConnect(con: Connection, ip: string, sni: string){.async.} =
+#     # con.socket.close()
+#     var fc = 0
+#     echo &"connecting to {ip}:{$con.port} (sni: {sni}) ..."
+
+#     while true:
+#         if fc > 3:
+#             con.close()
+#             raise newException(ValueError, "[SslConnect] could not connect, all retires failed")
+
+#         # var fut = con.socket.connect(ip, con.port.Port, sni = sni)
+#         var fut = asyncnet.dial(ip, Port(con.port), buffered = false)
+
+#         var timeout = withTimeout(fut, 3000)
+#         yield timeout
+#         if timeout.failed():
+#             inc fc
+#             if globals.log_conn_error: echo timeout.error.msg
+#             if globals.log_conn_error: echo &"[SslConnect] retry in {min(1000,fc*200)} ms"
+#             await sleepAsync(min(1000, fc*200))
+#             continue
+#         if timeout.read() == true:
+#             con.socket = fut.read()
+#             break
+#         if timeout.read() == false:
+#             con.close()
+#             raise newException(ValueError, "[SslConnect] dial timed-out")
+
+#     try:
+#         if not globals.keep_system_limit: con.socket.setSockOpt(OptNoDelay, true)
+
+#         ssl_ctx.wrapConnectedSocket(
+#             con.socket, handshakeAsClient, sni)
+#         let flags = {SocketFlag.SafeDisconn}
+
+#         block handshake:
+#             sslLoop(con.socket, flags, sslDoHandshake(con.socket.sslHandle))
+
+#     except:
+#         echo "[SslConnect] handshake error!"
+#         con.close()
+#         raise getCurrentException()
+
+#     if globals.log_conn_create: print "[SslConnect] conencted !"
+
+    
+#     SSL_free(con.socket.sslHandle)
+#     con.socket.isSsl = false
+
+#     #AES default chunk size is 16 so use a multple of 16
+#     let rlen: uint16 = uint16(16*(6+rand(4)))
+#     var random_trust_data: string
+#     random_trust_data.setLen(rlen)
 
 
-    # if globals.multi_port:
-    #     copyMem(unsafeAddr random_trust_data[8], unsafeAddr client_origin_port, 4)
-    await con.unEncryptedSend(random_trust_data)
+#     copyMem(addr random_trust_data[0], addr(globals.random_str[rand(250)]), rlen)
+#     copyMem(addr random_trust_data[0], addr globals.tls13_record_layer[0], 3) #tls header
+#     copyMem(addr random_trust_data[3], addr rlen, 2) #tls len
 
-    con.trusted = TrustStatus.pending
+
+
+#     let base = 5 + 7 + `mod`(globals.sh5, 7.uint8)
+#     copyMem(unsafeAddr random_trust_data[base+0], unsafeAddr globals.sh1.uint32, 4)
+#     copyMem(unsafeAddr random_trust_data[base+4], unsafeAddr globals.sh2.uint32, 4)
+
+#     # case globals.self_ip.family: # the type of the IP address (IPv4 or IPv6)
+#     #     of IpAddressFamily.IPv6:
+#     #         random_trust_data[base+9] = 6.char
+#     #         copyMem(unsafeAddr random_trust_data[base+10], unsafeAddr globals.self_ip.address_v6[0], globals.self_ip.address_v6.len)
+
+#     #     of IpAddressFamily.IPv4:
+#     #         random_trust_data[base+9] = 4.char
+#     #         copyMem(unsafeAddr random_trust_data[base+10], unsafeAddr globals.self_ip.address_v4[0], globals.self_ip.address_v4.len)
+
+
+#     # if globals.multi_port:
+#     #     copyMem(unsafeAddr random_trust_data[8], unsafeAddr client_origin_port, 4)
+#     await con.unEncryptedSend(random_trust_data)
+
+#     con.trusted = TrustStatus.pending
 
 
 proc monitorData(data: string): tuple[trust: bool, port: uint32] =
@@ -123,66 +149,70 @@ proc monitorData(data: string): tuple[trust: bool, port: uint32] =
 
 proc processConnection(client: Connection) {.async.} =
     # var remote: Connection = nil
-    var data = ""
-
     # var remoteEstabilishment: Future[void] = nil
 
-    proc remoteTrusted(): Connection =
-        var new_remote = newConnection()
-        new_remote.trusted = TrustStatus.yes
-        new_remote.estabilished = nil
-        return new_remote
+    proc remoteTrusted(port:Port): Future[Connection] {.async.} =
+        var con = await connection.connect(initTAddress(globals.next_route_addr,port))
+        con.trusted = TrustStatus.yes
+        return con
+
 
     var closed = false
-    proc close(client: Connection, remote: Connection) =
+    proc close(client: Connection,remote:Connection) {.async.} =
         if not closed:
             closed = true
             if globals.log_conn_destory: echo "[processRemote] closed client & remote"
-            client.close()
             if remote != nil:
-                remote.close()
+                await (remote.closeWait() and client.closeWait())
+            else:
+                await client.closeWait()
 
     proc processRemote(remote: Connection) {.async.} =
+        var data = newString(len = globals.chunk_size)
         try:
-            while not remote.isClosed:
-                data = await remote.recv(if mux: globals.mux_payload_size else: globals.chunk_size)
+            while not remote.closed:
+                # data = await remote.recv(if mux: globals.mux_payload_size else: globals.chunk_size)
+                data.setlen await remote.reader.readOnce(addr data[0], globals.chunk_size)
+
                 if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
 
 
                 if data.len() == 0:
                     break
                 
-                if not client.isClosed():
+                if not client.closed():
                     if mux: packForSendMux(remote.id, remote.port.uint16, data) else: packForSend(data)
 
-                    await client.unEncryptedSend(data)
+                    await client.twriter.write(data)
                     if globals.log_data_len: echo &"[processRemote] Sent {data.len()} bytes ->  client"
 
         except: discard
         if mux:
-            remote.close()
+            await remote.closeWait()
             context.outbound.remove(remote)
 
-            if not client.isClosed and client.mux_holds.contains(remote.id):
+            if not client.closed and client.mux_holds.contains(remote.id):
                 client.mux_holds.remove(remote.id)
                 inc client.mux_closes
                 var data = ""
                 echo "sending mux client close .... ", remote.id
                 packForSendMux(remote.id, remote.port.uint16, data)
-                await client.send(data)
+                await client.twriter.write(data)
 
             if client.mux_closes >= client.mux_capacity:
-                client.close() #end full connection
+                await client.closeWait() #end full connection
         else:
-            close(client, remote)
+            await close(client,remote)
 
     proc proccessClient() {.async.} =
         var remote: Connection = nil
+        var data = newString(len = globals.chunk_size)
 
         try:
-            while not client.isClosed:
+            while not client.closed:
+                data.setlen await client.treader.readOnce(addr data[0], globals.chunk_size)
 
-                data = await client.recv(if mux: globals.mux_chunk_size else: globals.chunk_size)
+                # data = await client.recv(if mux: globals.mux_chunk_size else: globals.chunk_size)
                 if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes from client"
 
 
@@ -191,85 +221,72 @@ proc processConnection(client: Connection) {.async.} =
 
 
                 if mux:
-                    if client.isTrusted:
-                        var (cid, port) = unPackForReadMux(data)
-                        if not globals.multi_port: port = globals.next_route_port.uint16
-                        print cid, port
-                        if not context.outbound.hasID(cid):
-                            let new_remote = remoteTrusted()
-                            new_remote.id = cid
-                            new_remote.port = port
-                            client.mux_holds.add(new_remote.id)
-                            if client.mux_holds.len.uint32 > client.mux_capacity:
-                                echo "[ERROR] this mux connection is taking more than capacity"
-                            context.outbound.register new_remote
-                            new_remote.estabilished = new_remote.socket.connect(globals.next_route_addr, port.Port)
-                            await new_remote.estabilished
-                            echo "connected to the remote core"
-                            asyncCheck processRemote(new_remote)
+                    discard #who cares
+                    # if client.isTrusted:
+                    #     var (cid, port) = unPackForReadMux(data)
+                    #     if not globals.multi_port: port = globals.next_route_port.uint16
+                    #     print cid, port
+                    #     if not context.outbound.hasID(cid):
+                    #         let new_remote = remoteTrusted()
+                    #         new_remote.id = cid
+                    #         new_remote.port = port
+                    #         client.mux_holds.add(new_remote.id)
+                    #         if client.mux_holds.len.uint32 > client.mux_capacity:
+                    #             echo "[ERROR] this mux connection is taking more than capacity"
+                    #         context.outbound.register new_remote
+                    #         new_remote.estabilished = new_remote.socket.connect(globals.next_route_addr, port.Port)
+                    #         await new_remote.estabilished
+                    #         echo "connected to the remote core"
+                    #         asyncCheck processRemote(new_remote)
 
-                        context.outbound.with(cid, name = con):
-                            if not con.estabilished.finished:
-                                await con.estabilished
+                    #     context.outbound.with(cid, name = con):
+                    #         if not con.estabilished.finished:
+                    #             await con.estabilished
 
-                            if data.len() == 0: #mux remote close
-                                echo "[processRemote] closed Mux remote"
-                                con.close()
-                                context.outbound.remove cid
-                                client.mux_holds.remove cid
-                                inc client.mux_closes
-                            elif not con.isClosed():
-                                await con.send(data)
-                                echo &"[proccessClient] {data.len()} bytes -> remote "
+                    #         if data.len() == 0: #mux remote close
+                    #             echo "[processRemote] closed Mux remote"
+                    #             con.close()
+                    #             context.outbound.remove cid
+                    #             client.mux_holds.remove cid
+                    #             inc client.mux_closes
+                    #         elif not con.closed():
+                    #             await con.send(data)
+                    #             echo &"[proccessClient] {data.len()} bytes -> remote "
 
-                    if client.trusted == TrustStatus.pending:
-                        var (trust, _) = monitorData(data)
-                        if trust:
-                            client.trusted = TrustStatus.yes
-                            print "Fake Reverse Handshake Complete !"
-                            client.setBuffered()
+                    # if client.trusted == TrustStatus.pending:
+                    #     var (trust, _) = monitorData(data)
+                    #     if trust:
+                    #         client.trusted = TrustStatus.yes
+                    #         print "Fake Reverse Handshake Complete !"
+                    #         client.setBuffered()
 
-                        else:
-                            echo "[proccessClient] Target server was not a trusted tunnel client, closing..."
-                            client.trusted = TrustStatus.no
-                            break
+                    #     else:
+                    #         echo "[proccessClient] Target server was not a trusted tunnel client, closing..."
+                    #         client.trusted = TrustStatus.no
+                    #         break
 
 
                 else:
+                    if (client.isTrusted()) and (remote.isNil()):
+                        remote = await remoteTrusted(client.port.Port)
+                        asyncCheck processRemote(remote)
+                        let i = context.free_peer_outbounds.find(client)
+                        if i != -1: context.free_peer_outbounds.del(i)
+                        # echo "established to remote, calling pool frame"
+                        poolFrame()
 
-                    if (client.isTrusted()) and (not remote.isNil()):
-                        if remote.estabilished.isNil:
-                            remote.estabilished = remote.socket.connect(globals.next_route_addr, client.port.Port)
-                            await remote.estabilished
-                            asyncCheck processRemote(remote)
-
-                            let i = context.free_peer_outbounds.find(client)
-                            if i != -1: context.free_peer_outbounds.del(i)
-                            echo "established to remote, calling pool frame"
-                            poolFrame()
-
-                        elif not remote.estabilished.finished:
-                            await remote.estabilished
-
+    
 
                     if client.trusted == TrustStatus.pending:
                         var (trust, port) = monitorData(data)
                         if trust:
                             if globals.multi_port:
                                 echo "multi-port target:", port
-                                client.port = port
+                                client.port = port.Port
                             else:
-                                client.port = globals.next_route_port.uint32
+                                client.port = globals.next_route_port.Port
                             client.trusted = TrustStatus.yes
                             print "Fake Reverse Handshake Complete !"
-                            # remote.close()
-                            # asyncdispatch.poll()
-                            try:
-                                remote = remoteTrusted()
-
-                            except:
-                                echo &"[Error] Failed to connect to the Target {globals.next_route_addr}:{globals.next_route_port}"
-                                raise
 
                             continue
                         else:
@@ -281,18 +298,18 @@ proc processConnection(client: Connection) {.async.} =
 
                     unPackForRead(data)
 
-                    if not remote.isClosed():
-                        await remote.send(data)
+                    if not remote.closed():
+                        await remote.writer.write(data)
                         if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote "
 
         except: discard
         if mux:
-            client.close()
+            await client.closeWait()
             for cid in client.mux_holds:
                 context.outbound.with(cid, name = con):
-                    con.close()
+                    await con.closeWait()
         else:
-            close(client, remote)
+            await close(client,remote)
 
 
     try:
@@ -304,21 +321,16 @@ proc processConnection(client: Connection) {.async.} =
 proc poolFrame(create_count: uint = 0) =
     var count = create_count
 
-    proc create() =
-        var con = newConnection(create_socket = false)
-        con.port = globals.iran_port.uint32
-        var fut = sslConnect(con, globals.iran_addr, globals.final_target_domain)
+    proc create() {.async.} =
+        try:
+            var con = await connect(initTAddress(globals.iran_addr,globals.iran_port),SocketScheme.Secure,globals.final_target_domain)
+            await con.writer.write(generateFinishHandShakeData())
+            asyncCheck processConnection(con)
 
-        fut.addCallback(
-            proc() =
-            {.gcsafe.}:
-                if fut.failed:
-                    if globals.log_conn_error: echo fut.error.msg
-                else:
-                    if globals.log_conn_create: echo &"[createNewCon] registered a new connection to the pool"
-                    asyncCheck processConnection(con)
-
-        )
+        except CatchableError as e:
+            echo "could not connect to iran server and perform handshake, info:"
+            print e
+            
 
     if count == 0:
         var i = context.free_peer_outbounds.len().uint
@@ -329,7 +341,7 @@ proc poolFrame(create_count: uint = 0) =
             count = 1
 
     for i in 0..<count:
-        create()
+        asyncCheck create()
 
 proc start*(){.async.} =
     mux = globals.mux
@@ -338,4 +350,4 @@ proc start*(){.async.} =
     #just to make sure we always willing to connect to the peer
     while true:
         poolFrame()
-        await sleepAsync(5000)
+        await sleepAsync(5.secs)
