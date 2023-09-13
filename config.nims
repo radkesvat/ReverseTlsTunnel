@@ -4,7 +4,7 @@ import std/strformat
 import std/strutils
 
 
-const Release = false
+const Release = true 
 
 
 const libs_dir = "libs"
@@ -48,7 +48,7 @@ task build_server, "builds server":
     
     
     switch("d", "useMalloc")
-    switch("exceptions", "quirky")
+    # switch("exceptions", "quirky")
 
     switch("d", "asyncBackend=chronos")
     switch("d", "asyncBackend:chronos")
