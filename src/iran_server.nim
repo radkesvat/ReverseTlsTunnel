@@ -314,10 +314,10 @@ proc start*(){.async.} =
                 # bigEndian16(addr origin_port, addr pbuf[2])
 
                 con.port = origin_port.Port
-                if globals.log_conn_create: print "Connected client: ", transp.localAddress, " multiport: ", con.port
+                if globals.log_conn_create: print "Connected client: ", transp.remoteAddress, " multiport: ", con.port
             else:
                 con.port = server.local.port.Port
-                if globals.log_conn_create: print "Connected client: ", transp.localAddress
+                if globals.log_conn_create: print "Connected client: ", transp.remoteAddress
 
             asyncCheck processConnection(con)
             
