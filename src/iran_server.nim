@@ -234,7 +234,8 @@ proc processConnection(client: Connection) {.async.} =
                 else:
                     break
 
-        except: discard
+        except: 
+            echo getCurrentExceptionMsg()
         echo "loop broke"
         if mux:
             await client.closeWait()
