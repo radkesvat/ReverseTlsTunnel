@@ -2644,7 +2644,6 @@ proc close*(transp: StreamTransport) =
         closeHandle(transp.fd, continuation)
       elif transp.kind == TransportKind.Socket:
         closeSocket(transp.fd, continuation)
-        echo "closeSocket!"
 
 proc closeWait*(transp: StreamTransport): Future[void] =
   ## Close and frees resources of transport ``transp``.

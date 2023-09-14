@@ -159,7 +159,6 @@ proc processConnection(client: Connection) {.async.} =
 
 
     proc closeLine(client: Connection,remote:Connection) {.async.} =
-        echo "Called closeLine -----------------------------"
         if globals.log_conn_destory: echo "closed client & remote"
         if remote != nil:
             await allFutures(remote.closeWait() , client.closeWait())
