@@ -1,4 +1,5 @@
 import chronos
+import chronos/streams/[tlsstream]
 import std/[strformat, net, openssl, random]
 import overrides/[asyncnet]
 import print, connection, pipe
@@ -328,8 +329,7 @@ proc poolFrame(create_count: uint = 0) =
         try:
             var conn = await connect(initTAddress(globals.iran_addr,globals.iran_port),SocketScheme.Secure,globals.final_target_domain)
             await conn.twriter.write(generateFinishHandShakeData())
-            echo "ssl handsahke complete"
-
+            echo "TlsHandsahke complete."
             # let pending =
             #     block:
             #         var res: seq[Future[void]]
@@ -346,20 +346,17 @@ proc poolFrame(create_count: uint = 0) =
             await stepsAsync(1)
             conn.transp.reader = nil
 
-
             # conn.treader = newAsyncStreamReader(transp)
             # conn.twriter = newAsyncStreamWriter(transp)
+            asyncCheck processConnection(conn)
+      
 
-
-            if conn.state == SocketState.Ready:
-                asyncCheck processConnection(conn)
-            else:
-                print "Handshake error, ", conn.state
-
-
-        except CatchableError as e:
-            echo "could not connect to iran server and perform handshake, info:"
-            print e
+        except TLSStreamProtocolError as exc:
+            echo "Tls error, handshake failed because:"
+            echo exc.msg
+        except CatchableError as exc:
+            echo "Connection failed because:"
+            echo exc.name, ": ", exc.msg
             
 
     if count == 0:

@@ -245,8 +245,6 @@ proc processConnection(client: Connection) {.async.} =
         else:
             await close()
 
-
-
     try:
         if context.peer_ip != TransportAddress() and
             context.peer_ip.address != client.transp.remoteAddress.address:
@@ -319,37 +317,6 @@ proc start*(){.async.} =
         echo &"Started tcp server... {globals.listen_addr}:{globals.listen_port}"
 
 
-        # context.listener = newConnection()
-        # context.listener.socket.setSockOpt(OptReuseAddr, true)
-        # context.listener.socket.bindAddr(globals.listen_port.Port, globals.listen_addr)
-        # if globals.multi_port:
-        #     globals.listen_port = getSockName(context.listener.socket.getFd()).uint32
-        #     globals.createIptablesForwardRules()
-
-        # echo &"Started tcp server... {globals.listen_addr}:{globals.listen_port}"
-        # context.listener.socket.listen()
-
-        # while true:
-        #     let (address, client) = await context.listener.socket.acceptAddr()
-
-        #     var con = newConnection(client, address)
-        #     if globals.multi_port:
-        #         var origin_port: cushort
-        #         var size = 16.SockLen
-        #         if getSockOpt(con.socket.getFd(), cint(globals.SOL_IP), cint(globals.SO_ORIGINAL_DST),
-        #         addr(pbuf[0]), addr(size)) < 0'i32:
-        #             echo "multiport failure getting origin port. !"
-        #             continue
-        #         bigEndian16(addr origin_port, addr pbuf[2])
-
-        #         con.port = origin_port
-        #         if globals.log_conn_create: print "Connected client: ", address, " : ", con.port
-        #     else:
-        #         con.port = globals.listen_port
-
-        #         if globals.log_conn_create: print "Connected client: ", address
-
-        #     asyncCheck processConnection(con)
 
     mux = globals.mux
     await sleepAsync(2500)

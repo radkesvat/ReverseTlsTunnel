@@ -202,10 +202,6 @@ proc register*(cons: var Connections, con: Connection) =
     # con.register_start_time = et
     cons.add con
 
-# proc setBuffered*(con: Connection) =
-#     con.socket.isBuffered = true
-#     con.socket.currPos = 0
-
 
 proc closed*(conn: Connection):bool=
     case conn.kind 
@@ -214,6 +210,20 @@ proc closed*(conn: Connection):bool=
     of SocketScheme.Secure:
         return conn.reader.closed and conn.writer.closed and 
             conn.treader.closed and conn.twriter.closed 
+
+proc close*(conn: Connection) =
+    if not(isNil(conn.reader)) and not(conn.reader.closed()):
+        conn.reader.close()
+    if not(isNil(conn.writer)) and not(conn.writer.closed()):
+        conn.writer.close()
+
+    case conn.kind 
+    of SocketScheme.NonSecure:discard
+    of SocketScheme.Secure:
+        conn.treader.close()
+        conn.twriter.close()
+    conn.transp.close()
+    conn.state = SocketState.Closing
 
 proc closeWait*(conn: Connection) {.async.} =
     ## Close HttpClientConnectionRef instance ``conn`` and free all the resources.
@@ -283,19 +293,22 @@ proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketSc
                 try:
                     await res.tls.handshake()
                     res.state = SocketState.Ready
-                except CancelledError as exc:
-                    await res.closeWait()
-                    raise exc
-                except AsyncStreamError:
+                except TLSStreamProtocolError as exc:
                     await res.closeWait()
                     res.state = SocketState.Error
+                    raise exc
+                except CatchableError as exc:
+                    await res.closeWait()
+                    res.state = SocketState.Error
+                    raise exc
+
             of SocketScheme.Nonsecure:
                 res.state = SocketState.Ready
             res
+            
     conn.creation_time = et
     conn.trusted = TrustStatus.pending
-    if conn.state == SocketState.Ready:
-        return conn
+    return conn
 
 proc connect*(address: TransportAddress, scheme: SocketScheme = SocketScheme.NonSecure,
     hostname: string = ""): Future[Connection] {.async.} =
@@ -307,24 +320,11 @@ proc connect*(address: TransportAddress, scheme: SocketScheme = SocketScheme.Non
             await connect(address, flags = flags)
         except CancelledError as exc:
             raise exc
-        except CatchableError:
-            nil
-    if not(isNil(transp)):
-        result = await Connection.new(transp, scheme, hostname)
-        result.port = address.port
-        return 
-    # If all attempts to connect to the remote host have failed.\
-    echo "[connect] connection to the remote host has failed."
-    raise newException(TransportAbortedError,
-                               "Transport was nil!")
-
-
-
-
-
-
-
-
+        except CatchableError as exc:
+            raise exc
+    
+    result = await Connection.new(transp, scheme, hostname)
+    result.port = address.port
 
 
 proc startController*(){.async.} =
