@@ -346,7 +346,7 @@ proc poolFrame(create_count: uint = 0) =
 
             conn.transp.reader.cancel()
             await stepsAsync(1)
-            conn.transp.reader = 1
+            conn.transp.reader = nil
 
 
             # conn.treader = newAsyncStreamReader(transp)
