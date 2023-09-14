@@ -270,7 +270,6 @@ proc processConnection(client: Connection) {.async.} =
 
                 else:
                     if (client.isTrusted()) and (remote.isNil()):
-                        await remote.closeWait()
                         remote = await remoteTrusted(client.port.Port)
                         asyncCheck processRemote(remote)
                         let i = context.free_peer_outbounds.find(client)
