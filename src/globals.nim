@@ -74,7 +74,7 @@ const SO_ORIGINAL_DST* = 80
 const SOL_IP* = 0
 
 proc isPortFree*(port:Port):bool = 
-    execCmdEx("""lsof -i:{port}"""").output.len < 3
+    execCmdEx(&"""lsof -i:{port}""").output.len < 3
 
 proc chooseRandomLPort():Port =
     result = block:
