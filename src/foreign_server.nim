@@ -338,6 +338,7 @@ proc poolFrame(create_count: uint = 0) =
                         res.add(conn.writer.closeWait())
                     res
             if len(pending) > 0: await allFutures(pending)
+            await stepsAsync(1)
 
             
             if conn.state == SocketState.Ready:
