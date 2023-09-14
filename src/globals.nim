@@ -86,10 +86,10 @@ proc resetIptables*() =
 proc createIptablesForwardRules*() =
     if reset_iptable: resetIptables()
     if not (multi_port_min == 0.Port or multi_port_max == 0.Port):
-        assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p tcp --dport {multi_port_min.int}:{multi_port_max.int} -j REDIRECT --to-destination:127.0.0.1:{listen_port.int}""").exitCode
+        assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p tcp --dport {multi_port_min.int}:{multi_port_max.int} -j REDIRECT --to-destination 127.0.0.1:{listen_port.int}""").exitCode
 
     for port in multi_port_additions:
-        assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p tcp --dport {port.int} -j REDIRECT  --to-destination:127.0.0.1:{listen_port.int}""").exitCode
+        assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p tcp --dport {port.int} -j REDIRECT  --to-destination:127.0.0.1 {listen_port.int}""").exitCode
 
 
 proc multiportSupported(): bool =
