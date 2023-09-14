@@ -186,7 +186,8 @@ proc processConnection(client: Connection) {.async.} =
                         echo "Trusted the connection !"
                         #peer connection
                         client.trusted = TrustStatus.yes
-                        print "Peer Fake Handshake Complete ! ", client.transp.remoteAddress()
+                        let address = client.transp.remoteAddress()
+                        print "Peer Fake Handshake Complete ! ", address
                         if mux: context.user_inbounds.remove(client)
                         context.peer_inbounds.register(client)
                         context.peer_ip = client.transp.remoteAddress
@@ -279,6 +280,7 @@ proc start*(){.async.} =
                          transp: StreamTransport) {.async.} =
 
             let con = await Connection.new(transp)
+            let address = con.transp.remoteAddress()
             if globals.multi_port:
                 var origin_port: int
                 var size = 16 
@@ -290,10 +292,11 @@ proc start*(){.async.} =
                 bigEndian16(addr origin_port, addr pbuf[2])
 
                 con.port = origin_port.Port
-                if globals.log_conn_create: print "Connected client: ", transp.remoteAddress, " multiport: ", con.port
+                
+                if globals.log_conn_create: print "Connected client: ", address, con.port
             else:
                 con.port = server.local.port.Port
-                if globals.log_conn_create: print "Connected client: ", transp.remoteAddress
+                if globals.log_conn_create: print "Connected client: ", address
 
             asyncCheck processConnection(con)
 
