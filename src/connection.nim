@@ -247,7 +247,7 @@ proc closeWait*(conn: Connection) {.async.} =
             discard
         await conn.transp.closeWait()
         conn.state = SocketState.Closed
-
+        echo "CLOSED 1 CON"
 
 proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketScheme = SocketScheme.NonSecure, hostname: string = ""): Future[Connection] {.async.} =
     if scheme == SocketScheme.Secure:
@@ -323,9 +323,9 @@ proc connect*(address: TransportAddress, scheme: SocketScheme = SocketScheme.Non
         except CatchableError as exc:
             raise exc
     
-    result = await Connection.new(transp, scheme, hostname)
-    result.port = address.port
-
+    let con = await Connection.new(transp, scheme, hostname)
+    con.port = address.port
+    return con
 
 proc startController*(){.async.} =
     while true:
