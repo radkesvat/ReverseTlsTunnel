@@ -268,7 +268,7 @@ proc init*() =
             quit(0)
         )
 
-    if multi_port and listen_addr == "0.0.0.0":
+    # if multi_port and listen_addr == "0.0.0.0":
         # listen_addr = "127.0.0.1"
 
     final_target_ip = resolveIPv4(final_target_domain)
