@@ -285,11 +285,11 @@ proc start*(){.async.} =
                 var origin_port: int
                 var size = 16.SockLen
                 if not getSockOpt(transp.fd, int(globals.SOL_IP), int(globals.SO_ORIGINAL_DST),
-                origin_port):
+                addr pbuf[0], size):
                     echo "multiport failure getting origin port. !"
                     await con.closeWait()
                     return
-                # bigEndian16(addr origin_port, addr pbuf[2])
+                bigEndian16(addr origin_port, addr pbuf[2])
 
                 con.port = origin_port.Port
                 if globals.log_conn_create: print "Connected client: ", transp.remoteAddress, " multiport: ", con.port
