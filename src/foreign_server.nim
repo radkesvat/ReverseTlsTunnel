@@ -181,7 +181,7 @@ proc processConnection(client: Connection) {.async.} =
                 if data.len() == 0:
                     break
                 
-                if not client.closeWait():
+                if not client.closed:
                     if mux: packForSendMux(remote.id, remote.port.uint16, data) else: packForSend(data)
 
                     await client.twriter.write(data)
