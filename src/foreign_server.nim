@@ -341,8 +341,8 @@ proc poolFrame(create_count: uint = 0) =
                         res.add(conn.writer.closeWait())
                     res
             if len(pending) > 0: await allFutures(pending)
-            await allFutures(conn.treader.closeWait(), conn.twriter.closeWait())
-            await stepsAsync(1)
+            # await allFutures(conn.treader.closeWait(), conn.twriter.closeWait())
+            # await stepsAsync(1)
 
             # conn.transp.reader.cancel()
             await stepsAsync(1)
