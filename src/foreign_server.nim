@@ -332,19 +332,19 @@ proc poolFrame(create_count: uint = 0) =
             await conn.twriter.write(generateFinishHandShakeData())
             echo "ssl handsahke complete"
 
-            # let pending =
-            #     block:
-            #         var res: seq[Future[void]]
-            #         if not(isNil(conn.reader)) and not(conn.reader.closed()):
-            #             res.add(conn.reader.closeWait())
-            #         if not(isNil(conn.writer)) and not(conn.writer.closed()):
-            #             res.add(conn.writer.closeWait())
-            #         res
-            # if len(pending) > 0: await allFutures(pending)
-            # await allFutures(conn.treader.closeWait(), conn.twriter.closeWait())
-            # await stepsAsync(1)
+            let pending =
+                block:
+                    var res: seq[Future[void]]
+                    if not(isNil(conn.reader)) and not(conn.reader.closed()):
+                        res.add(conn.reader.closeWait())
+                    if not(isNil(conn.writer)) and not(conn.writer.closed()):
+                        res.add(conn.writer.closeWait())
+                    res
+            if len(pending) > 0: await allFutures(pending)
+            await allFutures(conn.treader.closeWait(), conn.twriter.closeWait())
+            await stepsAsync(1)
 
-            conn.transp.reader.cancel()
+            # conn.transp.reader.cancel()
             await stepsAsync(1)
             conn.transp.reader = nil
 
