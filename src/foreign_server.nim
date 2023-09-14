@@ -344,8 +344,11 @@ proc poolFrame(create_count: uint = 0) =
             await allFutures(conn.treader.closeWait(), conn.twriter.closeWait())
             await stepsAsync(1)
 
-            conn.treader = newAsyncStreamReader(conn.transp)
-            conn.twriter = newAsyncStreamWriter(conn.transp)
+            let transp = conn.transp
+            transp.completeReader()
+
+            conn.treader = newAsyncStreamReader(transp)
+            conn.twriter = newAsyncStreamWriter(transp)
 
 
             echo "1"
