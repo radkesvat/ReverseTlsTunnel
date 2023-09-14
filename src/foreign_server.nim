@@ -171,6 +171,8 @@ proc processConnection(client: Connection) {.async.} =
         var data = newString(len = globals.chunk_size)
         try:
             while not remote.closed:
+                echo "remote read"
+
                 # data = await remote.recv(if mux: globals.mux_payload_size else: globals.chunk_size)
                 data.setlen await remote.reader.readOnce(addr data[0], globals.chunk_size)
 
@@ -211,6 +213,7 @@ proc processConnection(client: Connection) {.async.} =
 
         try:
             while not client.closed:
+                echo "cleint read"
                 data.setlen await client.treader.readOnce(addr data[0], globals.chunk_size)
 
                 # data = await client.recv(if mux: globals.mux_chunk_size else: globals.chunk_size)
@@ -344,7 +347,8 @@ proc poolFrame(create_count: uint = 0) =
             conn.treader = newAsyncStreamReader(conn.transp)
             conn.twriter = newAsyncStreamWriter(conn.transp)
 
-            
+
+            echo "1"
             if conn.state == SocketState.Ready:
                 asyncCheck processConnection(conn)
             else:
