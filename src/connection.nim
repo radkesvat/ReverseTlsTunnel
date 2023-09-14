@@ -247,7 +247,6 @@ proc closeWait*(conn: Connection) {.async.} =
             discard
         await conn.transp.closeWait()
         conn.state = SocketState.Closed
-        echo "CLOSED 1 CON"
 
 proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketScheme = SocketScheme.NonSecure, hostname: string = ""): Future[Connection] {.async.} =
     if scheme == SocketScheme.Secure:
