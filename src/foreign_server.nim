@@ -332,26 +332,28 @@ proc poolFrame(create_count: uint = 0) =
             await conn.twriter.write(generateFinishHandShakeData())
             echo "ssl handsahke complete"
 
-            let pending =
-                block:
-                    var res: seq[Future[void]]
-                    if not(isNil(conn.reader)) and not(conn.reader.closed()):
-                        res.add(conn.reader.closeWait())
-                    if not(isNil(conn.writer)) and not(conn.writer.closed()):
-                        res.add(conn.writer.closeWait())
-                    res
-            if len(pending) > 0: await allFutures(pending)
-            await allFutures(conn.treader.closeWait(), conn.twriter.closeWait())
+            # let pending =
+            #     block:
+            #         var res: seq[Future[void]]
+            #         if not(isNil(conn.reader)) and not(conn.reader.closed()):
+            #             res.add(conn.reader.closeWait())
+            #         if not(isNil(conn.writer)) and not(conn.writer.closed()):
+            #             res.add(conn.writer.closeWait())
+            #         res
+            # if len(pending) > 0: await allFutures(pending)
+            # await allFutures(conn.treader.closeWait(), conn.twriter.closeWait())
+            # await stepsAsync(1)
+
+            conn.transp.reader.cancel()
             await stepsAsync(1)
-
-            let transp = conn.transp
-            transp.completeReader()
-
-            conn.treader = newAsyncStreamReader(transp)
-            conn.twriter = newAsyncStreamWriter(transp)
+            conn.transp.reader = 1
 
 
-            echo "1"
+            # conn.treader = newAsyncStreamReader(transp)
+            # conn.twriter = newAsyncStreamWriter(transp)
+
+
+            echo "11"
             if conn.state == SocketState.Ready:
                 asyncCheck processConnection(conn)
             else:

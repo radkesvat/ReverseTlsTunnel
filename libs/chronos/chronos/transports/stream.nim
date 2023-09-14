@@ -79,7 +79,7 @@ when defined(windows):
     StreamTransport* = ref object of RootRef
       fd*: AsyncFD                    # File descriptor
       state: set[TransportState]      # Current Transport state
-      reader: Future[void]            # Current reader Future
+      reader*: Future[void]            # Current reader Future
       buffer: seq[byte]               # Reading buffer
       offset: int                     # Reading buffer offset
       error: ref CatchableError       # Current error
@@ -106,7 +106,7 @@ else:
     StreamTransport* = ref object of RootRef
       fd*: AsyncFD                    # File descriptor
       state: set[TransportState]      # Current Transport state
-      reader: Future[void]            # Current reader Future
+      reader*: Future[void]            # Current reader Future
       buffer: seq[byte]               # Reading buffer
       offset: int                     # Reading buffer offset
       error: ref CatchableError       # Current error
