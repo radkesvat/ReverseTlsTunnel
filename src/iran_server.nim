@@ -183,7 +183,6 @@ proc processConnection(client: Connection) {.async.} =
                 if client.trusted == TrustStatus.pending:
                     var trust = monitorData(data)
                     if trust:
-                        echo "Trusted the connection !"
                         #peer connection
                         client.trusted = TrustStatus.yes
                         let address = client.transp.remoteAddress()
