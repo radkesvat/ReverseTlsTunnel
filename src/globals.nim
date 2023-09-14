@@ -182,6 +182,11 @@ proc init*() =
                             listen_port = 0.Port
                         multi_port_additions.add p.val.parseInt().Port
 
+                    of "peer":
+                        
+                        trusted_foreign_peers.add parseIpAddress(p.val)
+
+
                     of "toip":
                         next_route_addr = (p.val)
                         print next_route_addr
