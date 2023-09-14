@@ -283,7 +283,7 @@ proc start*(){.async.} =
             let con = await Connection.new(transp)
             if globals.multi_port:
                 var origin_port: int
-                var size = 16.SockLen
+                var size = 16 
                 if not getSockOpt(transp.fd, int(globals.SOL_IP), int(globals.SO_ORIGINAL_DST),
                 addr pbuf[0], size):
                     echo "multiport failure getting origin port. !"
