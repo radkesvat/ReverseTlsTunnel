@@ -171,7 +171,6 @@ proc processConnection(client: Connection) {.async.} =
         var data = newString(len = globals.chunk_size)
         try:
             while not remote.closed:
-                echo "remote read"
 
                 # data = await remote.recv(if mux: globals.mux_payload_size else: globals.chunk_size)
                 data.setlen await remote.reader.readOnce(addr data[0], globals.chunk_size)
