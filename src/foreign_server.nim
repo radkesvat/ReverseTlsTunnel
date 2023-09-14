@@ -182,7 +182,7 @@ proc processConnection(client: Connection) {.async.} =
                 if data.len() == 0:
                     break
                 
-                if not client.closed():
+                if not client.closeWait():
                     if mux: packForSendMux(remote.id, remote.port.uint16, data) else: packForSend(data)
 
                     await client.twriter.write(data)
@@ -271,7 +271,7 @@ proc processConnection(client: Connection) {.async.} =
 
                 else:
                     if (client.isTrusted()) and (remote.isNil()):
-                        await remote.close()
+                        await remote.closeWait()
                         remote = await remoteTrusted(client.port.Port)
                         asyncCheck processRemote(remote)
                         let i = context.free_peer_outbounds.find(client)
