@@ -4,7 +4,7 @@ import checksums/sha1
 
 # export IpAddress
 
-const version = "2.2"
+const version = "3"
 
 type RunMode*{.pure.} = enum
     iran, kharej
@@ -24,13 +24,11 @@ var pool_size*: uint = 16
 var max_idle_time*: uint = 600 #secs (default TCP RFC is 3600)
 var max_pool_unused_time*: uint = 60 #secs
 const chunk_size* = 4096
-
 var mux*: bool = false
 let tls13_record_layer* = "\x17\x03\x03" 
 let mux_header_size*:uint32 = tls13_record_layer.len().uint32 + 2 + 2 + 4 + 1# followed by 2 bytes len +2 port+and 4 bytes cid and 1 byte reserve
 let mux_payload_size*:uint32 = 1024 
 let mux_chunk_size*:uint32 = mux_payload_size + mux_header_size
-
 let socket_buffered* = false # when using mux, it depends
 var mux_capacity*:uint32 = 4
 
@@ -43,8 +41,9 @@ var iran_addr* = ""
 var iran_port*: Port = 0.Port
 var final_target_domain* = ""
 var final_target_ip*: string
+var trusted_foreign_peers*:seq[IpAddress]
 const final_target_port*:Port = 443.Port # port of the sni host (443 for tls handshake)
-var self_ip*: TransportAddress
+var self_ip*: IpAddress
 
 
 # [passwords and hashes]
@@ -66,13 +65,28 @@ var debug_info* = false
 
 # [multiport]
 var multi_port* = false
-var multi_port_min: Port
-var multi_port_max: Port
+var multi_port_min: Port = 0.Port
+var multi_port_max: Port = 0.Port
 var multi_port_additions: seq[Port]
 
 # [posix constants]
 const SO_ORIGINAL_DST* = 80
 const SOL_IP* = 0
+
+proc isPortFree*(port:Port):bool = 
+    execCmdEx("""lsof -i:{port}"""").output.len < 3
+
+proc chooseRandomLPort():Port =
+    result = block:
+        if multi_port_min == 0.Port and multi_port_max == 0.Port:
+            multi_port_additions[rand(multi_port_additions.high).int]
+        elif (multi_port_min != 0.Port and multi_port_max != 0.Port):
+            (multi_port_min.int + rand(multi_port_max.int - multi_port_min.int)).Port
+        else:
+            quit("multi port range may not include port 0!")
+
+    if not isPortFree(result):return chooseRandomLPort()
+    
 proc iptablesInstalled(): bool {.used.} =
     execCmdEx("""dpkg-query -W --showformat='${Status}\n' iptables|grep "install ok install"""").output != ""
 
@@ -250,7 +264,9 @@ proc init*() =
             if listen_port == 0.Port and not multi_port:
                 echo "specify the listen prot --lport:{port}  (usually 443)"
                 exit = true
-
+            if listen_port == 0.Port and multi_port:
+                listen_port = chooseRandomLPort()
+                    
 
     if final_target_domain.isEmptyOrWhitespace():
         echo "specify the sni for routing --sni:{domain}"
@@ -273,7 +289,7 @@ proc init*() =
 
     final_target_ip = resolveIPv4(final_target_domain)
     print "\n"
-    self_ip =  initTAddress(getPrimaryIPAddr(dest = parseIpAddress("8.8.8.8")),0.Port)
+    self_ip =  getPrimaryIPAddr(dest = parseIpAddress("8.8.8.8"))
     password_hash = $(secureHash(password))
     sh1 = hash(password_hash).uint32
     sh2 = hash(sh1).uint32

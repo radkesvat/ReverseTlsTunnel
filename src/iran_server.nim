@@ -17,7 +17,7 @@ type
         listener: StreamServer
         user_inbounds: Connections
         peer_inbounds: Connections
-        peer_ip: TransportAddress
+        peer_ip: IpAddress
 
 
 var context = TunnelConnectionPoolContext()
@@ -26,7 +26,7 @@ var mux = false
 proc monitorData(data: var string): bool =
     try:
         let base = 5 + 7 + `mod`(globals.sh5, 7.uint8)
-        if data.high.uint8 < base + 4 : return false
+        if data.high.uint8 < base + 4: return false
         var sh1_c: uint32
         var sh2_c: uint32
 
@@ -70,7 +70,7 @@ proc processConnection(client: Connection) {.async.} =
     proc closeLine() {.async.} =
         if globals.log_conn_destory: echo "closed client & remote"
         if remote != nil:
-            await allFutures(remote.closeWait() , client.closeWait())
+            await allFutures(remote.closeWait(), client.closeWait())
         else:
             await client.closeWait()
 
@@ -127,7 +127,7 @@ proc processConnection(client: Connection) {.async.} =
                         if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client "
 
 
-        except: 
+        except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
         if mux:
@@ -187,7 +187,7 @@ proc processConnection(client: Connection) {.async.} =
                         print "Peer Fake Handshake Complete ! ", address
                         if mux: context.user_inbounds.remove(client)
                         context.peer_inbounds.register(client)
-                        context.peer_ip = client.transp.remoteAddress
+                        context.peer_ip = client.transp.remoteAddress.address
                         await remote.closeWait() # close untrusted remote
 
                         await processRemoteFuture
@@ -244,8 +244,14 @@ proc processConnection(client: Connection) {.async.} =
             await closeLine()
 
     try:
-        if context.peer_ip != TransportAddress() and
-            context.peer_ip.address != client.transp.remoteAddress.address:
+        if globals.trusted_foreign_peers.len != 0 and
+            client.transp.remoteAddress.address in globals.trusted_foreign_peers:
+            #load balancer connection
+            remote = await remoteUnTrusted()
+            processRemoteFuture = processRemote()
+
+        elif context.peer_ip != IpAddress() and
+            context.peer_ip != client.transp.remoteAddress.address:
             echo "Real User connected !"
             client.trusted = TrustStatus.no
             await chooseRemote() #associate peer
@@ -263,6 +269,7 @@ proc processConnection(client: Connection) {.async.} =
         else:
             remote = await remoteUnTrusted()
             processRemoteFuture = processRemote()
+
         asyncCheck processClient()
 
     except:
@@ -280,7 +287,7 @@ proc start*(){.async.} =
             let address = con.transp.remoteAddress()
             if globals.multi_port:
                 var origin_port: int
-                var size = 16 
+                var size = 16
                 if not getSockOpt(transp.fd, int(globals.SOL_IP), int(globals.SO_ORIGINAL_DST),
                 addr pbuf[0], size):
                     echo "multiport failure getting origin port. !"
@@ -289,7 +296,7 @@ proc start*(){.async.} =
                 bigEndian16(addr origin_port, addr pbuf[2])
 
                 con.port = origin_port.Port
-                
+
                 if globals.log_conn_create: print "Connected client: ", address, con.port
             else:
                 con.port = server.local.port.Port
@@ -310,7 +317,9 @@ proc start*(){.async.} =
         context.listener = server
 
         if globals.multi_port:
-            globals.listen_port = server.localAddress().port
+            assert globals.listen_port == server.localAddress().port
+            # globals.listen_port = server.localAddress().port # its must be same as listen port
+
             globals.createIptablesForwardRules()
 
         server.start()
