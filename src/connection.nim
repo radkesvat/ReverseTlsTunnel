@@ -217,6 +217,7 @@ proc closed*(conn: Connection):bool=
 
 proc closeWait*(conn: Connection) {.async.} =
     ## Close HttpClientConnectionRef instance ``conn`` and free all the resources.
+    if conn.isNil():return
     if conn.state notin {SocketState.Closing,
                          SocketState.Closed}:
         conn.state = SocketState.Closing
