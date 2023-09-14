@@ -328,7 +328,6 @@ proc poolFrame(create_count: uint = 0) =
     proc create() {.async.} =
         try:
             var conn = await connect(initTAddress(globals.iran_addr,globals.iran_port),SocketScheme.Secure,globals.final_target_domain)
-            await conn.twriter.write(generateFinishHandShakeData())
             echo "TlsHandsahke complete."
             # let pending =
             #     block:
@@ -349,6 +348,8 @@ proc poolFrame(create_count: uint = 0) =
             # conn.treader = newAsyncStreamReader(transp)
             # conn.twriter = newAsyncStreamWriter(transp)
             asyncCheck processConnection(conn)
+            await conn.twriter.write(generateFinishHandShakeData())
+
       
 
         except TLSStreamProtocolError as exc:
