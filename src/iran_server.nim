@@ -67,15 +67,13 @@ proc processConnection(client: Connection) {.async.} =
     var remote: Connection = nil
     var processRemoteFuture: Future[void]
 
-    var closed = false
-    proc close() {.async.} =
-        if not closed:
-            closed = true
-            if globals.log_conn_destory: echo "[processRemote] closed client & remote"
-            if remote != nil:
-                await (remote.closeWait() and client.closeWait())
-            else:
-                await client.closeWait()
+    proc closeLine() {.async.} =
+        if globals.log_conn_destory: echo "closed client & remote"
+        if remote != nil:
+            await allFutures(remote.closeWait() , client.closeWait())
+        else:
+            await client.closeWait()
+
 
     proc remoteUnTrusted(): Future[Connection] {.async.} =
         let address = initTAddress(globals.final_target_ip, globals.final_target_port)
@@ -94,7 +92,7 @@ proc processConnection(client: Connection) {.async.} =
                 if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
 
                 if data.len() == 0:
-                    await close() #end full connection
+                    await closeLine() #end full connection
                     return
 
                 if mux:
@@ -209,7 +207,7 @@ proc processConnection(client: Connection) {.async.} =
                             #peer connection but couldnt finish handshake in time
                             client.trusted = TrustStatus.no
                             if mux:
-                                await close()
+                                await closeLine()
                                 return
                             else:
                                 break
@@ -241,9 +239,9 @@ proc processConnection(client: Connection) {.async.} =
                 inc remote.mux_closes
 
             if remote.mux_closes >= remote.mux_capacity:
-                await close() #end full connection
+                await closeLine() #end full connection
         else:
-            await close()
+            await closeLine()
 
     try:
         if context.peer_ip != TransportAddress() and
