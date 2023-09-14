@@ -12,10 +12,10 @@ type RunMode*{.pure.} = enum
 var mode*: RunMode = RunMode.iran
 
 # [Log Options]true
-const log_data_len* = true
+const log_data_len* = false
 const log_conn_create* = true
-const log_conn_destory* = true
-const log_conn_error* = true
+const log_conn_destory* = false
+const log_conn_error* = false
 
 
 # [Connection]
@@ -86,10 +86,10 @@ proc resetIptables*() =
 proc createIptablesForwardRules*() =
     if reset_iptable: resetIptables()
     if not (multi_port_min == 0.Port or multi_port_max == 0.Port):
-        assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p tcp --dport {multi_port_min}:{multi_port_max} -j REDIRECT --to-destination:127.0.0.1:{listen_port}""").exitCode
+        assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p tcp --dport {multi_port_min.int}:{multi_port_max.int} -j REDIRECT --to-destination:127.0.0.1:{listen_port.int}""").exitCode
 
     for port in multi_port_additions:
-        assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p tcp --dport {port} -j REDIRECT  --to-destination:127.0.0.1:{listen_port}""").exitCode
+        assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p tcp --dport {port.int} -j REDIRECT  --to-destination:127.0.0.1:{listen_port.int}""").exitCode
 
 
 proc multiportSupported(): bool =

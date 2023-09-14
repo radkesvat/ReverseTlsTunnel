@@ -213,7 +213,6 @@ proc processConnection(client: Connection) {.async.} =
 
         try:
             while not client.closed:
-                echo "cleint read"
                 data.setlen await client.treader.readOnce(addr data[0], globals.chunk_size)
 
                 # data = await client.recv(if mux: globals.mux_chunk_size else: globals.chunk_size)
@@ -353,7 +352,6 @@ proc poolFrame(create_count: uint = 0) =
             # conn.twriter = newAsyncStreamWriter(transp)
 
 
-            echo "11"
             if conn.state == SocketState.Ready:
                 asyncCheck processConnection(conn)
             else:
