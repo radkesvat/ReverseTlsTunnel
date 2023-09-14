@@ -5,7 +5,7 @@
 
 [راهنمای اجرا به صورت سرویس](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/Service.md)
 
-همیشه با اجرای دستور نصب برنامه را آپدیت داشته باشید
+ نسخه ۲.۱ موقتا ریمو شد تا برسی بشه مشکلات
 
 
 # مقدمه
