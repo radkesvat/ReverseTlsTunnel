@@ -158,15 +158,12 @@ proc processConnection(client: Connection) {.async.} =
         return con
 
 
-    var closed = false
-    proc close(client: Connection,remote:Connection) {.async.} =
-        if not closed:
-            closed = true
-            if globals.log_conn_destory: echo "closed client & remote"
-            if remote != nil:
-                await (remote.closeWait() and client.closeWait())
-            else:
-                await client.closeWait()
+    proc closeLine(client: Connection,remote:Connection) {.async.} =
+        if globals.log_conn_destory: echo "closed client & remote"
+        if remote != nil:
+            await allFutures(remote.closeWait() , client.closeWait())
+        else:
+            await client.closeWait()
 
     proc processRemote(remote: Connection) {.async.} =
         var data = newString(len = globals.chunk_size)
@@ -205,7 +202,7 @@ proc processConnection(client: Connection) {.async.} =
             if client.mux_closes >= client.mux_capacity:
                 await client.closeWait() #end full connection
         else:
-            await close(client,remote)
+            await closeLine(client,remote)
 
     proc proccessClient() {.async.} =
         var remote: Connection = nil
@@ -313,7 +310,7 @@ proc processConnection(client: Connection) {.async.} =
                 context.outbound.with(cid, name = con):
                     await con.closeWait()
         else:
-            await close(client,remote)
+            await closeLine(client,remote)
 
 
     try:
