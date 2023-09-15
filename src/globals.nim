@@ -4,7 +4,7 @@ import checksums/sha1
 
 # export IpAddress
 
-const version = "3.1"
+const version = "3.2"
 
 type RunMode*{.pure.} = enum
     iran, kharej

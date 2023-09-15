@@ -270,16 +270,17 @@ proc processConnection(client: Connection) {.async.} =
                     if (client.isTrusted()) and (remote.isNil()):
                         remote = await remoteTrusted(client.port.Port)
                         asyncCheck processRemote(remote)
-                        let i = context.free_peer_outbounds.find(client)
-                        if i != -1: context.free_peer_outbounds.del(i)
-                        # echo "established to remote, calling pool frame"
-                        poolFrame()
+                        
 
     
 
                     if client.trusted == TrustStatus.pending:
                         var (trust, port) = monitorData(data)
+                        let i = context.free_peer_outbounds.find(client)
+                        if i != -1: context.free_peer_outbounds.del(i)
                         if trust:
+                            poolFrame()
+
                             if globals.multi_port:
                                 echo "multi-port target:", port
                                 client.port = port.Port
@@ -304,6 +305,10 @@ proc processConnection(client: Connection) {.async.} =
 
         except: 
             if globals.log_conn_error: echo getCurrentExceptionMsg()
+            
+        let i = context.free_peer_outbounds.find(client)
+        if i != -1: context.free_peer_outbounds.del(i)
+        
         if mux:
             await client.closeWait()
             for cid in client.mux_holds:
@@ -327,7 +332,7 @@ proc poolFrame(create_count: uint = 0) =
             var conn = await connect(initTAddress(globals.iran_addr,globals.iran_port),SocketScheme.Secure,globals.final_target_domain)
             echo "TlsHandsahke complete."
             context.free_peer_outbounds.add conn
-            sleepAsync(3000).addCallback(proc(arg: pointer)=
+            sleepAsync(5000).addCallback(proc(arg: pointer)=
                 {.gcsafe.}:
                     let i = context.free_peer_outbounds.find(conn)
                     if i != -1: context.free_peer_outbounds.del(i)
@@ -374,6 +379,7 @@ proc poolFrame(create_count: uint = 0) =
         elif i < globals.pool_size:
             count = 1
 
+    
     for i in 0..<count:
         asyncCheck create()
 
