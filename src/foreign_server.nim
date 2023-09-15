@@ -181,14 +181,14 @@ proc processConnection(client: Connection) {.async.} =
                     if (client.isTrusted()) and (remote.isNil()):
                         remote = await remoteTrusted(client.port.Port)
                         asyncCheck processRemote(remote)
-                        
+                        let i = context.free_peer_outbounds.find(client)
+                        if i != -1: context.free_peer_outbounds.del(i)
 
     
 
                     if client.trusted == TrustStatus.pending:
                         var (trust, port) = monitorData(data)
-                        let i = context.free_peer_outbounds.find(client)
-                        if i != -1: context.free_peer_outbounds.del(i)
+                        
                         if trust:
                             poolFrame()
 

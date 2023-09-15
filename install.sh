@@ -42,19 +42,19 @@ printf  "\n"
 
 
 case $(uname -m) in
-    x86_64)  URL="https://github.com/radkesvat/ReverseTlsTunnel/releases/download/V3.2/v3.2_linux_amd64.zip" ;;
-    arm)     URL="https://github.com/radkesvat/ReverseTlsTunnel/releases/download/V3.2/v3.2_linux_arm64.zip" ;;
-    aarch64) URL="https://github.com/radkesvat/ReverseTlsTunnel/releases/download/V3.2/v3.2_linux_arm64.zip" ;;
+    x86_64)  URL="https://github.com/radkesvat/ReverseTlsTunnel/releases/download/V3.3/v3.3_linux_amd64.zip" ;;
+    arm)     URL="https://github.com/radkesvat/ReverseTlsTunnel/releases/download/V3.3/v3.3_linux_arm64.zip" ;;
+    aarch64) URL="https://github.com/radkesvat/ReverseTlsTunnel/releases/download/V3.3/v3.3_linux_arm64.zip" ;;
     
     *)   echo "Unable to determine system architecture."; exit 1 ;;
 
 esac
 
 
-wget  $URL -O v3.2_linux_amd64.zip
-unzip -o v3.2_linux_amd64.zip
+wget  $URL -O v3.3_linux_amd64.zip
+unzip -o v3.3_linux_amd64.zip
 chmod +x RTT
-rm v3.2_linux_amd64.zip
+rm v3.3_linux_amd64.zip
 
 echo "finished."
 
