@@ -5,6 +5,8 @@
 
 [راهنمای اجرا به صورت سرویس](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/Service.md)
 
+[راهنمای لود بالانسر](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/Loadbalancer.md)
+
  با اجرای دوباره دستور نصب همیشه اپدیت کنید
 
 # مقدمه
