@@ -283,26 +283,32 @@ proc start*(){.async.} =
         proc serveStreamClient(server: StreamServer,
                          transp: StreamTransport) {.async.} =
 
-            let con = await Connection.new(transp)
-            let address = con.transp.remoteAddress()
-            if globals.multi_port:
-                var origin_port: int
-                var size = 16
-                if not getSockOpt(transp.fd, int(globals.SOL_IP), int(globals.SO_ORIGINAL_DST),
-                addr pbuf[0], size):
-                    echo "multiport failure getting origin port. !"
-                    await con.closeWait()
-                    return
-                bigEndian16(addr origin_port, addr pbuf[2])
+            try:
+                let con = await Connection.new(transp)
+                let address = con.transp.remoteAddress()
+                if globals.multi_port:
+                    var origin_port: int
+                    var size = 16
+                    if not getSockOpt(transp.fd, int(globals.SOL_IP), int(globals.SO_ORIGINAL_DST),
+                    addr pbuf[0], size):
+                        echo "multiport failure getting origin port. !"
+                        await con.closeWait()
+                        return
+                    bigEndian16(addr origin_port, addr pbuf[2])
 
-                con.port = origin_port.Port
+                    con.port = origin_port.Port
 
-                if globals.log_conn_create: print "Connected client: ", address, con.port
-            else:
-                con.port = server.local.port.Port
-                if globals.log_conn_create: print "Connected client: ", address
+                    if globals.log_conn_create: print "Connected client: ", address, con.port
+                else:
+                    con.port = server.local.port.Port
+                    if globals.log_conn_create: print "Connected client: ", address
 
-            asyncCheck processConnection(con)
+                asyncCheck processConnection(con)
+            except :
+                echo "handle client connection error:"
+                echo getCurrentExceptionMsg()
+                
+           
 
 
         var address = initTAddress(globals.listen_addr, globals.listen_port.Port)
