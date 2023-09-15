@@ -80,6 +80,7 @@ wget  "https://raw.githubusercontent.com/radkesvat/ReverseTlsTunnel/master/insta
 # مشکلات و دیباگ
 
 برای اینکه برنامه بعد از بسته شدن ssh ؛ بسته نشه و ران بمونه از nohup یا [service](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/Service.md) استفاده کنید 
+
 پیشناهاد میکنم از سرویس استفاده کنین چون اگرم برنامه کرش کنه دوباره استارت میشه توسط سرویس و همچنین اگر سرور شما ری استارت بشه هم ؛ برنامه بعد از بوت شدن اجرا میشه
 
 مثلا با nohup :
