@@ -327,6 +327,11 @@ proc poolFrame(create_count: uint = 0) =
             var conn = await connect(initTAddress(globals.iran_addr,globals.iran_port),SocketScheme.Secure,globals.final_target_domain)
             echo "TlsHandsahke complete."
             context.free_peer_outbounds.add conn
+            sleepAsync(3000).addCallback(proc(arg: pointer)=
+                {.gcsafe.}:
+                    let i = context.free_peer_outbounds.find(conn)
+                    if i != -1: context.free_peer_outbounds.del(i)
+            )
             # let pending =
             #     block:
             #         var res: seq[Future[void]]
@@ -347,12 +352,15 @@ proc poolFrame(create_count: uint = 0) =
             # conn.twriter = newAsyncStreamWriter(transp)
             asyncCheck processConnection(conn)
             await conn.twriter.write(generateFinishHandShakeData())
+            
 
+            
       
 
         except TLSStreamProtocolError as exc:
             echo "Tls error, handshake failed because:"
             echo exc.msg
+            
         except CatchableError as exc:
             echo "Connection failed because:"
             echo exc.name, ": ", exc.msg
