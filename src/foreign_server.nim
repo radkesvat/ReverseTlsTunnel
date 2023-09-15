@@ -32,97 +32,8 @@ proc generateFinishHandShakeData(): string =
     copyMem(unsafeAddr random_trust_data[base+0], unsafeAddr globals.sh1.uint32, 4)
     copyMem(unsafeAddr random_trust_data[base+4], unsafeAddr globals.sh2.uint32, 4)
 
-    # case globals.self_ip.family: # the type of the IP address (IPv4 or IPv6)
-    #     of IpAddressFamily.IPv6:
-    #         random_trust_data[base+9] = 6.char
-    #         copyMem(unsafeAddr random_trust_data[base+10], unsafeAddr globals.self_ip.address_v6[0], globals.self_ip.address_v6.len)
-
-    #     of IpAddressFamily.IPv4:
-    #         random_trust_data[base+9] = 4.char
-    #         copyMem(unsafeAddr random_trust_data[base+10], unsafeAddr globals.self_ip.address_v4[0], globals.self_ip.address_v4.len)
-
     return random_trust_data
 
-# proc sslConnect(con: Connection, ip: string, sni: string){.async.} =
-#     # con.socket.close()
-#     var fc = 0
-#     echo &"connecting to {ip}:{$con.port} (sni: {sni}) ..."
-
-#     while true:
-#         if fc > 3:
-#             con.close()
-#             raise newException(ValueError, "[SslConnect] could not connect, all retires failed")
-
-#         # var fut = con.socket.connect(ip, con.port.Port, sni = sni)
-#         var fut = asyncnet.dial(ip, Port(con.port), buffered = false)
-
-#         var timeout = withTimeout(fut, 3000)
-#         yield timeout
-#         if timeout.failed():
-#             inc fc
-#             if globals.log_conn_error: echo timeout.error.msg
-#             if globals.log_conn_error: echo &"[SslConnect] retry in {min(1000,fc*200)} ms"
-#             await sleepAsync(min(1000, fc*200))
-#             continue
-#         if timeout.read() == true:
-#             con.socket = fut.read()
-#             break
-#         if timeout.read() == false:
-#             con.close()
-#             raise newException(ValueError, "[SslConnect] dial timed-out")
-
-#     try:
-#         if not globals.keep_system_limit: con.socket.setSockOpt(OptNoDelay, true)
-
-#         ssl_ctx.wrapConnectedSocket(
-#             con.socket, handshakeAsClient, sni)
-#         let flags = {SocketFlag.SafeDisconn}
-
-#         block handshake:
-#             sslLoop(con.socket, flags, sslDoHandshake(con.socket.sslHandle))
-
-#     except:
-#         echo "[SslConnect] handshake error!"
-#         con.close()
-#         raise getCurrentException()
-
-#     if globals.log_conn_create: print "[SslConnect] conencted !"
-
-    
-#     SSL_free(con.socket.sslHandle)
-#     con.socket.isSsl = false
-
-#     #AES default chunk size is 16 so use a multple of 16
-#     let rlen: uint16 = uint16(16*(6+rand(4)))
-#     var random_trust_data: string
-#     random_trust_data.setLen(rlen)
-
-
-#     copyMem(addr random_trust_data[0], addr(globals.random_str[rand(250)]), rlen)
-#     copyMem(addr random_trust_data[0], addr globals.tls13_record_layer[0], 3) #tls header
-#     copyMem(addr random_trust_data[3], addr rlen, 2) #tls len
-
-
-
-#     let base = 5 + 7 + `mod`(globals.sh5, 7.uint8)
-#     copyMem(unsafeAddr random_trust_data[base+0], unsafeAddr globals.sh1.uint32, 4)
-#     copyMem(unsafeAddr random_trust_data[base+4], unsafeAddr globals.sh2.uint32, 4)
-
-#     # case globals.self_ip.family: # the type of the IP address (IPv4 or IPv6)
-#     #     of IpAddressFamily.IPv6:
-#     #         random_trust_data[base+9] = 6.char
-#     #         copyMem(unsafeAddr random_trust_data[base+10], unsafeAddr globals.self_ip.address_v6[0], globals.self_ip.address_v6.len)
-
-#     #     of IpAddressFamily.IPv4:
-#     #         random_trust_data[base+9] = 4.char
-#     #         copyMem(unsafeAddr random_trust_data[base+10], unsafeAddr globals.self_ip.address_v4[0], globals.self_ip.address_v4.len)
-
-
-#     # if globals.multi_port:
-#     #     copyMem(unsafeAddr random_trust_data[8], unsafeAddr client_origin_port, 4)
-#     await con.unEncryptedSend(random_trust_data)
-
-#     con.trusted = TrustStatus.pending
 
 
 proc monitorData(data: string): tuple[trust: bool, port: uint32] =
@@ -305,7 +216,7 @@ proc processConnection(client: Connection) {.async.} =
 
         except: 
             if globals.log_conn_error: echo getCurrentExceptionMsg()
-            
+
         let i = context.free_peer_outbounds.find(client)
         if i != -1: context.free_peer_outbounds.del(i)
         
@@ -332,7 +243,7 @@ proc poolFrame(create_count: uint = 0) =
             var conn = await connect(initTAddress(globals.iran_addr,globals.iran_port),SocketScheme.Secure,globals.final_target_domain)
             echo "TlsHandsahke complete."
             context.free_peer_outbounds.add conn
-            sleepAsync(5000).addCallback(proc(arg: pointer)=
+            sleepAsync(60000).addCallback(proc(arg: pointer)=
                 {.gcsafe.}:
                     let i = context.free_peer_outbounds.find(conn)
                     if i != -1: context.free_peer_outbounds.del(i)
