@@ -210,7 +210,7 @@ proc processConnection(client: Connection) {.async.} =
 
                 if client.trusted == TrustStatus.no:
                     data.setLen(data.len() +  globals.full_tls_record_len.int) 
-                    await client.reader.readExactly(addr data[0 + globals.full_tls_record_len], data.len)
+                    await client.reader.readExactly(addr data[0 + globals.full_tls_record_len], data.len -  globals.full_tls_record_len)
                 else:
                     await client.reader.readExactly(addr data[0], data.len)
                 
