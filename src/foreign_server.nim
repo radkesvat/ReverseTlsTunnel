@@ -77,18 +77,20 @@ proc processConnection(client: Connection) {.async.} =
             await client.closeWait()
 
     proc processRemote(remote: Connection) {.async.} =
-        var data = newString(len = globals.chunk_size)
+        var data = newString(len = 0)
         try:
             while not remote.closed:
-
-                # data = await remote.recv(if mux: globals.mux_payload_size else: globals.chunk_size)
-                data.setlen await remote.reader.readOnce(addr data[0], globals.chunk_size)
-
-                if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
-
+                data.setlen remote.reader.buffer.dataLen()
 
                 if data.len() == 0:
-                    break
+                    if client.reader.atEof():
+                        break
+                    else:continue
+
+                data.setLen(data.len() +  globals.full_tls_record_len.int) 
+
+                await remote.reader.readExactly(addr data[0 + globals.full_tls_record_len], data.len)
+                if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
                 
                 if not client.closed:
                     if mux: packForSendMux(remote.id, remote.port.uint16, data) else: packForSend(data)
@@ -117,18 +119,35 @@ proc processConnection(client: Connection) {.async.} =
 
     proc proccessClient() {.async.} =
         var remote: Connection = nil
-        var data = newString(len = globals.chunk_size)
-
+        var data = newString(len = 0)
+        var boundary:uint16 = 0
         try:
             while not client.closed:
-                data.setlen await client.treader.readOnce(addr data[0], globals.chunk_size)
-
-                # data = await client.recv(if mux: globals.mux_chunk_size else: globals.chunk_size)
-                if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes from client"
-
+                data.setlen client.reader.buffer.dataLen()
 
                 if data.len() == 0:
-                    break
+                    if client.reader.atEof():
+                        break
+                    else:continue
+
+                if client.isTrusted:
+                    if boundary == 0:
+                        data.setLen globals.full_tls_record_len
+                        await client.reader.readExactly(addr data[0],globals.full_tls_record_len.int)
+                        copyMem(addr boundary, addr data[0], sizeof(boundary))
+                        if boundary == 0: break
+                        continue
+                    
+                    let readable = min(boundary,data.len().uint16)
+                    boundary -= readable ; data.setlen readable
+                    await client.reader.readExactly(addr data[0], readable.int)
+
+                else:
+                    await client.reader.readExactly(addr data[0], data.len)
+
+
+
+                if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes from client"
 
 
                 if mux:

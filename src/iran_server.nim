@@ -84,11 +84,35 @@ proc processConnection(client: Connection) {.async.} =
 
 
     proc processRemote() {.async.} =
-        var data = newString(len = globals.chunk_size)
+        var data = newString(len = 0)
+        var boundary:uint16 = 0
+
         try:
             while not remote.isNil and not remote.closed:
-                # data = await remote.recv(if mux: globals.mux_chunk_size else: globals.chunk_size)
-                data.setlen await remote.reader.readOnce(addr data[0], globals.chunk_size)
+                data.setlen remote.reader.buffer.dataLen()
+
+                if data.len() == 0:
+                    if client.reader.atEof():
+                        break
+                    else:continue
+                
+                if remote.isTrusted:
+                    if boundary == 0:
+                        data.setLen globals.full_tls_record_len
+                        await remote.reader.readExactly(addr data[0],globals.full_tls_record_len.int)
+                        copyMem(addr boundary, addr data[0], sizeof(boundary))
+                        if boundary == 0: break
+                        continue
+                    
+                    let readable = min(boundary,data.len().uint16)
+                    boundary -= readable ; data.setlen readable
+                    await remote.reader.readExactly(addr data[0], readable.int)
+
+                else:
+                    await remote.reader.readExactly(addr data[0], data.len)
+               
+              
+
                 if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
 
                 if data.len() == 0:
@@ -145,7 +169,7 @@ proc processConnection(client: Connection) {.async.} =
 
     proc chooseRemote() {.async.} =
         if mux:
-            for i in 0..<16:
+            for i in 0..<80:
                 remote = context.peer_inbounds.randomPick()
                 if remote != nil:
                     if remote.mux_holds.len().uint32 >= remote.mux_capacity:
@@ -154,28 +178,37 @@ proc processConnection(client: Connection) {.async.} =
                     remote.mux_holds.add client.id
 
                     break
-                await sleepAsync(100)
+                await sleepAsync(5)
         else:
-            for i in 0..<16:
+            for i in 0..<80:
                 remote = context.peer_inbounds.grab()
                 if remote != nil:
                     if remote.closed: continue
                     break
-                await sleepAsync(100)
+                await sleepAsync(5)
 
 
     proc processClient() {.async.} =
-        var data = newString(len = globals.chunk_size)
+        var data = newString(len = 0)
 
         try:
             while not client.closed:
-                # data = await client.recv(if mux: globals.mux_payload_size else: globals.chunk_size)
-                data.setlen await client.reader.readOnce(addr data[0], globals.chunk_size)
+                data.setlen client.reader.buffer.dataLen()
 
+                if data.len() == 0:
+                    if client.reader.atEof():
+                        break
+                    else:continue
+                
+                if client.trusted == TrustStatus.no:
+                    data.setLen(data.len() +  globals.full_tls_record_len.int) 
+                    await client.reader.readExactly(addr data[0 + globals.full_tls_record_len], data.len)
+                else:
+                    await client.reader.readExactly(addr data[0], data.len)
+                
                 if globals.log_data_len: echo &"[processClient] {data.len()} bytes from client {client.id}"
 
-                if data.len() == 0: #user closed the connection
-                    break
+                
 
 
                 if client.trusted == TrustStatus.pending:
