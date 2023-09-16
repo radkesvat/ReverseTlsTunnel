@@ -78,7 +78,7 @@ proc processConnection(client: Connection) {.async.} =
         var data = newString(len = 0)
         try:
             while not remote.closed:
-                data.setlen remote.reader.buffer.dataLen()
+                data.setlen remote.reader.tsource.offset
 
                 if data.len() == 0:
                     if remote.reader.atEof():
@@ -122,7 +122,7 @@ proc processConnection(client: Connection) {.async.} =
         var boundary:uint16 = 0
         try:
             while not client.closed:
-                data.setlen client.reader.buffer.dataLen()
+                data.setlen client.reader.tsource.offset
 
                 if data.len() == 0:
                     if client.reader.atEof():

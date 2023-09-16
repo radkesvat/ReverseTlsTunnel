@@ -91,7 +91,7 @@ proc processConnection(client: Connection) {.async.} =
 
         try:
             while not remote.isNil and not remote.closed:
-                data.setlen remote.reader.buffer.dataLen()
+                data.setlen remote.reader.tsource.offset
 
                 if data.len() == 0:
                     if remote.reader.atEof():
@@ -196,7 +196,7 @@ proc processConnection(client: Connection) {.async.} =
 
         try:
             while not client.closed:
-                data.setlen client.reader.buffer.dataLen()
+                data.setlen client.reader.tsource.offset
 
                 if data.len() == 0:
                     if client.reader.atEof():
