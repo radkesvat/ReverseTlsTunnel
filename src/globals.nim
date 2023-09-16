@@ -4,7 +4,7 @@ import checksums/sha1
 
 # export IpAddress
 
-const version = "3.4"
+const version = "3.5"
 
 type RunMode*{.pure.} = enum
     iran, kharej
@@ -12,8 +12,8 @@ type RunMode*{.pure.} = enum
 var mode*: RunMode = RunMode.iran
 
 # [Log Options]true
-const log_data_len* = true
-const log_conn_create* = false
+const log_data_len* = false
+const log_conn_create* = true
 const log_conn_destory* = false
 const log_conn_error* = false
 
