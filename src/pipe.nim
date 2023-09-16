@@ -76,7 +76,7 @@ proc unPackForRead*(data: var string) =
     decrypt data
 
 proc packForSend*(data: var string) =
-    let size:uint16 = data.len().uint16
+    let size:uint16 = data.len().uint16 - globals.full_tls_record_len.uint
     copyMem(addr data[0], addr globals.tls13_record_layer[0], globals.tls13_record_layer.len())
     copyMem(addr data[0 + globals.tls13_record_layer.len()], addr size, sizeof(uint16))
 
