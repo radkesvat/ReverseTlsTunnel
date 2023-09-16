@@ -2402,7 +2402,7 @@ proc readOnce*(transp: StreamTransport, pbytes: pointer,
   ## If internal buffer is not empty, ``nbytes`` bytes will be transferred from
   ## internal buffer, otherwise it will wait until some bytes will be received.
   doAssert(not(isNil(pbytes)), "pbytes must not be nil")
-  doAssert(nbytes > 0, "nbytes must be positive integer")
+  # doAssert(nbytes > 0, "nbytes must be positive integer")
 
   var count = 0
   readLoop("stream.transport.readOnce"):

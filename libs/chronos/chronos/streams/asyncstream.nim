@@ -470,7 +470,7 @@ proc readOnce*(rstream: AsyncStreamReader, pbytes: pointer,
   ## If internal buffer is not empty, ``nbytes`` bytes will be transferred from
   ## internal buffer, otherwise it will wait until some bytes will be available.
   doAssert(not(isNil(pbytes)), "pbytes must not be nil")
-  doAssert(nbytes > 0, "nbytes must be positive value")
+  # doAssert(nbytes > 0, "nbytes must be positive value")
   checkStreamClosed(rstream)
 
   if isNil(rstream.rsource):

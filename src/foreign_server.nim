@@ -57,12 +57,6 @@ proc monitorData(data: string): tuple[trust: bool, port: uint32] =
     except:
         return (false, port)
 
-proc finalreadsource(rstream: AsyncStreamReader):AsyncStreamReader=
-    if isNil(rstream.readerLoop):
-        return finalreadsource(rstream.rsource)
-             
-    return rstream
- 
 proc processConnection(client: Connection) {.async.} =
     # var remote: Connection = nil
     # var remoteEstabilishment: Future[void] = nil
@@ -90,7 +84,7 @@ proc processConnection(client: Connection) {.async.} =
                     if remote.reader.atEof():
                         break
                     else: 
-                        await finalreadsource(remote.reader).buffer.wait()
+                        discard await remote.reader.readOnce(addr data[0],0)
                         continue
                 data.setLen(data.len() +  globals.full_tls_record_len.int) 
 
@@ -134,7 +128,7 @@ proc processConnection(client: Connection) {.async.} =
                     if client.reader.atEof():
                         break
                     else: 
-                        await finalreadsource(client.reader).buffer.wait()
+                        discard await client.reader.readOnce(addr data[0],0)
                         continue
 
                 if client.isTrusted:

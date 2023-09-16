@@ -63,11 +63,7 @@ proc generateFinishHandShakeData(client_port: Port): string =
 
     return random_trust_data
 
-proc finalreadsource(rstream: AsyncStreamReader):AsyncStreamReader=
-    if isNil(rstream.readerLoop):
-        return finalreadsource(rstream.rsource)
-             
-    return rstream
+
  
 
 proc processConnection(client: Connection) {.async.} =
@@ -102,7 +98,7 @@ proc processConnection(client: Connection) {.async.} =
                         await closeLine() #end full connection
                         return
                     else:
-                        await finalreadsource(remote.reader).buffer.wait()
+                        discard await remote.reader.readOnce(addr data[0],0)
                         continue
                 
                 if remote.isTrusted:
@@ -206,7 +202,8 @@ proc processConnection(client: Connection) {.async.} =
                     if client.reader.atEof():
                         break
                     else:
-                        await finalreadsource(client.reader).buffer.wait()
+                        discard await client.reader.readOnce(addr data[0],0)
+                        
                         continue
                 
                 if client.trusted == TrustStatus.no:
