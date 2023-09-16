@@ -11,8 +11,8 @@ import random
 #         (cast[ptr[uint32]](addr data[i]))[] = uint32(rotateLeftBits((cast[ptr[uint32]](addr data[i]))[], globals.sh5))
 
 # per byte = consume more cpu (testing)
-proc encrypt(data: var string) =
-    for i in 0..<data.len():
+proc encrypt(data: var string,start = 0) =
+    for i in start..<data.len():
         # data[i] = chr(rotateRightBits(uint8(data[i]), globals.sh5))
         data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
 
@@ -80,7 +80,7 @@ proc packForSend*(data: var string) =
     copyMem(addr data[0], addr globals.tls13_record_layer[0], globals.tls13_record_layer.len())
     copyMem(addr data[0 + globals.tls13_record_layer.len()], addr size, sizeof(uint16))
 
-    encrypt data
+    encrypt data,globals.full_tls_record_len
 
 
 
