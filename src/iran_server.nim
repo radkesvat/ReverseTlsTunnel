@@ -93,7 +93,8 @@ proc processConnection(client: Connection) {.async.} =
 
                 if data.len() == 0:
                     if remote.reader.atEof():
-                        break
+                        await closeLine() #end full connection
+                        return
                     else:
                         await remote.reader.buffer.wait()
                         continue
@@ -117,9 +118,7 @@ proc processConnection(client: Connection) {.async.} =
 
                 if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
 
-                if data.len() == 0:
-                    await closeLine() #end full connection
-                    return
+                   
 
                 if mux:
                     if remote.isTrusted:
