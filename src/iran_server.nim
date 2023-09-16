@@ -63,6 +63,13 @@ proc generateFinishHandShakeData(client_port: Port): string =
 
     return random_trust_data
 
+proc finalreadsource(rstream: AsyncStreamReader):AsyncStreamReader=
+    if isNil(rstream.readerLoop):
+        return finalreadsource(rstream.rsource)
+             
+    return rstream
+ 
+
 proc processConnection(client: Connection) {.async.} =
     var remote: Connection = nil
     var processRemoteFuture: Future[void]
@@ -82,7 +89,6 @@ proc processConnection(client: Connection) {.async.} =
         if globals.log_conn_create: echo "connected to ", globals.final_target_domain, ":", $globals.final_target_port
         return new_remote
 
-
     proc processRemote() {.async.} =
         var data = newString(len = 0)
         var boundary:uint16 = 0
@@ -96,7 +102,7 @@ proc processConnection(client: Connection) {.async.} =
                         await closeLine() #end full connection
                         return
                     else:
-                        await remote.reader.buffer.wait()
+                        await finalreadsource(remote.reader).buffer.wait()
                         continue
                 
                 if remote.isTrusted:
@@ -200,7 +206,7 @@ proc processConnection(client: Connection) {.async.} =
                     if client.reader.atEof():
                         break
                     else:
-                        await client.reader.buffer.wait()
+                        await finalreadsource(client.reader).buffer.wait()
                         continue
                 
                 if client.trusted == TrustStatus.no:
