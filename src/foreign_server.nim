@@ -84,7 +84,7 @@ proc processConnection(client: Connection) {.async.} =
                     if remote.reader.atEof():
                         break
                     else: 
-                        discard await remote.reader.readOnce(addr data[0],0)
+                        discard await remote.reader.readOnce(addr data,0)
                         continue
                 data.setLen(data.len() +  globals.full_tls_record_len.int) 
 
@@ -128,7 +128,7 @@ proc processConnection(client: Connection) {.async.} =
                     if client.reader.atEof():
                         break
                     else: 
-                        discard await client.reader.readOnce(addr data[0],0)
+                        discard await client.reader.readOnce(addr data,0)
                         continue
 
                 if client.isTrusted:
