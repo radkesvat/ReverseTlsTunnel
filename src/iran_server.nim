@@ -92,9 +92,11 @@ proc processConnection(client: Connection) {.async.} =
                 data.setlen remote.reader.buffer.dataLen()
 
                 if data.len() == 0:
-                    if client.reader.atEof():
+                    if remote.reader.atEof():
                         break
-                    else:continue
+                    else:
+                        await remote.reader.buffer.wait()
+                        continue
                 
                 if remote.isTrusted:
                     if boundary == 0:
@@ -198,7 +200,9 @@ proc processConnection(client: Connection) {.async.} =
                 if data.len() == 0:
                     if client.reader.atEof():
                         break
-                    else:continue
+                    else:
+                        await client.reader.buffer.wait()
+                        continue
                 
                 if client.trusted == TrustStatus.no:
                     data.setLen(data.len() +  globals.full_tls_record_len.int) 
