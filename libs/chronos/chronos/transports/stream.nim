@@ -108,7 +108,7 @@ else:
       state: set[TransportState]      # Current Transport state
       reader*: Future[void]            # Current reader Future
       buffer: seq[byte]               # Reading buffer
-      offset: int                     # Reading buffer offset
+      offset*: int                     # Reading buffer offset
       error: ref CatchableError       # Current error
       queue: Deque[StreamVector]      # Writer queue
       future: Future[void]            # Stream life future
