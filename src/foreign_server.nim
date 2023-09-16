@@ -88,7 +88,7 @@ proc processConnection(client: Connection) {.async.} =
                         continue
                 data.setLen(data.len() +  globals.full_tls_record_len.int) 
 
-                await remote.reader.readExactly(addr data[0 + globals.full_tls_record_len], data.len)
+                await remote.reader.readExactly(addr data[0 + globals.full_tls_record_len], data.len-globals.full_tls_record_len.int)
                 if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
                 
                 if not client.closed:
