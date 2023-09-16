@@ -172,7 +172,7 @@ proc processConnection(client: Connection) {.async.} =
 
     proc chooseRemote() {.async.} =
         if mux:
-            for i in 0..<80:
+            for i in 0..<200:
                 remote = context.peer_inbounds.randomPick()
                 if remote != nil:
                     if remote.mux_holds.len().uint32 >= remote.mux_capacity:
@@ -181,14 +181,14 @@ proc processConnection(client: Connection) {.async.} =
                     remote.mux_holds.add client.id
 
                     break
-                await sleepAsync(5)
+                await sleepAsync(10)
         else:
-            for i in 0..<80:
+            for i in 0..<200:
                 remote = context.peer_inbounds.grab()
                 if remote != nil:
                     if remote.closed: continue
                     break
-                await sleepAsync(5)
+                await sleepAsync(10)
 
 
     proc processClient() {.async.} =
