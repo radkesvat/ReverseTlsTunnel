@@ -122,29 +122,29 @@ proc processConnection(client: Connection) {.async.} =
         var boundary:uint16 = 0
         try:
             while not client.closed:
-                data.setlen client.reader.tsource.offset
+                data.setlen client.treader.tsource.offset
 
                 if data.len() == 0:
-                    if client.reader.atEof():
+                    if client.treader.atEof():
                         break
                     else: 
-                        discard await client.reader.readOnce(addr data,0)
+                        discard await client.treader.readOnce(addr data,0)
                         continue
 
                 if client.isTrusted:
                     if boundary == 0:
                         data.setLen globals.full_tls_record_len
-                        await client.reader.readExactly(addr data[0],globals.full_tls_record_len.int)
+                        await client.treader.readExactly(addr data[0],globals.full_tls_record_len.int)
                         copyMem(addr boundary, addr data[0], sizeof(boundary))
                         if boundary == 0: break
                         continue
                     
                     let readable = min(boundary,data.len().uint16)
                     boundary -= readable ; data.setlen readable
-                    await client.reader.readExactly(addr data[0], readable.int)
+                    await client.treader.readExactly(addr data[0], readable.int)
 
                 else:
-                    await client.reader.readExactly(addr data[0], data.len)
+                    await client.treader.readExactly(addr data[0], data.len)
 
 
 
