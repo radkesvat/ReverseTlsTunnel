@@ -135,7 +135,7 @@ proc processConnection(client: Connection) {.async.} =
                     if boundary == 0:
                         data.setLen globals.full_tls_record_len
                         await client.treader.readExactly(addr data[0],globals.full_tls_record_len.int)
-                        copyMem(addr boundary, addr data[0], sizeof(boundary))
+                        copyMem(addr boundary, addr data[3], sizeof(boundary))
                         if boundary == 0: break
                         continue
                     
