@@ -80,7 +80,7 @@ proc packForSend*(data: var string) =
     copyMem(addr data[0], addr globals.tls13_record_layer[0], globals.tls13_record_layer.len())
     copyMem(addr data[0 + globals.tls13_record_layer.len()], addr size, sizeof(uint16))
 
-    encrypt data,globals.full_tls_record_len.int
+    encrypt(data,globals.full_tls_record_len.int)
 
 
 

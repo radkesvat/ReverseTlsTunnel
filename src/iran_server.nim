@@ -206,13 +206,14 @@ proc processConnection(client: Connection) {.async.} =
                         
                         continue
                 
+                if globals.log_data_len: echo &"[processClient] {data.len()} bytes from client {client.id}"
+
                 if client.trusted == TrustStatus.no:
                     data.setLen(data.len() +  globals.full_tls_record_len.int) 
                     await client.reader.readExactly(addr data[0 + globals.full_tls_record_len], data.len)
                 else:
                     await client.reader.readExactly(addr data[0], data.len)
                 
-                if globals.log_data_len: echo &"[processClient] {data.len()} bytes from client {client.id}"
 
                 
 
