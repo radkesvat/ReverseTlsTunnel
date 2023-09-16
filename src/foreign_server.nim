@@ -117,7 +117,6 @@ proc processConnection(client: Connection) {.async.} =
             await closeLine(client,remote)
 
     proc proccessClient() {.async.} =
-        discard await client.transp.consume()
         var remote: Connection = nil
         var data = newString(len = 0)
         var boundary:uint16 = 0
