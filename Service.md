@@ -15,7 +15,7 @@ nano tunnel.service
 ```sh
 [Unit]
 Description=Reverse TLS Tunnel
-After=network.target
+Type=idle
 
 [Service]
 User=root
