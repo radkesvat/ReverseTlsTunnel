@@ -21,4 +21,10 @@
 آموزش ویدویی کانال AminiYT 
 [لینک](https://www.youtube.com/watch?v=UafuV3qmyX0)
 
+
+آموزش ویدویی کانال AminiYT 
+[لینک](https://www.youtube.com/watch?v=yXrXSSKP8ME)
+
+
+
 </div>
