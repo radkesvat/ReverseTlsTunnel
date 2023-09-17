@@ -22,7 +22,7 @@
 [لینک](https://www.youtube.com/watch?v=UafuV3qmyX0)
 
 
-آموزش ویدویی کانال AminiYT 
+آموزش ویدویی کانال Asanlearncom 
 [لینک](https://www.youtube.com/watch?v=yXrXSSKP8ME)
 
 
