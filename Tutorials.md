@@ -26,5 +26,9 @@
 [لینک](https://www.youtube.com/watch?v=yXrXSSKP8ME)
 
 
+***
+آموزش متنی سگارو
+[لینک](https://telegra.ph/Tips-on-setting-up-a-VPN-server-tunneling-and-applying-configurations-with-iSegaro-09-12)
+
 
 </div>
