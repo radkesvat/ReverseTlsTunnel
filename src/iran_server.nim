@@ -349,7 +349,7 @@ proc start*(){.async.} =
 
 
     mux = globals.mux
-    trackIdleConnections(context.peer_inbounds,10) # only save for 10 secs
+    trackIdleConnections(context.peer_inbounds,globals.pool_age)
 
     await sleepAsync(200)
     echo &"Mode Iran : {globals.self_ip}  handshake: {globals.final_target_domain}"

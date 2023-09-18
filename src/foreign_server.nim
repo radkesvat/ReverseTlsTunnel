@@ -278,7 +278,7 @@ proc start*(){.async.} =
     mux = globals.mux
 
     echo &"Mode Foreign Server:  {globals.listen_addr} <-> ({globals.final_target_domain} with ip {globals.final_target_ip})"
-    trackIdleConnections(context.free_peer_outbounds,10)# only save for 10 secs
+    trackIdleConnections(context.free_peer_outbounds,globals.pool_age)
     #just to make sure we always willing to connect to the peer
     while true:
         poolFrame()

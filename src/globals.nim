@@ -231,9 +231,9 @@ proc init*() =
                     of "pool":
                         pool_size = parseInt(p.val).uint
                         print pool_size
-                        
+
                     of "pool_age":
-                        pool_size = parseInt(p.val).uint
+                        pool_age = parseInt(p.val).uint
                         print pool_age
 
                     of "trust_time":
