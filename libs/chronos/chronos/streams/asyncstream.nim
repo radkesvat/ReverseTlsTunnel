@@ -421,6 +421,7 @@ template readLoop(body: untyped): untyped =
       break
     else:
       if not(rstream.atEof()):
+        
         await rstream.buffer.wait()
 
 proc readExactly*(rstream: AsyncStreamReader, pbytes: pointer,

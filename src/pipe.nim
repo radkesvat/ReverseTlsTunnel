@@ -70,8 +70,6 @@ proc muxRead(data: var string): tuple[cid: uint32, port: uint16, data: string] =
     return (cid,port, buffer)
 
 
-
-
 proc unPackForRead*(data: var string) =
     decrypt data
 

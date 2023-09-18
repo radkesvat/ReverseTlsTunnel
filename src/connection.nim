@@ -97,91 +97,12 @@ proc remove*(cons: var Connections, con: Connection or uint32) =
                 index = i
     if index != -1:
         cons.del index
+        
 proc remove*(cons: var seq[uint32], id: uint32) =
     let i = cons.find(id)
     if i != -1:
         cons.del(i)
 
-#send with a simple low cost timeout
-# template send*(con: Connection, data: string): untyped =
-#     con.action_start_time = et
-
-#     var result = con.socket.send(data)
-
-#     result.addCallback(proc() =
-#         con.action_start_time = 0
-#     )
-#     result
-
-# template unEncryptedSend*(con: Connection, data: string): untyped =
-#     con.action_start_time = et
-#     var result = send(con.socket.fd.AsyncFD, data, {SocketFlag.SafeDisconn})
-#     result.addCallback(proc() =
-#         con.action_start_time = 0
-#     )
-#     result
-
-# #recv with a simple low cost timeout
-# template recv*(con: Connection, data: SomeInteger): untyped =
-#     con.action_start_time = et
-#     var result = con.socket.recv(data.int)
-#     result.addCallback(proc() =
-#         con.action_start_time = 0
-#     )
-#     result
-
-
-# proc unEncryptedRecv*(con: Connection, size: SomeInteger): Future[string] {.async.} =
-#     con.action_start_time = et
-#     result = newString(size)
-#     var fut = asyncdispatch.recvInto(con.socket.fd.AsyncFD, addr result[0], size.int, {SocketFlag.SafeDisconn})
-#     fut.addCallback(proc() =
-#         con.action_start_time = 0
-#     )
-#     result.setLen(await fut)
-#     return result
-
-
-
-# template isClosed*(con: Connection): bool = con.socket.isClosed()
-
-
-# proc close*(con: Connection) =
-#     if con.socket != nil:
-#         con.socket.close()
-#     let i = allConnections.find(con)
-#     if i != -1:
-#         allConnections.del(i)
-
-
-# proc newConnection*(socket: AsyncSocket = nil, address: string = "", create_socket: bool = true, buffered: bool = globals.socket_buffered): Connection =
-#     new(result)
-#     result.id = new_uid()
-#     result.creation_time = epochTime().uint32
-#     result.trusted = TrustStatus.pending
-#     result.action_start_time = 0
-#     result.register_start_time = 0
-#     result.mux_capacity = globals.mux_capacity
-#     # result.mux_holds = 0
-#     result.mux_closes = 0
-
-#     result.in_use = false
-
-#     if not address.isEmptyOrWhitespace():
-#         try:
-#             var parsed = parseIpAddress(address)
-#             result.address = parsed
-#         except:
-#             echo "could not parse ip address"
-
-#     if socket == nil:
-#         if create_socket: result.socket = newAsyncSocket(buffered = buffered)
-#     else: result.socket = socket
-
-#     when not defined(android):
-#         if not socket.isNil and
-#          not globals.keep_system_limit: result.socket.setSockOpt(OptNoDelay, true)
-#     allConnections.add result
 
 proc grab*(cons: var Connections): Connection =
     if cons.len() == 0: return nil
