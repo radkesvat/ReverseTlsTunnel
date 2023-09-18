@@ -13,14 +13,15 @@ var mode*: RunMode = RunMode.iran
 
 # [Log Options]true
 const log_conn_create* = true
-const log_data_len* = true
-const log_conn_destory* = true
-const log_conn_error* = true
+const log_data_len* = false
+const log_conn_destory* = false
+const log_conn_error* = false
 
 
 # [Connection]
 var trust_time*: uint = 3 #secs
 var pool_size*: uint = 16
+var pool_age*: uint = 10
 var max_idle_time*: uint = 600 #secs (default TCP RFC is 3600)
 var max_pool_unused_time*: uint = 60 #secs
 const chunk_size* = 4096
@@ -230,6 +231,10 @@ proc init*() =
                     of "pool":
                         pool_size = parseInt(p.val).uint
                         print pool_size
+                        
+                    of "pool_age":
+                        pool_size = parseInt(p.val).uint
+                        print pool_age
 
                     of "trust_time":
                         trust_time = parseInt(p.val).uint
