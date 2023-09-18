@@ -14,7 +14,8 @@ nano tunnel.service
 خوب حالا این محتویات رو قرار میدیم 
 ```sh
 [Unit]
-Description= my tunnel service
+Description=Reverse TLS Tunnel
+Type=idle
 
 [Service]
 User=root
