@@ -28,6 +28,25 @@ Restart=always
 WantedBy=multi-user.target
 ```
 
+مثال درستش :
+```sh
+[Unit]
+Description=Reverse TLS Tunnel
+
+[Service]
+Type=idle
+User=root
+WorkingDirectory=/root
+ExecStart=/root/RTT --kharej --iran-ip:1.2.3.4 --iran-port:443 --toip:127.0.0.1 --toport:443 --password:123ab --sni:splus.ir --terminate:24
+Restart=always
+
+[Install]
+WantedBy=multi-user.targe
+
+```
+
+
+
 خوب حالا دقت کنین که برنامه رو توی پوشه /root نصب کرده باشین فکر نکنم این نیاز به توضیح داشته باشه ؛ وارد پوشه روت بشین و یه بار دستور برنامه رو اجرا کنین تا فایل RTT اونجا باشه
 
 دوم اینکه توی این فایلی که الان نوشتیم بخش ExecStart  باید جای \<your argemunts\>  پارامتر های برنامه رو بنویسید اما بعدش ما یک اپشن اضافه به اسم --terminate اضافه کردیم
