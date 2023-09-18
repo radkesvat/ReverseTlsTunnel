@@ -15,9 +15,10 @@ nano tunnel.service
 ```sh
 [Unit]
 Description=Reverse TLS Tunnel
-Type=idle
+
 
 [Service]
+Type=idle
 User=root
 WorkingDirectory=/root
 ExecStart=/root/RTT <your arguments> --terminate:24
