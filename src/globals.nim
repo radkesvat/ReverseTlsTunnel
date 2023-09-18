@@ -12,10 +12,10 @@ type RunMode*{.pure.} = enum
 var mode*: RunMode = RunMode.iran
 
 # [Log Options]true
-const log_data_len* = false
 const log_conn_create* = true
-const log_conn_destory* = false
-const log_conn_error* = false
+const log_data_len* = true
+const log_conn_destory* = true
+const log_conn_error* = true
 
 
 # [Connection]
