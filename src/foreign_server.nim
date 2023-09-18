@@ -75,45 +75,42 @@ proc processConnection(client: Connection) {.async.} =
         var data = newString(len = 0)
         try:
             while not remote.closed:
-                block read:   
-                    data.setlen remote.reader.tsource.offset
-                    if data.len() == 0:
-                        if remote.reader.atEof():
-                            break
-                        else:
-                            discard await remote.reader.readOnce(addr data, 0)
-                            continue
-                    let width = globals.full_tls_record_len.int
-                    data.setLen(data.len() + width)
-                    await remote.reader.readExactly(addr data[0 + width], data.len - width)
-                    if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
+                #read
+                data.setlen remote.reader.tsource.offset
+                if data.len() == 0:
+                    if remote.reader.atEof():
+                        break
+                    else:
+                        discard await remote.reader.readOnce(addr data, 0)
+                        continue
+                let width = globals.full_tls_record_len.int
+                data.setLen(data.len() + width)
+                await remote.reader.readExactly(addr data[0 + width], data.len - width)
+                if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
 
-                block write:
-                    if not client.closed:
-                        if mux: packForSendMux(remote.id, remote.port.uint16, data) else: packForSend(data)
-
-                        await client.twriter.write(data)
-                        if globals.log_data_len: echo &"[processRemote] Sent {data.len()} bytes ->  client"
+                #write
+                if not client.closed:
+                    if mux: packForSendMux(remote.id, remote.port.uint16, data) else: packForSend(data)
+                    await client.twriter.write(data)
+                    if globals.log_data_len: echo &"[processRemote] Sent {data.len()} bytes ->  client"
 
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
-        block close:
-            if mux:
-                await remote.closeWait()
-                context.outbound.remove(remote)
-
-                if not client.closed and client.mux_holds.contains(remote.id):
-                    client.mux_holds.remove(remote.id)
-                    inc client.mux_closes
-                    var data = ""
-                    echo "sending mux client close .... ", remote.id
-                    packForSendMux(remote.id, remote.port.uint16, data)
-                    await client.twriter.write(data)
-
-                if client.mux_closes >= client.mux_capacity:
-                    await client.closeWait() #end full connection
-            else:
-                await closeLine(client, remote)
+        #close
+        if mux:
+            await remote.closeWait()
+            context.outbound.remove(remote)
+            if not client.closed and client.mux_holds.contains(remote.id):
+                client.mux_holds.remove(remote.id)
+                inc client.mux_closes
+                var data = ""
+                echo "sending mux client close .... ", remote.id
+                packForSendMux(remote.id, remote.port.uint16, data)
+                await client.twriter.write(data)
+            if client.mux_closes >= client.mux_capacity:
+                await client.closeWait() #end full connection
+        else:
+            await closeLine(client, remote)
 
     proc proccessClient() {.async.} =
         var remote: Connection = nil
@@ -121,124 +118,115 @@ proc processConnection(client: Connection) {.async.} =
         var boundary: uint16 = 0
         try:
             while not client.closed:
-                block read:  
-                    data.setlen client.treader.tsource.offset
-                    if data.len() == 0:
-                        if client.treader.atEof():
-                            break
-                        else:
-                            discard await client.treader.readOnce(addr data, 0)
-                            continue
-
-                    if client.isTrusted:
-                        if boundary == 0:
-                            let width = globals.full_tls_record_len.int
-                            data.setLen width
-                            await client.treader.readExactly(addr data[0],width)
-                            copyMem(addr boundary, addr data[3], sizeof(boundary))
-                            if boundary == 0: break
-                            continue
-
-                        let readable = min(boundary, data.len().uint16)
-                        boundary -= readable; data.setlen readable
-                        await client.treader.readExactly(addr data[0], readable.int)
-
+                #read
+                data.setlen client.treader.tsource.offset
+                if data.len() == 0:
+                    if client.treader.atEof():
+                        break
                     else:
-                        await client.treader.readExactly(addr data[0], data.len)
+                        discard await client.treader.readOnce(addr data, 0)
+                        continue
+                if client.isTrusted:
+                    if boundary == 0:
+                        let width = globals.full_tls_record_len.int
+                        data.setLen width
+                        await client.treader.readExactly(addr data[0],width)
+                        copyMem(addr boundary, addr data[3], sizeof(boundary))
+                        if boundary == 0: break
+                        continue
+                    let readable = min(boundary, data.len().uint16)
+                    boundary -= readable; data.setlen readable
+                    await client.treader.readExactly(addr data[0], readable.int)
+                else:
+                    await client.treader.readExactly(addr data[0], data.len)
+                if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes from client"
 
-                    if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes from client"
 
 
-                block process:
-                    if mux:
-                        discard
-                    else:
-                        if (client.isTrusted()) and (remote.isNil()):
-                            remote = await remoteTrusted(client.port.Port)
-                            asyncCheck processRemote(remote)
-                            context.free_peer_outbounds.remove(client)
-                            poolFrame()
-
-                        if client.trusted == TrustStatus.pending:
-                            var (trust, port) = monitorData(data)
-                            if trust:
-                                if globals.multi_port:
-                                    echo "multi-port target:", port
-                                    client.port = port.Port
-                                else:
-                                    client.port = globals.next_route_port.Port
-                                client.trusted = TrustStatus.yes
-                                print "Fake Reverse Handshake Complete !"
-                                continue
+                #process
+                if mux:
+                    discard
+                else:
+                    if (client.isTrusted()) and (remote.isNil()):
+                        remote = await remoteTrusted(client.port.Port)
+                        asyncCheck processRemote(remote)
+                        context.free_peer_outbounds.remove(client)
+                        poolFrame()
+                    if client.trusted == TrustStatus.pending:
+                        var (trust, port) = monitorData(data)
+                        if trust:
+                            if globals.multi_port:
+                                echo "multi-port target:", port
+                                client.port = port.Port
                             else:
-                                echo "[proccessClient] Target server was not a trusted tunnel client, closing..."
-                                client.trusted = TrustStatus.no
-                                break
-                            # asyncCheck processRemote()
+                                client.port = globals.next_route_port.Port
+                            client.trusted = TrustStatus.yes
+                            print "Fake Reverse Handshake Complete !"
+                            continue
+                        else:
+                            echo "[proccessClient] Target server was not a trusted tunnel client, closing..."
+                            client.trusted = TrustStatus.no
+                            break
+                        # asyncCheck processRemote()
                     
-                block write:          
-                    if mux:
-                        discard #who cares
-                        # if client.isTrusted:
-                        #     var (cid, port) = unPackForReadMux(data)
-                        #     if not globals.multi_port: port = globals.next_route_port.uint16
-                        #     print cid, port
-                        #     if not context.outbound.hasID(cid):
-                        #         let new_remote = remoteTrusted()
-                        #         new_remote.id = cid
-                        #         new_remote.port = port
-                        #         client.mux_holds.add(new_remote.id)
-                        #         if client.mux_holds.len.uint32 > client.mux_capacity:
-                        #             echo "[ERROR] this mux connection is taking more than capacity"
-                        #         context.outbound.register new_remote
-                        #         new_remote.estabilished = new_remote.socket.connect(globals.next_route_addr, port.Port)
-                        #         await new_remote.estabilished
-                        #         echo "connected to the remote core"
-                        #         asyncCheck processRemote(new_remote)
-
-                        #     context.outbound.with(cid, name = con):
-                        #         if not con.estabilished.finished:
-                        #             await con.estabilished
-
-                        #         if data.len() == 0: #mux remote close
-                        #             echo "[processRemote] closed Mux remote"
-                        #             con.close()
-                        #             context.outbound.remove cid
-                        #             client.mux_holds.remove cid
-                        #             inc client.mux_closes
-                        #         elif not con.closed():
-                        #             await con.send(data)
-                        #             echo &"[proccessClient] {data.len()} bytes -> remote "
-
-                        # if client.trusted == TrustStatus.pending:
-                        #     var (trust, _) = monitorData(data)
-                        #     if trust:
-                        #         client.trusted = TrustStatus.yes
-                        #         print "Fake Reverse Handshake Complete !"
-                        #         client.setBuffered()
-
-                        #     else:
-                        #         echo "[proccessClient] Target server was not a trusted tunnel client, closing..."
-                        #         client.trusted = TrustStatus.no
-                        #         break
-                    else:
-                        unPackForRead(data)
-                        if not remote.closed():
-                            await remote.writer.write(data)
-                            if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote "
-
+                #write
+                if mux:
+                    discard #who cares
+                    # if client.isTrusted:
+                    #     var (cid, port) = unPackForReadMux(data)
+                    #     if not globals.multi_port: port = globals.next_route_port.uint16
+                    #     print cid, port
+                    #     if not context.outbound.hasID(cid):
+                    #         let new_remote = remoteTrusted()
+                    #         new_remote.id = cid
+                    #         new_remote.port = port
+                    #         client.mux_holds.add(new_remote.id)
+                    #         if client.mux_holds.len.uint32 > client.mux_capacity:
+                    #             echo "[ERROR] this mux connection is taking more than capacity"
+                    #         context.outbound.register new_remote
+                    #         new_remote.estabilished = new_remote.socket.connect(globals.next_route_addr, port.Port)
+                    #         await new_remote.estabilished
+                    #         echo "connected to the remote core"
+                    #         asyncCheck processRemote(new_remote)
+                    #     context.outbound.with(cid, name = con):
+                    #         if not con.estabilished.finished:
+                    #             await con.estabilished
+                    #         if data.len() == 0: #mux remote close
+                    #             echo "[processRemote] closed Mux remote"
+                    #             con.close()
+                    #             context.outbound.remove cid
+                    #             client.mux_holds.remove cid
+                    #             inc client.mux_closes
+                    #         elif not con.closed():
+                    #             await con.send(data)
+                    #             echo &"[proccessClient] {data.len()} bytes -> remote "
+                    # if client.trusted == TrustStatus.pending:
+                    #     var (trust, _) = monitorData(data)
+                    #     if trust:
+                    #         client.trusted = TrustStatus.yes
+                    #         print "Fake Reverse Handshake Complete !"
+                    #         client.setBuffered()
+                    #     else:
+                    #         echo "[proccessClient] Target server was not a trusted tunnel client, closing..."
+                    #         client.trusted = TrustStatus.no
+                    #         break
+                else:
+                    unPackForRead(data)
+                    if not remote.closed():
+                        await remote.writer.write(data)
+                        if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote "
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
-        block close:
-            context.free_peer_outbounds.remove(client)
-            if mux:
-                await client.closeWait()
-                for cid in client.mux_holds:
-                    context.outbound.with(cid, name = con):
-                        await con.closeWait()
-            else:
-                await closeLine(client, remote)
+        #close
+        context.free_peer_outbounds.remove(client)
+        if mux:
+            await client.closeWait()
+            for cid in client.mux_holds:
+                context.outbound.with(cid, name = con):
+                    await con.closeWait()
+        else:
+            await closeLine(client, remote)
 
 
     try:
