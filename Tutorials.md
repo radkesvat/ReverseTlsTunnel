@@ -25,6 +25,11 @@
 آموزش ویدویی کانال Asanlearncom 
 [لینک](https://www.youtube.com/watch?v=yXrXSSKP8ME)
 
+آموزش ویدویی کانال AI Universe
+[لینک](https://www.youtube.com/@AIUniversetop)
+
+
+
 
 ***
 آموزش متنی سگارو
