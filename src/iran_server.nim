@@ -291,7 +291,6 @@ proc processConnection(client: Connection) {.async.} =
                 if globals.multi_port:
                     await remote.writer.write(generateFinishHandShakeData(client.port))
 
-                if not mux: asyncCheck processRemote(remote) # mux already called this
             else:
                 if globals.log_conn_destory: echo &"[createNewCon][Error] left without connection, closes forcefully."
                 await client.closeWait()
@@ -299,6 +298,7 @@ proc processConnection(client: Connection) {.async.} =
         else:
             remote = await connectTargetSNI()
 
+        if not mux: asyncCheck processRemote(remote) # mux already called this
         asyncCheck processClient(remote)
 
     except:
