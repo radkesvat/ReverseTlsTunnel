@@ -199,7 +199,7 @@ proc processConnection(client: Connection) {.async.} =
                     if globals.log_data_len: echo &"[processClient] {data.len()} bytes from client {client.id}"
 
                     if client.trusted == TrustStatus.no:
-                        let width = full_tls_record_len.int
+                        let width = globals.full_tls_record_len.int
                         data.setLen(data.len() + width)
                         await client.reader.readExactly(addr data[0 + width], data.len - width)
                     else:
@@ -207,39 +207,38 @@ proc processConnection(client: Connection) {.async.} =
 
                 block choose_route:
                     if client.trusted == TrustStatus.pending:
-                    var trust = monitorData(data)
-                    if trust:
-                        #peer connection
-                        client.trusted = TrustStatus.yes
-                        let address = client.transp.remoteAddress()
-                        print "Peer Fake Handshake Complete ! ", address
-                        if mux: context.user_inbounds.remove(client)
-                        context.peer_inbounds.register(client)
-                        context.peer_ip = client.transp.remoteAddress.address
-                        await remote.closeWait() # close untrusted remote
-                        # await processRemoteFuture
+                        var trust = monitorData(data)
+                        if trust:
+                            #peer connection
+                            client.trusted = TrustStatus.yes
+                            let address = client.transp.remoteAddress()
+                            print "Peer Fake Handshake Complete ! ", address
+                            if mux: context.user_inbounds.remove(client)
+                            context.peer_inbounds.register(client)
+                            context.peer_ip = client.transp.remoteAddress.address
+                            await remote.closeWait() # close untrusted remote
+                            # await processRemoteFuture
 
-                        if mux:
-                            discard
-                            # remote = client
-                            # remote.setBuffered()
-                            # asyncCheck processRemote(client)
-
-                        if not globals.multi_port and not client.closed:
-                            await client.writer.write(generateFinishHandShakeData(client.port))
-
-                        return
-                    else:
-
-                        if (epochTime().uint - client.creation_time) > globals.trust_time:
-                            #user connection but no peer connected yet
-                            #peer connection but couldnt finish handshake in time
-                            client.trusted = TrustStatus.no
                             if mux:
-                                await closeLine(client,remote)
-                                return
-                            else:
-                                break
+                                discard
+                                # remote = client
+                                # remote.setBuffered()
+                                # asyncCheck processRemote(client)
+
+                            if not globals.multi_port and not client.closed:
+                                await client.writer.write(generateFinishHandShakeData(client.port))
+
+                            return
+                        else:
+                            if (epochTime().uint - client.creation_time) > globals.trust_time:
+                                #user connection but no peer connected yet
+                                #peer connection but couldnt finish handshake in time
+                                client.trusted = TrustStatus.no
+                                if mux:
+                                    await closeLine(client,remote)
+                                    return
+                                else:
+                                    break
 
                 block write:                
                     if not remote.closed:
@@ -363,6 +362,8 @@ proc start*(){.async.} =
 
 
     mux = globals.mux
+    trackIdleConnections(context.peer_inbounds,10) # only save for 10 secs
+
     await sleepAsync(200)
     echo &"Mode Iran : {globals.self_ip}  handshake: {globals.final_target_domain}"
     asyncCheck start_listener()

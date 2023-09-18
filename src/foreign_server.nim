@@ -149,6 +149,33 @@ proc processConnection(client: Connection) {.async.} =
                     if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes from client"
 
 
+                block process:
+                    if mux:
+                        discard
+                    else:
+                        if (client.isTrusted()) and (remote.isNil()):
+                            remote = await remoteTrusted(client.port.Port)
+                            asyncCheck processRemote(remote)
+                            context.free_peer_outbounds.remove(client)
+                            poolFrame()
+
+                        if client.trusted == TrustStatus.pending:
+                            var (trust, port) = monitorData(data)
+                            if trust:
+                                if globals.multi_port:
+                                    echo "multi-port target:", port
+                                    client.port = port.Port
+                                else:
+                                    client.port = globals.next_route_port.Port
+                                client.trusted = TrustStatus.yes
+                                print "Fake Reverse Handshake Complete !"
+                                continue
+                            else:
+                                echo "[proccessClient] Target server was not a trusted tunnel client, closing..."
+                                client.trusted = TrustStatus.no
+                                break
+                            # asyncCheck processRemote()
+                    
                 block write:          
                     if mux:
                         discard #who cares
@@ -195,37 +222,7 @@ proc processConnection(client: Connection) {.async.} =
                         #         client.trusted = TrustStatus.no
                         #         break
                     else:
-                        if (client.isTrusted()) and (remote.isNil()):
-                            remote = await remoteTrusted(client.port.Port)
-                            asyncCheck processRemote(remote)
-                            let i = context.free_peer_outbounds.find(client)
-                            if i != -1: context.free_peer_outbounds.del(i)
-                            poolFrame()
-
-
-
-                        if client.trusted == TrustStatus.pending:
-                            var (trust, port) = monitorData(data)
-
-                            if trust:
-                                if globals.multi_port:
-                                    echo "multi-port target:", port
-                                    client.port = port.Port
-                                else:
-                                    client.port = globals.next_route_port.Port
-                                client.trusted = TrustStatus.yes
-                                print "Fake Reverse Handshake Complete !"
-
-                                continue
-                            else:
-                                echo "[proccessClient] Target server was not a trusted tunnel client, closing..."
-                                client.trusted = TrustStatus.no
-                                break
-                            # asyncCheck processRemote()
-
-
                         unPackForRead(data)
-
                         if not remote.closed():
                             await remote.writer.write(data)
                             if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote "
@@ -234,8 +231,7 @@ proc processConnection(client: Connection) {.async.} =
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
         block close:
-            let i = context.free_peer_outbounds.find(client)
-            if i != -1: context.free_peer_outbounds.del(i)
+            context.free_peer_outbounds.remove(client)
             if mux:
                 await client.closeWait()
                 for cid in client.mux_holds:
@@ -259,31 +255,11 @@ proc poolFrame(create_count: uint = 0) =
             var conn = await connect(initTAddress(globals.iran_addr, globals.iran_port), SocketScheme.Secure, globals.final_target_domain)
             echo "TlsHandsahke complete."
             context.free_peer_outbounds.add conn
-            sleepAsync(30.secs).addCallback(proc(arg: pointer) =
-                {.gcsafe.}:
-                    let i = context.free_peer_outbounds.find(conn)
-                    if i != -1: 
-                        context.free_peer_outbounds.del(i)
-                        conn.close()
-            )
-            # let pending =
-            #     block:
-            #         var res: seq[Future[void]]
-            #         if not(isNil(conn.reader)) and not(conn.reader.closed()):
-            #             res.add(conn.reader.closeWait())
-            #         if not(isNil(conn.writer)) and not(conn.writer.closed()):
-            #             res.add(conn.writer.closeWait())
-            #         res
-            # if len(pending) > 0: await allFutures(pending)
-            # await allFutures(conn.treader.closeWait(), conn.twriter.closeWait())
-            # await stepsAsync(1)
 
             conn.transp.reader.cancel()
             await stepsAsync(1)
             conn.transp.reader = nil
 
-            # conn.treader = newAsyncStreamReader(transp)
-            # conn.twriter = newAsyncStreamWriter(transp)
             asyncCheck processConnection(conn)
             await conn.twriter.write(generateFinishHandShakeData())
 
@@ -316,6 +292,7 @@ proc start*(){.async.} =
     mux = globals.mux
 
     echo &"Mode Foreign Server:  {globals.listen_addr} <-> ({globals.final_target_domain} with ip {globals.final_target_ip})"
+    trackIdleConnections(context.free_peer_outbounds,10)# only save for 10 secs
     #just to make sure we always willing to connect to the peer
     while true:
         poolFrame()

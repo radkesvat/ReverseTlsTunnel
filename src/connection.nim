@@ -29,9 +29,9 @@ type
 
     Connection* = ref object
         creation_time*: uint        #creation epochtime
-        # action_start_time*: uint    #when recv/send action started (0 = idle)
-        # register_start_time*: uint  #when the connection is added to the pool (0 = idle)
-        id*: uint32 #global incremental id
+                                    # action_start_time*: uint    #when recv/send action started (0 = idle)
+                                    # register_start_time*: uint  #when the connection is added to the pool (0 = idle)
+        id*: uint32                 #global incremental id
         case kind*: SocketScheme
         of SocketScheme.NonSecure:
             discard
@@ -42,24 +42,25 @@ type
         transp*: StreamTransport
         reader*: AsyncStreamReader
         writer*: AsyncStreamWriter
-        remoteHostname*: string # sni
+        remoteHostname*: string     # sni
         state*: SocketState
 
-        trusted*: TrustStatus #when fake handshake perfromed
-        # socket*: AsyncSocket        #wrapped asyncsocket
+        trusted*: TrustStatus       #when fake handshake perfromed
+                                    # socket*: AsyncSocket        #wrapped asyncsocket
 
         estabilished*: Future[void] #connection has started
 
-        port*: Port #the port the socket points to
-        
-        
+        port*: Port                 #the port the socket points to
+
+
         # address*: IpAddress #the address from socket level
-        mux_capacity*: uint32 #how many connections can be multiplexed into this
-        mux_holds*: seq[uint32] #how many connections  multiplexed into this
-        mux_closes*: uint32 #how many connections have been closed
+        mux_capacity*: uint32       #how many connections can be multiplexed into this
+        mux_holds*: seq[uint32]     #how many connections  multiplexed into this
+        mux_closes*: uint32         #how many connections have been closed
 
 
     Connections* = seq[Connection]
+    ConnectionsRef* = ref var Connections
 
 var allConnections: seq[Connection]
 
@@ -97,7 +98,7 @@ proc remove*(cons: var Connections, con: Connection or uint32) =
                 index = i
     if index != -1:
         cons.del index
-        
+
 proc remove*(cons: var seq[uint32], id: uint32) =
     let i = cons.find(id)
     if i != -1:
@@ -124,13 +125,13 @@ proc register*(cons: var Connections, con: Connection) =
     cons.add con
 
 
-proc closed*(conn: Connection):bool=
-    case conn.kind 
+proc closed*(conn: Connection): bool =
+    case conn.kind
     of SocketScheme.NonSecure:
         return conn.reader.closed and conn.writer.closed
     of SocketScheme.Secure:
-        return conn.reader.closed and conn.writer.closed and 
-            conn.treader.closed and conn.twriter.closed 
+        return conn.reader.closed and conn.writer.closed and
+            conn.treader.closed and conn.twriter.closed
 
 proc close*(conn: Connection) =
     if not(isNil(conn.reader)) and not(conn.reader.closed()):
@@ -138,8 +139,8 @@ proc close*(conn: Connection) =
     if not(isNil(conn.writer)) and not(conn.writer.closed()):
         conn.writer.close()
 
-    case conn.kind 
-    of SocketScheme.NonSecure:discard
+    case conn.kind
+    of SocketScheme.NonSecure: discard
     of SocketScheme.Secure:
         conn.treader.close()
         conn.twriter.close()
@@ -148,7 +149,7 @@ proc close*(conn: Connection) =
 
 proc closeWait*(conn: Connection) {.async.} =
     ## Close HttpClientConnectionRef instance ``conn`` and free all the resources.
-    if conn.isNil():return
+    if conn.isNil(): return
     if conn.state notin {SocketState.Closing,
                          SocketState.Closed}:
         conn.state = SocketState.Closing
@@ -169,7 +170,8 @@ proc closeWait*(conn: Connection) {.async.} =
         await conn.transp.closeWait()
         conn.state = SocketState.Closed
 
-proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketScheme = SocketScheme.NonSecure, hostname: string = ""): Future[Connection] {.async.} =
+proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketScheme = SocketScheme.NonSecure, hostname: string = ""): Future[
+        Connection] {.async.} =
     if scheme == SocketScheme.Secure:
         assert not hostname.isEmptyOrWhitespace(), "hostname was empty for secure socket!"
     let conn =
@@ -225,7 +227,7 @@ proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketSc
             of SocketScheme.Nonsecure:
                 res.state = SocketState.Ready
             res
-            
+
     conn.creation_time = et
     conn.trusted = TrustStatus.pending
     return conn
@@ -242,12 +244,31 @@ proc connect*(address: TransportAddress, scheme: SocketScheme = SocketScheme.Non
             raise exc
         except CatchableError as exc:
             raise exc
-    
+
     let con = await Connection.new(transp, scheme, hostname)
     con.port = address.port
     return con
 
-proc startController*(){.async.} =
+
+
+template trackIdleConnections*(cons: var Connections, age: uint) =
+    block:
+        proc remove() =
+            cons.keepIf(proc(x: Connection): bool =
+                if x.creation_time != 0:
+                    if et - x.creation_time > age:
+                        x.close()
+                        if globals.log_conn_destory: echo "[Controller] closed a idle connection"
+                return true
+            )
+        proc tracker(){.async.} =
+            while true:
+                await sleepAsync(1000)
+                remove()
+        asyncCheck tracker()
+
+
+proc startController*() {.async.} =
     while true:
         et = epochTime().uint
         await sleepAsync(1000)
