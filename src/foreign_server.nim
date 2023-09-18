@@ -150,8 +150,9 @@ proc processConnection(client: Connection) {.async.} =
                     if (client.isTrusted()) and (remote.isNil()):
                         remote = await remoteTrusted(client.port.Port)
                         asyncCheck processRemote(remote)
-                        context.free_peer_outbounds.remove(client)
                         poolFrame()
+                        context.free_peer_outbounds.remove(client)
+                        
                     if client.trusted == TrustStatus.pending:
                         var (trust, port) = monitorData(data)
                         if trust:
@@ -219,6 +220,7 @@ proc processConnection(client: Connection) {.async.} =
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
         #close
+        poolFrame()
         context.free_peer_outbounds.remove(client)
         if mux:
             await client.closeWait()
@@ -250,10 +252,6 @@ proc poolFrame(create_count: uint = 0) =
 
             asyncCheck processConnection(conn)
             await conn.twriter.write(generateFinishHandShakeData())
-
-
-
-
 
         except TLSStreamProtocolError as exc:
             echo "Tls error, handshake failed because:"

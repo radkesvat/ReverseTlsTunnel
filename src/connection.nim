@@ -258,7 +258,7 @@ template trackIdleConnections*(cons: var Connections, age: uint) =
                 if x.creation_time != 0:
                     if et - x.creation_time > age:
                         x.close()
-                        if globals.log_conn_destory: echo "[Controller] closed a idle connection"
+                        if globals.log_conn_destory: echo "[Controller] closed a idle connection, ",et - x.creation_time
                 return true
             )
         proc tracker(){.async.} =
