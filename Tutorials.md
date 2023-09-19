@@ -28,6 +28,9 @@
 آموزش ویدویی کانال AI Universe
 [لینک](https://www.youtube.com/@AIUniversetop)
 
+آموزش ویدویی کانال Elfina Tech
+[لینک](https://youtu.be/lkH-IP7-Jag)
+
 
 
 
