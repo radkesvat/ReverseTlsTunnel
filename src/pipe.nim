@@ -95,7 +95,7 @@ proc packForSend*(data: var string, cid: uint16, port: uint16, flags: uint8 = 0)
 
 proc closeSignalData*(cid: uint16): string =
     let port: uint16 = rand(uint16.high.int).uint16
-    let flags: uint16 = rand(uint8.high.int).uint16
+    let flags: uint8 = rand(uint8.high.int).uint8
 
     let width = globals.full_tls_record_len.int+sizeof(port)+sizeof(cid) + sizeof(flags)
 
