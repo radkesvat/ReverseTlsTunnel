@@ -101,14 +101,16 @@ proc closeSignalData*(cid: uint16): string =
 
     var data = newString(len = width)
 
-    let size: uint16 = sizeof(port)+sizeof(cid) + sizeof(flags)
+    let size: uint16 = sizeof(port)+sizeof(e_cid) + sizeof(flags)
+    let e_cid: uint16 = cid xor size
+
     copyMem(addr data[0], addr globals.tls13_record_layer[0], globals.tls13_record_layer.len())
     copyMem(addr data[0 + globals.tls13_record_layer.len], addr size, sizeof(size))
 
 
-    copyMem(addr data[0 + globals.full_tls_record_len.int], addr cid, sizeof(cid))
-    copyMem(addr data[0 + globals.full_tls_record_len.int+sizeof(cid)], addr port, sizeof(port))
-    copyMem(addr data[0 + globals.full_tls_record_len.int+sizeof(cid)+sizeof(port)], addr flags, sizeof(flags))
+    copyMem(addr data[0 + globals.full_tls_record_len.int], addr e_cid, sizeof(e_cid))
+    copyMem(addr data[0 + globals.full_tls_record_len.int+sizeof(e_cid)], addr port, sizeof(port))
+    copyMem(addr data[0 + globals.full_tls_record_len.int+sizeof(e_cid)+sizeof(port)], addr flags, sizeof(flags))
     return data
 #returns connection id
 # proc unPackForReadMux*(data: var string): tuple[cid: uint32, port: uint16] =

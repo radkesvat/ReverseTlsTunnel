@@ -62,10 +62,11 @@ proc acquireClientConnection(): Future[Connection] {.async.} =
     var found: Connection = nil
     for i in 0..<50:
         found = context.used_peer_outbounds.randomPick()
-        if found != nil and not found.closed:
-            return found
-        else:
-            context.used_peer_outbounds.remove(found)
+        if found != nil :
+            if not found.closed:
+                return found
+            else:
+                context.used_peer_outbounds.remove(found)
 
     return nil
 
@@ -97,19 +98,6 @@ proc processConnection(client: Connection) {.async.} =
                 data.setLen(data.len() + width)
                 await remote.reader.readExactly(addr data[0 + width], data.len - width)
                 if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
-
-
-
-                #write
-
-                # context.used_peer_outbounds.with(remote.id, child_client):
-                #     unPackForRead(data)
-                #     if not child_client.closed:
-                #         await child_client.writer.write(data)
-                #         if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client "
-                #     else:
-                #         context.used_peer_outbounds.remove(child_client)
-                #         break
 
                 if client.closed:
                     client = await acquireClientConnection()
@@ -159,7 +147,7 @@ proc processConnection(client: Connection) {.async.} =
                         await client.treader.readExactly(addr data[0], width)
                         copyMem(addr boundary, addr data[3], sizeof(boundary))
                         if boundary == 0: break
-                       
+
 
                         copyMem(addr cid, addr data[globals.full_tls_record_len], sizeof(cid))
                         copyMem(addr port, addr data[globals.full_tls_record_len.int + sizeof(cid)], sizeof(port))
