@@ -128,7 +128,7 @@ proc processConnection(client: Connection) {.async.} =
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
-        
+
         await remote.closeWait()
 
     proc proccessClient() {.async.} =
@@ -158,6 +158,7 @@ proc processConnection(client: Connection) {.async.} =
                         data.setLen width
                         await client.treader.readExactly(addr data[0], width)
                         copyMem(addr boundary, addr data[3], sizeof(boundary))
+                        boundary-=globals.mux_record_len.uint16
                         if boundary == 0: break
 
                         copyMem(addr cid, addr data[globals.full_tls_record_len], sizeof(cid))
