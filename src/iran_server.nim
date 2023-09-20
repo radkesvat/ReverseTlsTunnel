@@ -221,9 +221,10 @@ proc processConnection(client: Connection) {.async.} =
         context.user_inbounds.remove(client)
 
         remote.counter.dec
-        if remote.counter <= 0:
+        if remote.counter <= 0 and remote.exhausted:
+            context.available_peer_inbounds.remove(remote)
             await remote.closeWait()
-
+            echo "Closed a exhausted mux connection"
 
 
 
