@@ -193,7 +193,7 @@ proc processConnection(client: Connection) {.async.} =
                         let new_remote = await remoteTrusted(if globals.multi_port: port.Port else: globals.next_route_port)
                         context.outbounds.register(new_remote)
                         new_remote.id = cid
-                        asyncCheck processRemote(remote)
+                        asyncCheck processRemote(new_remote)
                         poolFrame()
                         context.free_peer_outbounds.remove(client)
                         context.used_peer_outbounds.register(client)
