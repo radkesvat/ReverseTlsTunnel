@@ -234,13 +234,14 @@ proc poolFrame(create_count: uint = 0) =
             var conn = await connect(initTAddress(globals.iran_addr, globals.iran_port), SocketScheme.Secure, globals.final_target_domain)
             echo "TlsHandsahke complete."
             conn.trusted = TrustStatus.yes
-            context.free_peer_outbounds.add conn
 
             conn.transp.reader.cancel()
             await stepsAsync(1)
             conn.transp.reader = nil
 
             asyncCheck processConnection(conn)
+            context.free_peer_outbounds.add conn
+
             # await conn.twriter.write(generateFinishHandShakeData())
 
         except TLSStreamProtocolError as exc:
