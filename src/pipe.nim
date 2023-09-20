@@ -9,7 +9,7 @@ proc encrypt(data: var string, start = 0) =
 
 proc decrypt(data: var string) =
     for i in 0 ..< data.len() div 4:
-        (cast[ptr[uint32]](addr data[i]))[] = uint32(`xor`((cast[ptr[uint32]](addr data[i]))[], globals.sh4))
+        (cast[ptr[uint32]](addr data[i*4]))[] = uint32(`xor`((cast[ptr[uint32]](addr data[i*4]))[], globals.sh4))
 
 # per byte = consume more cpu (testing)
 # proc encrypt(data: var string, start = 0) =
