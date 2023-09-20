@@ -48,7 +48,7 @@ type
         
         counter*:uint
         exhausted*:bool
-        
+
      
 
     Connections* = seq[Connection]
@@ -89,7 +89,7 @@ proc remove*(cons: var Connections, con: Connection or uint16) =
             if el.id == con:
                 index = i
     if index != -1:
-        cons.del index
+        cons.delete index
 
 # proc remove*(cons: var seq[uint32], id: uint16) =
 #     let i = cons.find(id)

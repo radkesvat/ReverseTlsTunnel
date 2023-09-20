@@ -55,8 +55,8 @@ proc generateFinishHandShakeData(): string =
 
 proc acquireRemoteConnection(): Future[Connection] {.async.} =
     var remote: Connection = nil
-    for i in 0..<400:
-        remote = context.available_peer_inbounds.randomPick()
+    for i in 0..<200:
+        remote = context.available_peer_inbounds[0]
         if remote != nil:
             if remote.closed or remote.exhausted:
                 context.available_peer_inbounds.remove(remote)
@@ -149,6 +149,7 @@ proc processConnection(client: Connection) {.async.} =
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
         #close
+        context.available_peer_inbounds.remove(remote)
         if not remote.isNil(): await remote.closeWait()
 
 
@@ -209,7 +210,9 @@ proc processConnection(client: Connection) {.async.} =
                 #write
                 if remote.closed:
                     remote = await acquireRemoteConnection()
-                    if remote == nil: await closeLine(client, remote); return
+                    if remote == nil: 
+                        echo &"[Error] left without connection, closes forcefully."
+                        await closeLine(client, remote); return
 
                 if remote.isTrusted:
                     data.packForSend(client.id, client.port.uint16)
@@ -256,7 +259,7 @@ proc processConnection(client: Connection) {.async.} =
                 context.user_inbounds.register(client)
 
             else:
-                if globals.log_conn_destory: echo &"[createNewCon][Error] left without connection, closes forcefully."
+                echo &"[createNewCon][Error] left without connection, closes forcefully."
                 await client.closeWait()
                 return
         else:
