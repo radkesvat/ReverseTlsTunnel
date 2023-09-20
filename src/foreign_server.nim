@@ -186,7 +186,7 @@ proc processConnection(client: Connection) {.async.} =
                                 await child_remote.writer.write(data)
                                 if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote "
                             else:
-                                await child_remote.writer.write(closeSignalData(cid))
+                                await client.writer.write(closeSignalData(cid))
                                 context.outbounds.remove cid
 
                     else:
