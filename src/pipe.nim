@@ -82,7 +82,7 @@ proc packForSend*(data: var string, cid: uint16, port: uint16, flags: uint8 = 0)
 
     let e_cid: uint16 = cid xor size
     let e_port: uint16 = port xor size
-    let e_flags: uint8 = flags xor size
+    let e_flags: uint8 = flags xor size.uint8
 
 
     copyMem(addr data[0 + globals.full_tls_record_len.int], addr e_cid, sizeof(e_cid))
