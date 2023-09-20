@@ -112,10 +112,11 @@ proc processConnection(client: Connection) {.async.} =
                         await remote.reader.readExactly(addr data[0], width)
                         copyMem(addr boundary, addr data[3], sizeof(boundary))
                         if boundary == 0: break
-                        boundary-=globals.mux_record_len.uint16
+                        
 
                         copyMem(addr cid, addr data[globals.full_tls_record_len], sizeof(cid))
                         cid = cid xor boundary
+                        boundary-=globals.mux_record_len.uint16
                         if boundary == 0:
                             context.user_inbounds.with(cid, child_client):
                                 child_client.close()
