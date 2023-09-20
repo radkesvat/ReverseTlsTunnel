@@ -116,8 +116,7 @@ proc processConnection(client: Connection) {.async.} =
 
                         copyMem(addr cid, addr data[globals.full_tls_record_len], sizeof(cid))
                         cid = cid xor boundary
-                        if boundary == globals.mux_width:
-                            boundary = 0
+                        if boundary == 0:
                             context.user_inbounds.with(cid, child_client):
                                 child_client.close()
                                 context.user_inbounds.remove(child_client)

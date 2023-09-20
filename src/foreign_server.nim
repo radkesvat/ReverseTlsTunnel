@@ -165,8 +165,7 @@ proc processConnection(client: Connection) {.async.} =
                         copyMem(addr port, addr data[globals.full_tls_record_len.int + sizeof(cid)], sizeof(port))
                         cid = cid xor boundary
                         port = port xor boundary
-                        if boundary == globals.mux_width:
-                            boundary = 0
+                        if boundary == 0:
                             context.outbounds.with(cid, child_remote):
                                 child_remote.close()
                                 context.outbounds.remove(child_remote)
@@ -191,9 +190,9 @@ proc processConnection(client: Connection) {.async.} =
                             #write
                             if not child_remote.closed():
                                 await child_remote.writer.write(data)
-                                if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
+                                if globals.log_data_len: echo &"XXXXXXXXXXXXX[proccessClient] {data.len()} bytes -> remote"
                             else:
-                                await client.writer.write(closeSignalData(cid))
+                                await client.twriter.write(closeSignalData(cid))
                                 context.outbounds.remove cid
 
                     else:
