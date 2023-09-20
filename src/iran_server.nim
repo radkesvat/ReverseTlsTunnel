@@ -112,7 +112,7 @@ proc processConnection(client: Connection) {.async.} =
                         await remote.reader.readExactly(addr data[0], width)
                         copyMem(addr boundary, addr data[3], sizeof(boundary))
                         if boundary == 0: break
-                        
+
 
                         copyMem(addr cid, addr data[globals.full_tls_record_len], sizeof(cid))
                         cid = cid xor boundary
@@ -182,14 +182,18 @@ proc processConnection(client: Connection) {.async.} =
                     if first_packet:
                         if data.contains(globals.final_target_domain):
                             #peer connection
-                            sleepAsync(350).addCallback( proc(udata: pointer) =
-                                client.trusted = TrustStatus.yes
-                                let address = client.transp.remoteAddress()
-                                print "Peer Fake Handshake Complete ! ", address
-                                context.available_peer_inbounds.register(client)
-                                context.peer_ip = client.transp.remoteAddress.address
-                                remote.close() 
+                            sleepAsync(350).addCallback(proc(udata: pointer) {.gcsafe,raises: [Defect].} =
+                                try:
+                                    client.trusted = TrustStatus.yes
+                                    let address = client.transp.remoteAddress()
+                                    print "Peer Fake Handshake Complete ! ", address
+                                    context.available_peer_inbounds.register(client)
+                                    context.peer_ip = client.transp.remoteAddress.address
+                                    remote.close()
+                                except :discard
+                                    
                                 
+
                             )
                         else:
                             #user connection but no peer connected yet
@@ -230,7 +234,7 @@ proc processConnection(client: Connection) {.async.} =
                 #write
                 if remote.closed:
                     remote = await acquireRemoteConnection()
-                    if remote == nil: 
+                    if remote == nil:
                         echo &"[Error] left without connection, closes forcefully."
                         await closeLine(client, remote); return
 
