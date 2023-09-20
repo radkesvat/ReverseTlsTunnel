@@ -76,7 +76,7 @@ proc unPackForRead*(data: var string) =
 proc packForSend*(data: var string, cid: uint16, port: uint16, flags: uint8 = 0) =
     let width = globals.full_tls_record_len.int+sizeof(port)+sizeof(cid) + sizeof(flags)
 
-    let size: uint16 = data.len().uint16 - globals.full_tls_record_len.int
+    let size: uint16 = data.len().uint16 - globals.full_tls_record_len.uint16
     copyMem(addr data[0], addr globals.tls13_record_layer[0], globals.tls13_record_layer.len())
     copyMem(addr data[0 + globals.tls13_record_layer.len()], addr size, sizeof(size))
 
