@@ -2,25 +2,25 @@ from globals import nil
 import random, strutils
 
 
-proc encrypt(data: var string, start = 0) =
-    let len = (data.len() - start) div 4
-    for i in 0..<len:
-        (cast[ptr[uint32]](addr data[start+i*4]))[] = uint32(`xor`((cast[ptr[uint32]](addr data[start+i*4]))[], globals.sh4))
-
-proc decrypt(data: var string) =
-    for i in 0 ..< data.len() div 4:
-        (cast[ptr[uint32]](addr data[i*4]))[] = uint32(`xor`((cast[ptr[uint32]](addr data[i*4]))[], globals.sh4))
-
-# per byte = consume more cpu (testing)
 # proc encrypt(data: var string, start = 0) =
-#     for i in start..<data.len():
-#         # data[i] = chr(rotateRightBits(uint8(data[i]), globals.sh5))
-#         data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
+#     let len = (data.len() - start) div 4
+#     for i in 0..<len:
+#         (cast[ptr[uint32]](addr data[start+i*4]))[] = uint32(`xor`((cast[ptr[uint32]](addr data[start+i*4]))[], globals.sh4))
 
 # proc decrypt(data: var string) =
-#     for i in 0..<data.len():
-#         # data[i] = chr(rotateLeftBits(uint8(data[i]), globals.sh5))
-#         data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
+#     for i in 0 ..< data.len() div 4:
+#         (cast[ptr[uint32]](addr data[i*4]))[] = uint32(`xor`((cast[ptr[uint32]](addr data[i*4]))[], globals.sh4))
+
+# per byte = consume more cpu (testing)
+proc encrypt(data: var string, start = 0) =
+    for i in start..<data.len():
+        # data[i] = chr(rotateRightBits(uint8(data[i]), globals.sh5))
+        data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
+
+proc decrypt(data: var string) =
+    for i in 0..<data.len():
+        # data[i] = chr(rotateLeftBits(uint8(data[i]), globals.sh5))
+        data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
 
 
 # proc muxPack(cid: uint32, port: uint16, data: string): string =
