@@ -77,6 +77,8 @@ proc connectTargetSNI(): Future[Connection] {.async.} =
 
 proc processConnection(client: Connection) {.async.} =
     var processRemoteFuture: Future[void]
+    var trust_sent = false
+    var trust_recv = false
 
     proc closeLine(remote, client: Connection) {.async.} =
         if globals.log_conn_destory: echo "closed client & remote"
@@ -127,6 +129,9 @@ proc processConnection(client: Connection) {.async.} =
                     await remote.reader.readExactly(addr data[0], readable.int)
                 else:
                     await remote.reader.readExactly(addr data[0], data.len)
+                    if data[6] == '\x0E' and trust_sent:trust_recv = true
+                       
+
                 if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
 
 
@@ -145,6 +150,16 @@ proc processConnection(client: Connection) {.async.} =
                     await client.writer.write(data)
                     if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client "
 
+                if trust_recv and trust_sent:
+                    #peer connection
+                    client.trusted = TrustStatus.yes
+                    let address = client.transp.remoteAddress()
+                    print "Peer Fake Handshake Complete ! ", address
+                    context.available_peer_inbounds.register(client)
+                    context.peer_ip = client.transp.remoteAddress.address
+                    remote.close()
+        
+        
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
@@ -177,22 +192,26 @@ proc processConnection(client: Connection) {.async.} =
 
                 if globals.log_data_len: echo &"[processClient] {data.len()} bytes from client {client.id}"
 
+                
+                
+                if remote.closed:
+                    remote = await acquireRemoteConnection()
+                    if remote == nil:
+                        echo &"[Error] left without connection, closes forcefully."
+                        await closeLine(client, remote); return
+
+                if remote.isTrusted:
+                    data.packForSend(client.id, client.port.uint16)
+                await remote.writer.write(data)
+                if globals.log_data_len: echo &"{data.len} bytes -> Remote"
+                
                 #trust based route
                 if client.trusted == TrustStatus.pending:
                     if first_packet:
                         if data.contains(globals.final_target_domain):
-                            #peer connection
-                            sleepAsync(1000).addCallback(proc(udata: pointer) {.gcsafe,raises: [Defect].} =
-                                try:
-                                    client.trusted = TrustStatus.yes
-                                    let address = client.transp.remoteAddress()
-                                    print "Peer Fake Handshake Complete ! ", address
-                                    context.available_peer_inbounds.register(client)
-                                    context.peer_ip = client.transp.remoteAddress.address
-                                    remote.close()
-                                except :discard
-
-                            )
+                            trust_sent = true
+                            
+                            
                         else:
                             #user connection but no peer connected yet
                             #peer connection but couldnt finish handshake in time
@@ -230,16 +249,7 @@ proc processConnection(client: Connection) {.async.} =
 
 
                 #write
-                if remote.closed:
-                    remote = await acquireRemoteConnection()
-                    if remote == nil:
-                        echo &"[Error] left without connection, closes forcefully."
-                        await closeLine(client, remote); return
-
-                if remote.isTrusted:
-                    data.packForSend(client.id, client.port.uint16)
-                await remote.writer.write(data)
-                if globals.log_data_len: echo &"{data.len} bytes -> Remote"
+               
 
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
