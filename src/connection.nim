@@ -224,7 +224,7 @@ proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketSc
 
     conn.creation_time = et
     conn.trusted = TrustStatus.pending
-    con.estabilished.fire()
+    conn.estabilished.fire()
 
     return conn
 
