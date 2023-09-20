@@ -182,11 +182,11 @@ proc processConnection(client: Connection) {.async.} =
                             if not isSet(child_remote.estabilished): await child_remote.estabilished.wait()
                             #write
                             unPackForRead(data)
-                            if not remote.closed():
-                                await remote.writer.write(data)
+                            if not child_remote.closed():
+                                await child_remote.writer.write(data)
                                 if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote "
                             else:
-                                await remote.writer.write(closeSignalData(cid))
+                                await child_remote.writer.write(closeSignalData(cid))
                                 context.outbounds.remove cid
 
                     else:
