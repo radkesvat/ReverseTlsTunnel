@@ -182,7 +182,7 @@ proc processConnection(client: Connection) {.async.} =
                     if first_packet:
                         if data.contains(globals.final_target_domain):
                             #peer connection
-                            sleepAsync(350).addCallback(proc(udata: pointer) {.gcsafe,raises: [Defect].} =
+                            sleepAsync(1000).addCallback(proc(udata: pointer) {.gcsafe,raises: [Defect].} =
                                 try:
                                     client.trusted = TrustStatus.yes
                                     let address = client.transp.remoteAddress()
