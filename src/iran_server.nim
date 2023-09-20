@@ -156,6 +156,7 @@ proc processConnection(client: Connection) {.async.} =
     proc processClient(remote: Connection) {.async.} =
         var remote = remote
         var data = newString(len = 0)
+        var first_packet = true
         try:
             while not client.closed:
                 #read
@@ -188,12 +189,20 @@ proc processConnection(client: Connection) {.async.} =
                         remote.close() # close untrusted remote
                         await client.writer.write(generateFinishHandShakeData())
                         return
-                    elif (epochTime().uint - client.creation_time) > globals.trust_time:
-                        #user connection but no peer connected yet
-                        #peer connection but couldnt finish handshake in time
-                        client.trusted = TrustStatus.no
-                        await closeLine(client, remote)
-                        return
+                    else:
+                        if first_packet:
+                            if not data.contains(globals.final_target_domain):
+                                #user connection but no peer connected yet
+                                client.trusted = TrustStatus.no
+                                await closeLine(client, remote)
+                                return
+                        if (epochTime().uint - client.creation_time) > globals.trust_time:
+                            #user connection but no peer connected yet
+                            #peer connection but couldnt finish handshake in time
+                            client.trusted = TrustStatus.no
+                            await closeLine(client, remote)
+                            return
+                    first_packet = false
 
 
                 #write

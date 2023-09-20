@@ -48,6 +48,7 @@ type
         
         counter*:uint
         exhausted*:bool
+        
      
 
     Connections* = seq[Connection]
