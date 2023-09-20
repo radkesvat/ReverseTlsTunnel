@@ -151,7 +151,7 @@ proc processConnection(client: Connection) {.async.} =
                     if boundary == 0:
                         let width = int(globals.full_tls_record_len + globals.mux_record_len)
                         data.setLen width
-                        await client.reader.readExactly(addr data[0], width)
+                        await client.treader.readExactly(addr data[0], width)
                         copyMem(addr boundary, addr data[3], sizeof(boundary))
                         if boundary == 0: break
 

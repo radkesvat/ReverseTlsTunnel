@@ -99,7 +99,7 @@ proc processConnection(client: Connection) {.async.} =
                         if remote.isTrusted:
                             break
                         else:
-                            await closeLine(client,remote)
+                            await closeLine(client, remote)
                             return
                     else:
                         discard await remote.reader.readOnce(addr data, 0)
@@ -130,7 +130,7 @@ proc processConnection(client: Connection) {.async.} =
 
 
                 # write
-                if remote.isTrusted:                
+                if remote.isTrusted:
                     context.user_inbounds.with(cid, child_client):
                         unPackForRead(data)
                         if not child_client.closed:
@@ -140,7 +140,7 @@ proc processConnection(client: Connection) {.async.} =
                             context.user_inbounds.remove(child_client)
                             await remote.writer.write(closeSignalData(child_client.id))
 
-                else:   
+                else:
                     await client.writer.write(data)
                     if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client "
 
@@ -201,7 +201,7 @@ proc processConnection(client: Connection) {.async.} =
                     if remote == nil: await closeLine(client, remote); return
 
                 if remote.isTrusted:
-                    data.packForSend(client.id,client.port.uint16)
+                    data.packForSend(client.id, client.port.uint16)
                 await remote.writer.write(data)
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
 
@@ -213,9 +213,9 @@ proc processConnection(client: Connection) {.async.} =
         try:
             if not remote.closed:
                 await remote.writer.write(closeSignalData(client.id))
-        except :
+        except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
-      
+
         await client.closeWait()
         context.user_inbounds.remove(client)
 
