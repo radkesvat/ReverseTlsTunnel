@@ -1,34 +1,32 @@
 from globals import nil
 import random, strutils
 
-proc `+`*(x: ptr[uint32],y:int): ptr[uint32] =
+# proc `+`*(x: ptr[uint32],y:int): ptr[uint32] =
 
-  return cast[ptr[uint32]](cast[uint](x) + y.uint)
+#   return cast[ptr[uint32]](cast[uint](x) + y.uint)
 
-proc encrypt(data: var string, start = 0) =
-    let len = (data.len() - start) div 4
-    var address = cast[ptr[uint32]](addr data[start])
-
-    for i in 0..<len:
-        (address+i)[] = `xor`((address+i)[], globals.sh4)
-
-        # (cast[ptr[uint32]](addr data[start+i*4]))[] = uint32(`xor`((cast[ptr[uint32]](addr data[start+i*4]))[], globals.sh4))
-
-proc decrypt(data: var string) =
-    var address =cast[ptr[uint32]](addr data[0])
-    for i in 0 ..< data.len() div 4:
-        (address+i)[] = `xor`((address+i)[], globals.sh4)
-
-# per byte = consume more cpu (testing)
 # proc encrypt(data: var string, start = 0) =
-#     for i in start..<data.len():
-#         # data[i] = chr(rotateRightBits(uint8(data[i]), globals.sh5))
-#         data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
+#     let len = (data.len() - start) div 4
+#     var address = cast[ptr[uint32]](addr data[start])
+#     for i in 0..<len:
+#         (address+i)[] = `xor`((address+i)[], globals.sh4)
+
 
 # proc decrypt(data: var string) =
-#     for i in 0..<data.len():
-#         # data[i] = chr(rotateLeftBits(uint8(data[i]), globals.sh5))
-#         data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
+#     var address =cast[ptr[uint32]](addr data[0])
+#     for i in 0 ..< data.len() div 4:
+#         (address+i)[] = `xor`((address+i)[], globals.sh4)
+
+per byte = consume more cpu (testing)
+proc encrypt(data: var string, start = 0) =
+    for i in start..<data.len():
+        # data[i] = chr(rotateRightBits(uint8(data[i]), globals.sh5))
+        data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
+
+proc decrypt(data: var string) =
+    for i in 0..<data.len():
+        # data[i] = chr(rotateLeftBits(uint8(data[i]), globals.sh5))
+        data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
 
 
 # proc muxPack(cid: uint32, port: uint16, data: string): string =
