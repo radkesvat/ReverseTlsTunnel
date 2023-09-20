@@ -175,7 +175,7 @@ proc processConnection(client: Connection) {.async.} =
 
 
 
-                #process
+                #write
                 if client.isTrusted():
                     if context.outbounds.hasID(cid):
                             context.outbounds.with(cid, child_remote):
@@ -183,10 +183,10 @@ proc processConnection(client: Connection) {.async.} =
                                 #write
                                 unPackForRead(data)
                                 if not remote.closed():
-                                    await remote.twriter.write(data)
+                                    await remote.writer.write(data)
                                     if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote "
                                 else:
-                                    await remote.twriter.write(closeSignalData(cid))
+                                    await remote.writer.write(closeSignalData(cid))
                                     context.outbounds.remove cid
 
                     else:
