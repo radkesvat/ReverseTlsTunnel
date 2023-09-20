@@ -201,6 +201,7 @@ proc processConnection(client: Connection) {.async.} =
                         context.outbounds.register(new_remote)
                         asyncCheck processRemote(new_remote)
                         await new_remote.writer.write(data)
+                        if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote "
                         poolFrame()
                         context.free_peer_outbounds.remove(client)
                         context.used_peer_outbounds.register(client)
