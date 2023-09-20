@@ -129,7 +129,7 @@ proc processConnection(client: Connection) {.async.} =
                     await remote.reader.readExactly(addr data[0], readable.int)
                 else:
                     await remote.reader.readExactly(addr data[0], data.len)
-                    if data[6] == '\x0E' and trust_sent:trust_recv = true
+                    if data.contains("\x15\x03\x03") and trust_sent:trust_recv = true
                        
 
                 if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
