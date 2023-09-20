@@ -63,7 +63,10 @@ proc acquireClientConnection(): Future[Connection] {.async.} =
     for i in 0..<50:
         found = context.used_peer_outbounds.randomPick()
         if found != nil and not found.closed:
-                return found
+            return found
+        else:
+            context.available_peer_inbounds.remove(found)
+
     return nil
 
 
