@@ -73,9 +73,9 @@ proc unPackForRead*(data: var string) =
     decrypt data
 
 
-proc packForSend*(data: var string, cid: uint16,port: uint16, flags: uint8 = 0) =
+proc packForSend*(data: var string, cid: uint16, port: uint16, flags: uint8 = 0) =
     let width = globals.full_tls_record_len.int+sizeof(port)+sizeof(cid) + sizeof(flags)
-     
+
     let size: uint16 = data.len().uint16 - width.uint16
     copyMem(addr data[0], addr globals.tls13_record_layer[0], globals.tls13_record_layer.len())
     copyMem(addr data[0 + globals.tls13_record_layer.len()], addr size, sizeof(size))
@@ -93,9 +93,9 @@ proc packForSend*(data: var string, cid: uint16,port: uint16, flags: uint8 = 0) 
 
 
 
-proc closeSignalData*(cid: uint16):string=
+proc closeSignalData*(cid: uint16): string =
     let port: uint16 = rand(uint16.high.int).uint16
-    let flags: uint16 =rand(uint8.high.int).uint16
+    let flags: uint16 = rand(uint8.high.int).uint16
 
     let width = globals.full_tls_record_len.int+sizeof(port)+sizeof(cid) + sizeof(flags)
 
@@ -105,11 +105,11 @@ proc closeSignalData*(cid: uint16):string=
     copyMem(addr data[0], addr globals.tls13_record_layer[0], globals.tls13_record_layer.len())
     copyMem(addr data[0 + globals.tls13_record_layer.len], addr size, sizeof(size))
 
- 
+
     copyMem(addr data[0 + globals.full_tls_record_len.int], addr cid, sizeof(cid))
     copyMem(addr data[0 + globals.full_tls_record_len.int+sizeof(cid)], addr port, sizeof(port))
     copyMem(addr data[0 + globals.full_tls_record_len.int+sizeof(cid)+sizeof(port)], addr flags, sizeof(flags))
-
+    return data
 #returns connection id
 # proc unPackForReadMux*(data: var string): tuple[cid: uint32, port: uint16] =
 #     decrypt data
