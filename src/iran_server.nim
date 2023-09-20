@@ -129,7 +129,6 @@ proc processConnection(client: Connection) {.async.} =
                     await remote.reader.readExactly(addr data[0], readable.int)
                 else:
                     await remote.reader.readExactly(addr data[0], data.len)
-                    if data.contains("\x15\x03\x03") and trust_sent:trust_recv = true
                        
 
                 if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
@@ -150,14 +149,7 @@ proc processConnection(client: Connection) {.async.} =
                     await client.writer.write(data)
                     if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client "
 
-                if trust_recv and trust_sent:
-                    #peer connection
-                    client.trusted = TrustStatus.yes
-                    let address = client.transp.remoteAddress()
-                    print "Peer Fake Handshake Complete ! ", address
-                    context.available_peer_inbounds.register(client)
-                    context.peer_ip = client.transp.remoteAddress.address
-                    remote.close()
+
         
         
         except:
@@ -206,46 +198,45 @@ proc processConnection(client: Connection) {.async.} =
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
                 
                 #trust based route
-                if client.trusted == TrustStatus.pending:
+                # if client.trusted == TrustStatus.pending:
+                #     if first_packet:
+                #         if data.contains(globals.final_target_domain):
+                #             trust_sent = true
+                            
+                            
+                #         else:
+                #             #user connection but no peer connected yet
+                #             #peer connection but couldnt finish handshake in time
+                #             echo "[Error] user connection but no peer connected yet."
+                #             client.trusted = TrustStatus.no
+                #             await client.closeWait()
+
+                #     first_packet = false
+
+                var trust = monitorData(data)
+                if trust:
+                    #peer connection
+                    client.trusted = TrustStatus.yes
+                    let address = client.transp.remoteAddress()
+                    print "Peer Fake Handshake Complete ! ", address
+                    context.available_peer_inbounds.register(client)
+                    context.peer_ip = client.transp.remoteAddress.address
+                    remote.close() # close untrusted remote
+                    return
+                else:
                     if first_packet:
-                        if data.contains(globals.final_target_domain):
-                            trust_sent = true
-                            
-                            
-                        else:
+                        if not data.contains(globals.final_target_domain):
                             #user connection but no peer connected yet
-                            #peer connection but couldnt finish handshake in time
-                            echo "[Error] user connection but no peer connected yet."
                             client.trusted = TrustStatus.no
-                            await client.closeWait()
-
-                    first_packet = false
-
-                    # var trust = monitorData(data)
-                    # if trust:
-                    #     #peer connection
-                    #     client.trusted = TrustStatus.yes
-                    #     let address = client.transp.remoteAddress()
-                    #     print "Peer Fake Handshake Complete ! ", address
-                    #     context.available_peer_inbounds.register(client)
-                    #     context.peer_ip = client.transp.remoteAddress.address
-                    #     remote.close() # close untrusted remote
-                    #     await client.writer.write(generateFinishHandShakeData())
-                    #     return
-                    # else:
-                    #     if first_packet:
-                    #         if not data.contains(globals.final_target_domain):
-                    #             #user connection but no peer connected yet
-                    #             client.trusted = TrustStatus.no
-                    #             echo "[Error] user connection but no peer connected yet."
-                    #             await closeLine(client, remote)
-                    #             return
-                    #     if (epochTime().uint - client.creation_time) > globals.trust_time:
-                    #         #user connection but no peer connected yet
-                    #         #peer connection but couldnt finish handshake in time
-                    #         client.trusted = TrustStatus.no
-                    #         await closeLine(client, remote)
-                    #         return
+                            echo "[Error] user connection but no peer connected yet."
+                            await closeLine(client, remote)
+                            return
+                    if (epochTime().uint - client.creation_time) > globals.trust_time:
+                        #user connection but no peer connected yet
+                        #peer connection but couldnt finish handshake in time
+                        client.trusted = TrustStatus.no
+                        await closeLine(client, remote)
+                        return
 
 
                 #write

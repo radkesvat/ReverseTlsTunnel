@@ -242,7 +242,7 @@ proc poolFrame(create_count: uint = 0) =
             asyncCheck processConnection(conn)
             context.free_peer_outbounds.add conn
 
-            # await conn.twriter.write(generateFinishHandShakeData())
+            await conn.twriter.write(generateFinishHandShakeData())
 
         except TLSStreamProtocolError as exc:
             echo "Tls error, handshake failed because:"
