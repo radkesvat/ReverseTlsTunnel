@@ -93,7 +93,7 @@ proc processConnection(client: Connection) {.async.} =
                     else:
                         discard await remote.reader.readOnce(addr data, 0)
                         continue
-                let width = globals.full_tls_record_len.int
+                let width = globals.full_tls_record_len.int + globals.mux_record_len.int
                 data.setLen(data.len() + width)
                 await remote.reader.readExactly(addr data[0 + width], data.len - width)
                 if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
@@ -190,7 +190,7 @@ proc processConnection(client: Connection) {.async.} =
                             #write
                             if not child_remote.closed():
                                 await child_remote.writer.write(data)
-                                if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote "
+                                if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
                             else:
                                 await client.writer.write(closeSignalData(cid))
                                 context.outbounds.remove cid
@@ -201,7 +201,7 @@ proc processConnection(client: Connection) {.async.} =
                         context.outbounds.register(new_remote)
                         asyncCheck processRemote(new_remote)
                         await new_remote.writer.write(data)
-                        if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote "
+                        if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
                         poolFrame()
                         context.free_peer_outbounds.remove(client)
                         context.used_peer_outbounds.register(client)
