@@ -122,8 +122,13 @@ proc processConnection(client: Connection) {.async.} =
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
         #close
-        if not client.closed:
-            await client.twriter.write(closeSignalData(remote.id))
+        try:
+            if not client.closed:
+                await client.twriter.write(closeSignalData(remote.id))
+        except:
+            if globals.log_conn_error: echo getCurrentExceptionMsg()
+
+        
         await remote.closeWait()
 
     proc proccessClient() {.async.} =
@@ -177,11 +182,12 @@ proc processConnection(client: Connection) {.async.} =
 
                 #write
                 if client.isTrusted():
+                    unPackForRead(data)
+
                     if context.outbounds.hasID(cid):
                         context.outbounds.with(cid, child_remote):
                             if not isSet(child_remote.estabilished): await child_remote.estabilished.wait()
                             #write
-                            unPackForRead(data)
                             if not child_remote.closed():
                                 await child_remote.writer.write(data)
                                 if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote "
@@ -191,9 +197,10 @@ proc processConnection(client: Connection) {.async.} =
 
                     else:
                         let new_remote = await remoteTrusted(if globals.multi_port: port.Port else: globals.next_route_port)
-                        context.outbounds.register(new_remote)
                         new_remote.id = cid
+                        context.outbounds.register(new_remote)
                         asyncCheck processRemote(new_remote)
+                        await new_remote.writer.write(data)
                         poolFrame()
                         context.free_peer_outbounds.remove(client)
                         context.used_peer_outbounds.register(client)
