@@ -166,7 +166,7 @@ proc init*() =
                                 let port_range_string = p.val
                                 multi_port = true
                                 listen_port = 0.Port # will take a random port
-                                pool_size = max(2.uint, pool_size div 2.uint)
+                                # pool_size = max(2.uint, pool_size div 2.uint)
                                 let port_range = port_range_string.split('-')
                                 assert port_range.len == 2, "Invalid listen port range. !"
                                 multi_port_min = max(1.uint16, port_range[0].parseInt.uint16).Port

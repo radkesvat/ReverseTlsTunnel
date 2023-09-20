@@ -1,9 +1,9 @@
 # import overrides/[asyncnet]
 import chronos
-import chronos/streams/[asyncstream, tlsstream, chunkstream, boundstream]
-
+import chronos/streams/[asyncstream,asyncsync, tlsstream, boundstream]
 import std/[tables, sequtils, times, strutils, net, random]
 import globals
+export asyncsync
 
 type
     TrustStatus*{.pure.} = enum
@@ -45,8 +45,8 @@ type
         trusted*: TrustStatus       #when fake handshake perfromed
         estabilished*: AsyncEvent   #connection has started
         port*: Port                 #the port the socket points to
-        recordid*:uint
-        children*:Connections
+        
+        counter*:int
         exhausted*:bool
      
 
@@ -70,11 +70,12 @@ proc hasID*(cons: var Connections, id: uint16): bool =
     return false
 
 template with*(cons: Connections, cid: uint16, name: untyped, action: untyped) =
-    block:
+    block withconnection:
         for el in cons:
-            var con {.inject.} = el
-            if con.id == cid:
+            var `name` {.inject.} = el
+            if `name`.id == cid:
                 action
+                break withconnection
 
 proc remove*(cons: var Connections, con: Connection or uint16) =
     var index = -1
@@ -176,7 +177,8 @@ proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketSc
                     reader: newAsyncStreamReader(transp),
                     writer: newAsyncStreamWriter(transp),
                     state: SocketState.Connecting,
-                    remoteHostname: hostname
+                    remoteHostname: hostname,
+                    estabilished:newAsyncEvent()
                     )
                     res
                 of SocketScheme.Secure:
@@ -196,7 +198,9 @@ proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketSc
                     writer: tls.writer,
                     tls: tls,
                     state: SocketState.Connecting,
-                    remoteHostname: hostname
+                    remoteHostname: hostname,
+                    estabilished:newAsyncEvent()
+
                     )
                     res
 
@@ -237,6 +241,7 @@ proc connect*(address: TransportAddress, scheme: SocketScheme = SocketScheme.Non
 
     let con = await Connection.new(transp, scheme, hostname)
     con.port = address.port
+    con.estabilished.fire()
     return con
 
 
