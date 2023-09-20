@@ -17,7 +17,7 @@ import random, strutils
 #     for i in 0 ..< data.len() div 4:
 #         (address+i)[] = `xor`((address+i)[], globals.sh4)
 
-per byte = consume more cpu (testing)
+# per byte = consume more cpu (testing)
 proc encrypt(data: var string, start = 0) =
     for i in start..<data.len():
         # data[i] = chr(rotateRightBits(uint8(data[i]), globals.sh5))
