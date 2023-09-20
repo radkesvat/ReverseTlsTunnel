@@ -314,7 +314,7 @@ proc start*(){.async.} =
 
 
 
-    trackIdleConnections(context.available_peer_inbounds, globals.pool_age)
+    # trackIdleConnections(context.available_peer_inbounds, globals.pool_age)
 
     await sleepAsync(200)
     echo &"Mode Iran : {globals.self_ip}  handshake: {globals.final_target_domain}"
