@@ -158,8 +158,8 @@ proc processConnection(client: Connection) {.async.} =
                         data.setLen width
                         await client.treader.readExactly(addr data[0], width)
                         copyMem(addr boundary, addr data[3], sizeof(boundary))
-                        boundary-=globals.mux_record_len.uint16
                         if boundary == 0: break
+                        boundary-=globals.mux_record_len.uint16
 
                         copyMem(addr cid, addr data[globals.full_tls_record_len], sizeof(cid))
                         copyMem(addr port, addr data[globals.full_tls_record_len.int + sizeof(cid)], sizeof(port))
