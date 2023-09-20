@@ -179,32 +179,52 @@ proc processConnection(client: Connection) {.async.} =
 
                 #trust based route
                 if client.trusted == TrustStatus.pending:
-                    var trust = monitorData(data)
-                    if trust:
-                        #peer connection
-                        client.trusted = TrustStatus.yes
-                        let address = client.transp.remoteAddress()
-                        print "Peer Fake Handshake Complete ! ", address
-                        context.available_peer_inbounds.register(client)
-                        context.peer_ip = client.transp.remoteAddress.address
-                        remote.close() # close untrusted remote
-                        await client.writer.write(generateFinishHandShakeData())
-                        return
-                    else:
-                        if first_packet:
-                            if not data.contains(globals.final_target_domain):
-                                #user connection but no peer connected yet
-                                client.trusted = TrustStatus.no
-                                echo "[Error] user connection but no peer connected yet."
-                                await closeLine(client, remote)
-                                return
-                        if (epochTime().uint - client.creation_time) > globals.trust_time:
+                    if first_packet:
+                        if data.contains(globals.final_target_domain):
+                            #peer connection
+                            sleepAsync(350).addCallback( proc(udata: pointer) =
+                                client.trusted = TrustStatus.yes
+                                let address = client.transp.remoteAddress()
+                                print "Peer Fake Handshake Complete ! ", address
+                                context.available_peer_inbounds.register(client)
+                                context.peer_ip = client.transp.remoteAddress.address
+                                remote.close() 
+                                
+                            )
+                        else:
                             #user connection but no peer connected yet
                             #peer connection but couldnt finish handshake in time
+                            echo "[Error] user connection but no peer connected yet."
                             client.trusted = TrustStatus.no
                             await closeLine(client, remote)
-                            return
+
                     first_packet = false
+
+                    # var trust = monitorData(data)
+                    # if trust:
+                    #     #peer connection
+                    #     client.trusted = TrustStatus.yes
+                    #     let address = client.transp.remoteAddress()
+                    #     print "Peer Fake Handshake Complete ! ", address
+                    #     context.available_peer_inbounds.register(client)
+                    #     context.peer_ip = client.transp.remoteAddress.address
+                    #     remote.close() # close untrusted remote
+                    #     await client.writer.write(generateFinishHandShakeData())
+                    #     return
+                    # else:
+                    #     if first_packet:
+                    #         if not data.contains(globals.final_target_domain):
+                    #             #user connection but no peer connected yet
+                    #             client.trusted = TrustStatus.no
+                    #             echo "[Error] user connection but no peer connected yet."
+                    #             await closeLine(client, remote)
+                    #             return
+                    #     if (epochTime().uint - client.creation_time) > globals.trust_time:
+                    #         #user connection but no peer connected yet
+                    #         #peer connection but couldnt finish handshake in time
+                    #         client.trusted = TrustStatus.no
+                    #         await closeLine(client, remote)
+                    #         return
 
 
                 #write

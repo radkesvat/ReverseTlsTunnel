@@ -197,16 +197,16 @@ proc processConnection(client: Connection) {.async.} =
                         context.free_peer_outbounds.remove(client)
                         context.used_peer_outbounds.register(client)
 
-                if client.trusted == TrustStatus.pending:
-                    var trust = monitorData(data)
-                    if trust:
-                        client.trusted = TrustStatus.yes
-                        print "Fake Reverse Handshake Complete !"
+                # if client.trusted == TrustStatus.pending:
+                #     var trust = monitorData(data)
+                #     if trust:
+                #         client.trusted = TrustStatus.yes
+                #         print "Fake Reverse Handshake Complete !"
 
-                    else:
-                        echo "[proccessClient] Target server was not a trusted tunnel client, closing..."
-                        client.trusted = TrustStatus.no
-                        break
+                #     else:
+                #         echo "[proccessClient] Target server was not a trusted tunnel client, closing..."
+                #         client.trusted = TrustStatus.no
+                #         break
 
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
@@ -233,6 +233,7 @@ proc poolFrame(create_count: uint = 0) =
         try:
             var conn = await connect(initTAddress(globals.iran_addr, globals.iran_port), SocketScheme.Secure, globals.final_target_domain)
             echo "TlsHandsahke complete."
+            conn.trusted = TrustStatus.yes
             context.free_peer_outbounds.add conn
 
             conn.transp.reader.cancel()
@@ -240,7 +241,7 @@ proc poolFrame(create_count: uint = 0) =
             conn.transp.reader = nil
 
             asyncCheck processConnection(conn)
-            await conn.twriter.write(generateFinishHandShakeData())
+            # await conn.twriter.write(generateFinishHandShakeData())
 
         except TLSStreamProtocolError as exc:
             echo "Tls error, handshake failed because:"
