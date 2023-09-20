@@ -101,7 +101,7 @@ proc closeSignalData*(cid: uint16): string =
 
     var data = newString(len = width)
 
-    let size: uint16 = sizeof(port)+sizeof(e_cid) + sizeof(flags)
+    let size: uint16 = sizeof(port)+sizeof(cid) + sizeof(flags)
     let e_cid: uint16 = cid xor size
 
     copyMem(addr data[0], addr globals.tls13_record_layer[0], globals.tls13_record_layer.len())
