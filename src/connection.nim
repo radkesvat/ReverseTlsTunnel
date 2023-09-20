@@ -224,6 +224,8 @@ proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketSc
 
     conn.creation_time = et
     conn.trusted = TrustStatus.pending
+    con.estabilished.fire()
+
     return conn
 
 proc connect*(address: TransportAddress, scheme: SocketScheme = SocketScheme.NonSecure,
@@ -241,7 +243,6 @@ proc connect*(address: TransportAddress, scheme: SocketScheme = SocketScheme.Non
 
     let con = await Connection.new(transp, scheme, hostname)
     con.port = address.port
-    con.estabilished.fire()
     return con
 
 

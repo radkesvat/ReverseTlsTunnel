@@ -191,6 +191,7 @@ proc processConnection(client: Connection) {.async.} =
 
                     else:
                         let new_remote = await remoteTrusted(port.Port)
+                        context.outbounds.register(new_remote)
                         new_remote.id = cid
                         asyncCheck processRemote(remote)
                         poolFrame()
