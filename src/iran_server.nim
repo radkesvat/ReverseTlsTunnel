@@ -190,7 +190,7 @@ proc processConnection(client: Connection) {.async.} =
                                     context.available_peer_inbounds.register(client)
                                     context.peer_ip = client.transp.remoteAddress.address
                                     remote.close()
-                                except :discar
+                                except :discard
 
                             )
                         else:
