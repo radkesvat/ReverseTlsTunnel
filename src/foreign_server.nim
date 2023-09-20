@@ -33,7 +33,7 @@ proc generateFinishHandShakeData(): string =
 
     return random_trust_data
 
-proc monitorData(data: string):bool =
+proc monitorData(data: string): bool =
     try:
         if len(data) < 16: return false
         let base = 5 + 7 + `mod`(globals.sh5, 7.uint8)
@@ -101,7 +101,7 @@ proc processConnection(client: Connection) {.async.} =
 
 
                 #write
-                          
+
                 # context.used_peer_outbounds.with(remote.id, child_client):
                 #     unPackForRead(data)
                 #     if not child_client.closed:
@@ -115,7 +115,7 @@ proc processConnection(client: Connection) {.async.} =
                     client = await acquireClientConnection()
                     if client == nil: await closeLine(client, remote); return
 
-                packForSend(data,remote.id,remote.port.uint16)
+                packForSend(data, remote.id, remote.port.uint16)
                 await client.twriter.write(data)
                 if globals.log_data_len: echo &"[processRemote] Sent {data.len()} bytes ->  client"
 
@@ -142,11 +142,11 @@ proc processConnection(client: Connection) {.async.} =
                         if client.isTrusted:
                             break
                         else:
-                            await closeLine(client,remote)
+                            await closeLine(client, remote)
                             return
                     else:
-                        discard await client.treader.readOnce(addr data, 0);continue
-                        
+                        discard await client.treader.readOnce(addr data, 0); continue
+
                 if client.isTrusted:
                     if boundary == 0:
                         let width = int(globals.full_tls_record_len + globals.mux_record_len)
@@ -178,19 +178,19 @@ proc processConnection(client: Connection) {.async.} =
                 #write
                 if client.isTrusted():
                     if context.outbounds.hasID(cid):
-                            context.outbounds.with(cid, child_remote):
-                                if not isSet(child_remote.estabilished):await child_remote.estabilished.wait()
-                                #write
-                                unPackForRead(data)
-                                if not remote.closed():
-                                    await remote.writer.write(data)
-                                    if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote "
-                                else:
-                                    await remote.writer.write(closeSignalData(cid))
-                                    context.outbounds.remove cid
+                        context.outbounds.with(cid, child_remote):
+                            if not isSet(child_remote.estabilished): await child_remote.estabilished.wait()
+                            #write
+                            unPackForRead(data)
+                            if not remote.closed():
+                                await remote.writer.write(data)
+                                if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote "
+                            else:
+                                await remote.writer.write(closeSignalData(cid))
+                                context.outbounds.remove cid
 
                     else:
-                        let new_remote = await remoteTrusted(port.Port)
+                        let new_remote = await remoteTrusted(if globals.multi_port: port.Port else: globals.next_route_port)
                         context.outbounds.register(new_remote)
                         new_remote.id = cid
                         asyncCheck processRemote(remote)
@@ -203,12 +203,12 @@ proc processConnection(client: Connection) {.async.} =
                     if trust:
                         client.trusted = TrustStatus.yes
                         print "Fake Reverse Handshake Complete !"
-                        
+
                     else:
                         echo "[proccessClient] Target server was not a trusted tunnel client, closing..."
                         client.trusted = TrustStatus.no
                         break
-                
+
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
@@ -217,7 +217,7 @@ proc processConnection(client: Connection) {.async.} =
         context.free_peer_outbounds.remove(client)
         await client.closeWait()
 
-        
+
         # await closeLine(client, remote)
 
 
@@ -266,7 +266,7 @@ proc poolFrame(create_count: uint = 0) =
 
 proc start*(){.async.} =
     echo &"Mode Foreign Server:  {globals.listen_addr} <-> ({globals.final_target_domain} with ip {globals.final_target_ip})"
-    trackIdleConnections(context.free_peer_outbounds,globals.pool_age)
+    trackIdleConnections(context.free_peer_outbounds, globals.pool_age)
     #just to make sure we always willing to connect to the peer
     while true:
         poolFrame()
