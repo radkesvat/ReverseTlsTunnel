@@ -190,9 +190,7 @@ proc processConnection(client: Connection) {.async.} =
                                     context.available_peer_inbounds.register(client)
                                     context.peer_ip = client.transp.remoteAddress.address
                                     remote.close()
-                                except :discard
-                                    
-                                
+                                except :discar
 
                             )
                         else:
@@ -200,7 +198,7 @@ proc processConnection(client: Connection) {.async.} =
                             #peer connection but couldnt finish handshake in time
                             echo "[Error] user connection but no peer connected yet."
                             client.trusted = TrustStatus.no
-                            await closeLine(client, remote)
+                            await client.closeWait()
 
                     first_packet = false
 
