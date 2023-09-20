@@ -189,7 +189,7 @@ proc processConnection(client: Connection) {.async.} =
                         context.available_peer_inbounds.register(client)
                         context.peer_ip = client.transp.remoteAddress.address
                         remote.close() # close untrusted remote
-                        await client.writer.write(generateFinishHandShakeData())
+                        # await client.writer.write(generateFinishHandShakeData())
                         return
                     else:
                         if first_packet:
