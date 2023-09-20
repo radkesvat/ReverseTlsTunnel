@@ -17,6 +17,11 @@ const log_data_len* = false
 const log_conn_destory* = false
 const log_conn_error* = false
 
+# [TLS]
+let tls13_record_layer* = "\x17\x03\x03" 
+let tls13_record_layer_data_len_size*:uint = 2
+let full_tls_record_len*:uint = tls13_record_layer.len().uint + tls13_record_layer_data_len_size
+# var tls_records*:uint = 50
 
 # [Connection]
 var trust_time*: uint = 3 #secs
@@ -24,16 +29,11 @@ var pool_size*: uint = 16
 var pool_age*: uint = 10
 var max_idle_time*: uint = 600 #secs (default TCP RFC is 3600)
 var max_pool_unused_time*: uint = 60 #secs
-const chunk_size* = 4096
-var mux*: bool = false
-let tls13_record_layer* = "\x17\x03\x03" 
-let tls13_record_layer_data_len_size*:uint = 2
-let full_tls_record_len*:uint = tls13_record_layer.len().uint + tls13_record_layer_data_len_size
-let mux_header_size*:uint32 = tls13_record_layer.len().uint32 + 2 + 2 + 4 + 1# followed by 2 bytes len +2 port+and 4 bytes cid and 1 byte reserve
-let mux_payload_size*:uint32 = 1024 
-let mux_chunk_size*:uint32 = mux_payload_size + mux_header_size
-let socket_buffered* = false # when using mux, it depends
-var mux_capacity*:uint32 = 4
+
+let mux_record_len*:uint32 = 5 #2bytes port 2bytes id 1byte reserved
+var mux_width*:uint32 = 16
+
+
 
 # [Routes]
 var listen_addr* = "0.0.0.0"
@@ -125,7 +125,7 @@ proc init*() =
     for i in 0..<random_str.len():
         random_str[i] = rand(char.low .. char.high).char
 
-    var p = initOptParser(longNoVal = @["kharej", "iran", "multiport", "keep-ufw", "keep-iptables", "keep-os-limit", "mux", "debug"])
+    var p = initOptParser(longNoVal = @["kharej", "iran", "multiport", "keep-ufw", "keep-iptables", "keep-os-limit",  "debug"])
     while true:
         p.next()
         case p.kind
@@ -149,8 +149,7 @@ proc init*() =
                         keep_system_limit = true
                     of "debug":
                         debug_info = true
-                    of "mux":
-                        mux = true
+
 
                     else:
                         echo "invalid option"

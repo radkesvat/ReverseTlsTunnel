@@ -98,17 +98,18 @@ proc processConnection(client: Connection) {.async.} =
             if globals.log_conn_error: echo getCurrentExceptionMsg()
         #close
         if mux:
-            await remote.closeWait()
-            context.outbound.remove(remote)
-            if not client.closed and client.mux_holds.contains(remote.id):
-                client.mux_holds.remove(remote.id)
-                inc client.mux_closes
-                var data = ""
-                echo "sending mux client close .... ", remote.id
-                packForSendMux(remote.id, remote.port.uint16, data)
-                await client.twriter.write(data)
-            if client.mux_closes >= client.mux_capacity:
-                await client.closeWait() #end full connection
+            discard
+            # await remote.closeWait()
+            # context.outbound.remove(remote)
+            # if not client.closed and client.mux_holds.contains(remote.id):
+            #     client.mux_holds.remove(remote.id)
+            #     inc client.mux_closes
+            #     var data = ""
+            #     echo "sending mux client close .... ", remote.id
+            #     packForSendMux(remote.id, remote.port.uint16, data)
+            #     await client.twriter.write(data)
+            # if client.mux_closes >= client.mux_capacity:
+            #     await client.closeWait() #end full connection
         else:
             await closeLine(client, remote)
 
@@ -223,10 +224,11 @@ proc processConnection(client: Connection) {.async.} =
         poolFrame()
         context.free_peer_outbounds.remove(client)
         if mux:
-            await client.closeWait()
-            for cid in client.mux_holds:
-                context.outbound.with(cid, name = con):
-                    await con.closeWait()
+            discard
+            # await client.closeWait()
+            # for cid in client.mux_holds:
+            #     context.outbound.with(cid, name = con):
+            #         await con.closeWait()
         else:
             await closeLine(client, remote)
 

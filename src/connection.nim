@@ -29,9 +29,7 @@ type
 
     Connection* = ref object
         creation_time*: uint        #creation epochtime
-                                    # action_start_time*: uint    #when recv/send action started (0 = idle)
-                                    # register_start_time*: uint  #when the connection is added to the pool (0 = idle)
-        id*: uint32                 #global incremental id
+        id*: uint16                 #global incremental id
         case kind*: SocketScheme
         of SocketScheme.NonSecure:
             discard
@@ -44,28 +42,20 @@ type
         writer*: AsyncStreamWriter
         remoteHostname*: string     # sni
         state*: SocketState
-
         trusted*: TrustStatus       #when fake handshake perfromed
-                                    # socket*: AsyncSocket        #wrapped asyncsocket
-
-        estabilished*: Future[void] #connection has started
-
+        estabilished*: AsyncEvent   #connection has started
         port*: Port                 #the port the socket points to
-
-
-        # address*: IpAddress #the address from socket level
-        mux_capacity*: uint32       #how many connections can be multiplexed into this
-        mux_holds*: seq[uint32]     #how many connections  multiplexed into this
-        mux_closes*: uint32         #how many connections have been closed
-
+        recordid*:uint
+        children*:Connections
+        exhausted*:bool
+     
 
     Connections* = seq[Connection]
-    ConnectionsRef* = ref var Connections
 
 var allConnections: seq[Connection]
 
-var lgid: uint32 = 1 #last incremental global id
-proc new_uid: uint32 =
+var lgid: uint16 = 1 #last incremental global id
+proc new_uid: uint16 =
     result = lgid
     inc lgid
 
@@ -73,36 +63,36 @@ var et: uint = 0 #last epoch time
 
 proc isTrusted*(con: Connection): bool = con.trusted == TrustStatus.yes
 
-proc hasID*(cons: var Connections, id: uint32): bool =
+proc hasID*(cons: var Connections, id: uint16): bool =
     for el in cons:
         if el.id == id:
             return true
     return false
 
-template with*(cons: Connections, cid: uint32, name: untyped, action: untyped) =
+template with*(cons: Connections, cid: uint16, name: untyped, action: untyped) =
     block:
         for el in cons:
             var con {.inject.} = el
             if con.id == cid:
                 action
 
-proc remove*(cons: var Connections, con: Connection or uint32) =
+proc remove*(cons: var Connections, con: Connection or uint16) =
     var index = -1
     when con is Connection:
         for i, el in cons:
             if el.id == con.id:
                 index = i
-    when con is uint32:
+    when con is uint16:
         for i, el in cons:
             if el.id == con:
                 index = i
     if index != -1:
         cons.del index
 
-proc remove*(cons: var seq[uint32], id: uint32) =
-    let i = cons.find(id)
-    if i != -1:
-        cons.del(i)
+# proc remove*(cons: var seq[uint32], id: uint16) =
+#     let i = cons.find(id)
+#     if i != -1:
+#         cons.del(i)
 
 
 proc grab*(cons: var Connections): Connection =
