@@ -66,7 +66,7 @@ proc acquireRemoteConnection(): Future[Connection] {.async.} =
             remote.exhausted = remote.counter == globals.mux_width
             break
         await sleepAsync(10)
-    return remote
+    return nil
 
 proc connectTargetSNI(): Future[Connection] {.async.} =
     let address = initTAddress(globals.final_target_ip, globals.final_target_port)
@@ -210,10 +210,8 @@ proc processConnection(client: Connection) {.async.} =
 
         #client closed!
         #close
-        if remote.closed:
-            remote = await acquireRemoteConnection()
-            if remote == nil: await closeLine(client, remote); return
-        await remote.writer.write(closeSignalData(client.id))
+        if not remote.closed:
+            await remote.writer.write(closeSignalData(client.id))
 
         await client.closeWait()
         context.user_inbounds.remove(client)

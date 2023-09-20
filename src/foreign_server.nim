@@ -119,10 +119,8 @@ proc processConnection(client: Connection) {.async.} =
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
         #close
-        if client.closed:
-            client = await acquireClientConnection()
-            if client == nil: await closeLine(client, remote); return
-        await client.twriter.write(closeSignalData(remote.id))
+        if not client.closed:
+            await client.twriter.write(closeSignalData(remote.id))
         await remote.closeWait()
 
     proc proccessClient() {.async.} =
