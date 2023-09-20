@@ -77,8 +77,6 @@ proc connectTargetSNI(): Future[Connection] {.async.} =
 
 proc processConnection(client: Connection) {.async.} =
     var processRemoteFuture: Future[void]
-    var trust_sent = false
-    var trust_recv = false
 
     proc closeLine(remote, client: Connection) {.async.} =
         if globals.log_conn_destory: echo "closed client & remote"
@@ -114,7 +112,7 @@ proc processConnection(client: Connection) {.async.} =
                         await remote.reader.readExactly(addr data[0], width)
                         copyMem(addr boundary, addr data[3], sizeof(boundary))
                         if boundary == 0: break
-
+                        
 
                         copyMem(addr cid, addr data[globals.full_tls_record_len], sizeof(cid))
                         cid = cid xor boundary
@@ -129,8 +127,6 @@ proc processConnection(client: Connection) {.async.} =
                     await remote.reader.readExactly(addr data[0], readable.int)
                 else:
                     await remote.reader.readExactly(addr data[0], data.len)
-                       
-
                 if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
 
 
@@ -149,9 +145,6 @@ proc processConnection(client: Connection) {.async.} =
                     await client.writer.write(data)
                     if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client "
 
-
-        
-        
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
@@ -184,11 +177,41 @@ proc processConnection(client: Connection) {.async.} =
 
                 if globals.log_data_len: echo &"[processClient] {data.len()} bytes from client {client.id}"
 
-                
-                
+                #trust based route
+                if client.trusted == TrustStatus.pending:
+                  
+                    var trust = monitorData(data)
+                    if trust:
+                        #peer connection
+                        client.trusted = TrustStatus.yes
+                        let address = client.transp.remoteAddress()
+                        print "Peer Fake Handshake Complete ! ", address
+                        context.available_peer_inbounds.register(client)
+                        context.peer_ip = client.transp.remoteAddress.address
+                        remote.close() # close untrusted remote
+                        await client.writer.write(generateFinishHandShakeData())
+                        return
+                    else:
+                        if first_packet:
+                            if not data.contains(globals.final_target_domain):
+                                #user connection but no peer connected yet
+                                client.trusted = TrustStatus.no
+                                echo "[Error] user connection but no peer connected yet."
+                                await closeLine(client, remote)
+                                return
+                        if (epochTime().uint - client.creation_time) > globals.trust_time:
+                            #user connection but no peer connected yet
+                            #peer connection but couldnt finish handshake in time
+                            client.trusted = TrustStatus.no
+                            await closeLine(client, remote)
+                            return
+                    first_packet = false
+
+
+                #write
                 if remote.closed:
                     remote = await acquireRemoteConnection()
-                    if remote == nil:
+                    if remote == nil: 
                         echo &"[Error] left without connection, closes forcefully."
                         await closeLine(client, remote); return
 
@@ -196,51 +219,6 @@ proc processConnection(client: Connection) {.async.} =
                     data.packForSend(client.id, client.port.uint16)
                 await remote.writer.write(data)
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
-                
-                #trust based route
-                # if client.trusted == TrustStatus.pending:
-                #     if first_packet:
-                #         if data.contains(globals.final_target_domain):
-                #             trust_sent = true
-                            
-                            
-                #         else:
-                #             #user connection but no peer connected yet
-                #             #peer connection but couldnt finish handshake in time
-                #             echo "[Error] user connection but no peer connected yet."
-                #             client.trusted = TrustStatus.no
-                #             await client.closeWait()
-
-                #     first_packet = false
-
-                var trust = monitorData(data)
-                if trust:
-                    #peer connection
-                    client.trusted = TrustStatus.yes
-                    let address = client.transp.remoteAddress()
-                    print "Peer Fake Handshake Complete ! ", address
-                    context.available_peer_inbounds.register(client)
-                    context.peer_ip = client.transp.remoteAddress.address
-                    remote.close() # close untrusted remote
-                    return
-                else:
-                    if first_packet:
-                        if not data.contains(globals.final_target_domain):
-                            #user connection but no peer connected yet
-                            client.trusted = TrustStatus.no
-                            echo "[Error] user connection but no peer connected yet."
-                            await closeLine(client, remote)
-                            return
-                    if (epochTime().uint - client.creation_time) > globals.trust_time:
-                        #user connection but no peer connected yet
-                        #peer connection but couldnt finish handshake in time
-                        client.trusted = TrustStatus.no
-                        await closeLine(client, remote)
-                        return
-
-
-                #write
-               
 
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
