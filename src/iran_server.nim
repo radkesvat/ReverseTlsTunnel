@@ -210,9 +210,12 @@ proc processConnection(client: Connection) {.async.} =
 
         #client closed!
         #close
-        if not remote.closed:
-            await remote.writer.write(closeSignalData(client.id))
-
+        try:
+            if not remote.closed:
+                await remote.writer.write(closeSignalData(client.id))
+        except :
+            if globals.log_conn_error: echo getCurrentExceptionMsg()
+      
         await client.closeWait()
         context.user_inbounds.remove(client)
 
