@@ -1,6 +1,6 @@
 # import overrides/[asyncnet]
-import chronos
-import chronos/streams/[asyncstream,asyncsync, tlsstream, boundstream]
+import chronos,chronos/asyncsync
+import chronos/streams/[asyncstream, tlsstream, boundstream]
 import std/[tables, sequtils, times, strutils, net, random]
 import globals
 export asyncsync
@@ -46,7 +46,7 @@ type
         estabilished*: AsyncEvent   #connection has started
         port*: Port                 #the port the socket points to
         
-        counter*:int
+        counter*:uint
         exhausted*:bool
      
 
@@ -248,7 +248,7 @@ proc connect*(address: TransportAddress, scheme: SocketScheme = SocketScheme.Non
 
 template trackIdleConnections*(cons: var Connections, age: uint) =
     block:
-        proc remove() =
+        proc checkAndRemove() =
             cons.keepIf(proc(x: Connection): bool =
                 if x.creation_time != 0:
                     if et - x.creation_time > age:
@@ -260,7 +260,7 @@ template trackIdleConnections*(cons: var Connections, age: uint) =
         proc tracker(){.async.} =
             while true:
                 await sleepAsync(1000)
-                remove()
+                checkAndRemove()
         asyncCheck tracker()
 
 

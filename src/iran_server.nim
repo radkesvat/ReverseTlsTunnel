@@ -14,7 +14,6 @@ type
 
 
 var context = TunnelConnectionPoolContext()
-var mux = false
 
 proc monitorData(data: var string): bool =
     try:
@@ -56,7 +55,6 @@ proc generateFinishHandShakeData(): string =
 
 proc acquireRemoteConnection(): Future[Connection] {.async.} =
     var remote: Connection = nil
-
     for i in 0..<400:
         remote = context.available_peer_inbounds.randomPick()
         if remote != nil:
@@ -68,8 +66,6 @@ proc acquireRemoteConnection(): Future[Connection] {.async.} =
             remote.exhausted = remote.counter == globals.mux_width
             break
         await sleepAsync(10)
-
-
     return remote
 
 proc connectTargetSNI(): Future[Connection] {.async.} =
@@ -103,7 +99,7 @@ proc processConnection(client: Connection) {.async.} =
                         if remote.isTrusted:
                             break
                         else:
-                            closeLine(client,remote)
+                            await closeLine(client,remote)
                             return
                     else:
                         discard await remote.reader.readOnce(addr data, 0)
@@ -141,11 +137,12 @@ proc processConnection(client: Connection) {.async.} =
                             await child_client.writer.write(data)
                             if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client "
                         else:
-                            child_client.close()
                             context.user_inbounds.remove(child_client)
-                else:
+                            await remote.writer.write(closeSignalData(child_client.id))
+
+                else:   
                     await client.writer.write(data)
-                            if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client "
+                    if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client "
 
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
@@ -156,6 +153,7 @@ proc processConnection(client: Connection) {.async.} =
 
 
     proc processClient(remote: Connection) {.async.} =
+        var remote = remote
         var data = newString(len = 0)
         try:
             while not client.closed:
@@ -169,7 +167,7 @@ proc processConnection(client: Connection) {.async.} =
                         continue
                 if globals.log_data_len: echo &"[processClient] {data.len()} bytes from client {client.id}"
                 if client.trusted == TrustStatus.no:
-                    let width = globals.full_tls_record_len.int + mux_record_len.int
+                    let width = globals.full_tls_record_len.int + globals.mux_record_len.int
                     data.setLen(data.len() + width)
                     await client.reader.readExactly(addr data[0 + width], data.len - width)
                 else:
@@ -184,7 +182,6 @@ proc processConnection(client: Connection) {.async.} =
                         client.trusted = TrustStatus.yes
                         let address = client.transp.remoteAddress()
                         print "Peer Fake Handshake Complete ! ", address
-                        if mux: context.user_inbounds.remove(client)
                         context.available_peer_inbounds.register(client)
                         context.peer_ip = client.transp.remoteAddress.address
                         remote.close() # close untrusted remote
@@ -204,7 +201,7 @@ proc processConnection(client: Connection) {.async.} =
                     if remote == nil: await closeLine(client, remote); return
 
                 if remote.isTrusted:
-                    data.packForSend(client.port, client.id)
+                    data.packForSend(client.id,client.port.uint16)
                 await remote.writer.write(data)
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
 
@@ -240,9 +237,8 @@ proc processConnection(client: Connection) {.async.} =
             context.peer_ip != client.transp.remoteAddress.address:
             echo "Real User connected !"
             client.trusted = TrustStatus.no
-            remtoe = await acquireRemoteConnection() #associate peer
+            remote = await acquireRemoteConnection() #associate peer
             if remote != nil:
-                if mux: context.user_inbounds.register(client)
                 if globals.log_conn_create: echo &"[createNewCon][Succ] Associated a peer connection"
                 context.user_inbounds.register(client)
 
@@ -253,7 +249,7 @@ proc processConnection(client: Connection) {.async.} =
         else:
             remote = await connectTargetSNI()
 
-        if not mux: asyncCheck processRemote(remote) # mux already called this
+        asyncCheck processRemote(remote) # mux already called this
         asyncCheck processClient(remote)
 
     except:
@@ -316,7 +312,6 @@ proc start*(){.async.} =
 
 
 
-    mux = globals.mux
     trackIdleConnections(context.available_peer_inbounds, globals.pool_age)
 
     await sleepAsync(200)

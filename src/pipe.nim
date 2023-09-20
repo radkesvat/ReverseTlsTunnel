@@ -74,9 +74,9 @@ proc unPackForRead*(data: var string) =
 
 
 proc packForSend*(data: var string, cid: uint16,port: uint16, flags: uint8 = 0) =
-    let width = globals.full_tls_record_len.len()+sizeof(port)+sizeof(cid) + sizeof(flags)
+    let width = globals.full_tls_record_len.int+sizeof(port)+sizeof(cid) + sizeof(flags)
      
-    let size: uint16 = data.len().uint16 - width
+    let size: uint16 = data.len().uint16 - width.uint16
     copyMem(addr data[0], addr globals.tls13_record_layer[0], globals.tls13_record_layer.len())
     copyMem(addr data[0 + globals.tls13_record_layer.len()], addr size, sizeof(size))
 
@@ -85,30 +85,30 @@ proc packForSend*(data: var string, cid: uint16,port: uint16, flags: uint8 = 0) 
     let e_flags: uint16 = flags xor size
 
 
-    copyMem(addr data[0 + globals.full_tls_record_len.len()], addr e_cid, sizeof(e_cid))
-    copyMem(addr data[0 + globals.full_tls_record_len.len()+sizeof(e_cid)], addr e_port, sizeof(e_port))
-    copyMem(addr data[0 + globals.full_tls_record_len.len()+sizeof(e_cid)+sizeof(e_port)], addr e_flags, sizeof(e_flags))
+    copyMem(addr data[0 + globals.full_tls_record_len.int], addr e_cid, sizeof(e_cid))
+    copyMem(addr data[0 + globals.full_tls_record_len.int+sizeof(e_cid)], addr e_port, sizeof(e_port))
+    copyMem(addr data[0 + globals.full_tls_record_len.int+sizeof(e_cid)+sizeof(e_port)], addr e_flags, sizeof(e_flags))
 
     encrypt(data, width)
 
 
 
 proc closeSignalData*(cid: uint16):string=
-    let width = globals.full_tls_record_len.len()+sizeof(port)+sizeof(cid) + sizeof(flags)
+    let port: uint16 = rand(uint16.high.int).uint16
+    let flags: uint16 =rand(uint8.high.int).uint16
+
+    let width = globals.full_tls_record_len.int+sizeof(port)+sizeof(cid) + sizeof(flags)
 
     var data = newString(len = width)
 
     let size: uint16 = sizeof(port)+sizeof(cid) + sizeof(flags)
     copyMem(addr data[0], addr globals.tls13_record_layer[0], globals.tls13_record_layer.len())
-    copyMem(addr data[0 + globals.tls13_record_layer.len()], addr size, sizeof(size))
+    copyMem(addr data[0 + globals.tls13_record_layer.len], addr size, sizeof(size))
 
-    let e_cid: uint16 = cid xor size
-    let e_flags: uint16 = flags xor size
-    let e_port:uint16 = rand(uint16.high)
  
-    copyMem(addr data[0 + globals.full_tls_record_len.len()], addr e_cid, sizeof(e_cid))
-    copyMem(addr data[0 + globals.full_tls_record_len.len()+sizeof(e_cid)], addr e_port, sizeof(e_port))
-    copyMem(addr data[0 + globals.full_tls_record_len.len()+sizeof(e_cid)+sizeof(e_port)], addr e_flags, sizeof(e_flags))
+    copyMem(addr data[0 + globals.full_tls_record_len.int], addr cid, sizeof(cid))
+    copyMem(addr data[0 + globals.full_tls_record_len.int+sizeof(cid)], addr port, sizeof(port))
+    copyMem(addr data[0 + globals.full_tls_record_len.int+sizeof(cid)+sizeof(port)], addr flags, sizeof(flags))
 
 #returns connection id
 # proc unPackForReadMux*(data: var string): tuple[cid: uint32, port: uint16] =

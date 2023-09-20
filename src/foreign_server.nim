@@ -12,7 +12,6 @@ type
         outbounds: Connections
 
 var context = ServerConnectionPoolContext()
-var mux = false
 
 # [FWD]
 proc poolFrame(create_count: uint = 0)
@@ -36,7 +35,7 @@ proc generateFinishHandShakeData(): string =
 
 proc monitorData(data: string):bool =
     try:
-        if len(data) < 16: return (false, port)
+        if len(data) < 16: return false
         let base = 5 + 7 + `mod`(globals.sh5, 7.uint8)
 
         var sh3_c: uint32
@@ -51,13 +50,22 @@ proc monitorData(data: string):bool =
 
         return chk1 and chk2
     except:
-        return (false
+        return false
 
 
 proc remoteTrusted(port: Port): Future[Connection] {.async.} =
     var con = await connection.connect(initTAddress(globals.next_route_addr, port))
     con.trusted = TrustStatus.yes
     return con
+
+proc acquireClientConnection(): Future[Connection] {.async.} =
+    var found: Connection = nil
+    for i in 0..<50:
+        found = context.used_peer_outbounds.randomPick()
+        if found != nil and not found.closed:
+                return found
+    return nil
+
 
 proc processConnection(client: Connection) {.async.} =
 
@@ -70,6 +78,7 @@ proc processConnection(client: Connection) {.async.} =
             await client.closeWait()
 
     proc processRemote(remote: Connection) {.async.} =
+        var client = client
         var data = newString(len = 0)
         try:
             while not remote.closed:
@@ -86,30 +95,35 @@ proc processConnection(client: Connection) {.async.} =
                 await remote.reader.readExactly(addr data[0 + width], data.len - width)
                 if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
 
+
+
                 #write
-                if not client.closed:
-                    if mux: packForSendMux(remote.id, remote.port.uint16, data) else: packForSend(data)
-                    await client.twriter.write(data)
-                    if globals.log_data_len: echo &"[processRemote] Sent {data.len()} bytes ->  client"
+                          
+                # context.used_peer_outbounds.with(remote.id, child_client):
+                #     unPackForRead(data)
+                #     if not child_client.closed:
+                #         await child_client.writer.write(data)
+                #         if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client "
+                #     else:
+                #         context.used_peer_outbounds.remove(child_client)
+                #         break
+
+                if client.closed:
+                    client = await acquireClientConnection()
+                    if client == nil: await closeLine(client, remote); return
+
+                packForSend(data,remote.id,remote.port.uint16)
+                await client.twriter.write(data)
+                if globals.log_data_len: echo &"[processRemote] Sent {data.len()} bytes ->  client"
 
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
         #close
-        if mux:
-            discard
-            # await remote.closeWait()
-            # context.outbounds.remove(remote)
-            # if not client.closed and client.mux_holds.contains(remote.id):
-            #     client.mux_holds.remove(remote.id)
-            #     inc client.mux_closes
-            #     var data = ""
-            #     echo "sending mux client close .... ", remote.id
-            #     packForSendMux(remote.id, remote.port.uint16, data)
-            #     await client.twriter.write(data)
-            # if client.mux_closes >= client.mux_capacity:
-            #     await client.closeWait() #end full connection
-        else:
-            await closeLine(client, remote)
+        if client.closed:
+            client = await acquireClientConnection()
+            if client == nil: await closeLine(client, remote); return
+        await client.twriter.write(closeSignalData(remote.id))
+        await remote.closeWait()
 
     proc proccessClient() {.async.} =
         var remote: Connection = nil
@@ -123,11 +137,11 @@ proc processConnection(client: Connection) {.async.} =
                 #read
                 data.setlen client.treader.tsource.offset
                 if data.len() == 0:
-                    if remote.reader.atEof():
-                        if remote.isTrusted:
+                    if client.treader.atEof():
+                        if client.isTrusted:
                             break
                         else:
-                            closeLine(client,remote)
+                            await closeLine(client,remote)
                             return
                     else:
                         discard await client.treader.readOnce(addr data, 0);continue
@@ -141,7 +155,7 @@ proc processConnection(client: Connection) {.async.} =
                         if boundary == 0: break
 
                         copyMem(addr cid, addr data[globals.full_tls_record_len], sizeof(cid))
-                        copyMem(addr port, addr data[globals.full_tls_record_len+sizeof(cid)], sizeof(port))
+                        copyMem(addr port, addr data[globals.full_tls_record_len.int + sizeof(cid)], sizeof(port))
                         cid = cid xor boundary
                         port = port xor boundary
                         if boundary == globals.mux_width:
@@ -168,11 +182,15 @@ proc processConnection(client: Connection) {.async.} =
                                 #write
                                 unPackForRead(data)
                                 if not remote.closed():
-                                    await remote.writer.write(data)
-                                if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote "
+                                    await remote.twriter.write(data)
+                                    if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote "
+                                else:
+                                    await remote.twriter.write(closeSignalData(cid))
+                                    context.outbounds.remove cid
 
                     else:
                         let new_remote = await remoteTrusted(port.Port)
+                        new_remote.id = cid
                         asyncCheck processRemote(remote)
                         poolFrame()
                         context.free_peer_outbounds.remove(client)
@@ -245,8 +263,6 @@ proc poolFrame(create_count: uint = 0) =
         asyncCheck create()
 
 proc start*(){.async.} =
-    mux = globals.mux
-
     echo &"Mode Foreign Server:  {globals.listen_addr} <-> ({globals.final_target_domain} with ip {globals.final_target_ip})"
     trackIdleConnections(context.free_peer_outbounds,globals.pool_age)
     #just to make sure we always willing to connect to the peer
