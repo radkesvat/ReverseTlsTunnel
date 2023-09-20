@@ -65,7 +65,7 @@ proc acquireClientConnection(): Future[Connection] {.async.} =
         if found != nil and not found.closed:
             return found
         else:
-            context.available_peer_inbounds.remove(found)
+            context.used_peer_outbounds.remove(found)
 
     return nil
 
