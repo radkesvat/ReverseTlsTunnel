@@ -194,6 +194,7 @@ proc processConnection(client: Connection) {.async.} =
                             if not data.contains(globals.final_target_domain):
                                 #user connection but no peer connected yet
                                 client.trusted = TrustStatus.no
+                                echo "[Error] user connection but no peer connected yet."
                                 await closeLine(client, remote)
                                 return
                         if (epochTime().uint - client.creation_time) > globals.trust_time:
