@@ -115,9 +115,9 @@ proc processConnection(client: Connection) {.async.} =
         try:
             if client == nil or client.closed:
                 client = await acquireClientConnection()
-                if client != nil:
-                    await client.twriter.write(closeSignalData(remote.id))
-                    echo "SENT CLOSE SIGNAL FOR ", remote.id
+               
+            await client.twriter.write(closeSignalData(remote.id))
+            echo "SENT CLOSE SIGNAL FOR ", remote.id
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
