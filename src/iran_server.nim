@@ -77,6 +77,60 @@ proc connectTargetSNI(): Future[Connection] {.async.} =
     if globals.log_conn_create: echo "connected to ", globals.final_target_domain, ":", $globals.final_target_port
     return new_remote
 
+proc processTrustedRemote(remote: Connection) {.async.} =
+    var data = newString(len = 0)
+    var boundary: uint16 = 0
+    var cid: uint16
+    try:
+        while not remote.isNil and not remote.closed:
+            #read
+            data.setlen remote.reader.tsource.offset
+            if data.len() == 0:
+                if remote.reader.atEof():
+                    break      
+                else:
+                    discard await remote.reader.readOnce(addr data, 0)
+                    continue
+
+            if boundary == 0:
+                let width = int(globals.full_tls_record_len + globals.mux_record_len)
+                data.setLen width
+                await remote.reader.readExactly(addr data[0], width)
+                copyMem(addr boundary, addr data[3], sizeof(boundary))
+                if boundary == 0: break
+                
+                copyMem(addr cid, addr data[globals.full_tls_record_len], sizeof(cid))
+                cid = cid xor boundary
+                boundary-=globals.mux_record_len.uint16
+                if boundary == 0:
+                    context.user_inbounds.with(cid, child_client):
+                        child_client.close()
+                        context.user_inbounds.remove(child_client)
+                continue
+            let readable = min(boundary, data.len().uint16)
+            boundary -= readable; data.setlen readable
+            await remote.reader.readExactly(addr data[0], readable.int)
+            if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
+            
+            # write
+            context.user_inbounds.with(cid, child_client):
+                unPackForRead(data)
+                if not child_client.closed:
+                    await child_client.writer.write(data)
+                    if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client "
+                else:
+                    context.user_inbounds.remove(child_client)
+                    await remote.writer.write(closeSignalData(child_client.id))
+           
+    except:
+        if globals.log_conn_error: echo getCurrentExceptionMsg()
+    #close
+    echo "----------------------------------> Remote CLSOE-------------"
+    if context.available_peer_inbounds.hasID(remote.id):
+        context.available_peer_inbounds.remove(remote)
+        echo "----------------------------------> MUX CLSOE-------------"
+    if not remote.isNil(): await remote.closeWait()
+
 proc processConnection(client: Connection) {.async.} =
     proc closeLine(remote, client: Connection) {.async.} =
         if globals.log_conn_destory: echo "closed client & remote"
@@ -86,78 +140,34 @@ proc processConnection(client: Connection) {.async.} =
             await client.closeWait()
 
 
-    proc processRemote(remote: Connection) {.async.} =
+
+    proc processUntrustedRemote(remote: Connection) {.async.} =
         var data = newString(len = 0)
-        var boundary: uint16 = 0
-        var cid: uint16
         try:
             while not remote.isNil and not remote.closed:
                 #read
                 data.setlen remote.reader.tsource.offset
                 if data.len() == 0:
                     if remote.reader.atEof():
-                        if remote.isTrusted:
-                            break
-                        else:
-                            await closeLine(client, remote)
-                            return
+                        await closeLine(client, remote)
+                        return
                     else:
                         discard await remote.reader.readOnce(addr data, 0)
                         continue
-
-                if remote.isTrusted:
-                    if boundary == 0:
-                        let width = int(globals.full_tls_record_len + globals.mux_record_len)
-                        data.setLen width
-                        await remote.reader.readExactly(addr data[0], width)
-                        copyMem(addr boundary, addr data[3], sizeof(boundary))
-                        if boundary == 0: break
-                        
-
-                        copyMem(addr cid, addr data[globals.full_tls_record_len], sizeof(cid))
-                        cid = cid xor boundary
-                        boundary-=globals.mux_record_len.uint16
-                        if boundary == 0:
-                            context.user_inbounds.with(cid, child_client):
-                                child_client.close()
-                                context.user_inbounds.remove(child_client)
-                        continue
-                    let readable = min(boundary, data.len().uint16)
-                    boundary -= readable; data.setlen readable
-                    await remote.reader.readExactly(addr data[0], readable.int)
-                else:
-                    await remote.reader.readExactly(addr data[0], data.len)
+               
+                await remote.reader.readExactly(addr data[0], data.len)
                 if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
-
-
+                
                 # write
-                if remote.isTrusted:
-                    context.user_inbounds.with(cid, child_client):
-                        unPackForRead(data)
-                        if not child_client.closed:
-                            await child_client.writer.write(data)
-                            if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client "
-                        else:
-                            context.user_inbounds.remove(child_client)
-                            await remote.writer.write(closeSignalData(child_client.id))
-
-                else:
-                    await client.writer.write(data)
-                    if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client "
-
+                await client.writer.write(data)
+                if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client "
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
-
         #close
-        echo "----------------------------------> Remote CLSOE-------------"
-
-        if context.available_peer_inbounds.hasID(remote.id):
-            context.available_peer_inbounds.remove(remote)
-
-            echo "----------------------------------> MUX CLSOE-------------"
-        if not remote.isNil(): await remote.closeWait()
-
-
+        await remote.closeWait()
+        if not client.isTrusted():
+            await client.closeWait()
+            
 
     proc processClient(remote: Connection) {.async.} =
         var remote = remote
@@ -194,6 +204,8 @@ proc processConnection(client: Connection) {.async.} =
                         context.available_peer_inbounds.register(client)
                         context.peer_ip = client.transp.remoteAddress.address
                         remote.close() # close untrusted remote
+                        asyncCheck processTrustedRemote(client)
+
                         # await client.writer.write(generateFinishHandShakeData())
                         return
                     else:
@@ -254,6 +266,7 @@ proc processConnection(client: Connection) {.async.} =
             client.transp.remoteAddress.address in globals.trusted_foreign_peers:
             #load balancer connection
             remote = await connectTargetSNI()
+            asyncCheck processUntrustedRemote(remote)
 
         elif context.peer_ip != IpAddress() and
             context.peer_ip != client.transp.remoteAddress.address:
@@ -270,8 +283,8 @@ proc processConnection(client: Connection) {.async.} =
                 return
         else:
             remote = await connectTargetSNI()
+            asyncCheck processUntrustedRemote(remote)
 
-        asyncCheck processRemote(remote) # mux already called this
         asyncCheck processClient(remote)
 
     except:
