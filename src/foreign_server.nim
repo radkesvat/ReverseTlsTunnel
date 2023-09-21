@@ -62,7 +62,7 @@ proc acquireClientConnection(): Future[Connection] {.async.} =
     var found: Connection = nil
     for i in 0..<50:
         found = context.used_peer_outbounds.randomPick()
-        if found != nil :
+        if found != nil:
             if not found.closed:
                 return found
             else:
@@ -101,7 +101,7 @@ proc processConnection(client: Connection) {.async.} =
 
                 if client.closed:
                     client = await acquireClientConnection()
-                    if client == nil: await closeLine(client, remote); return
+                    if client == nil: break
 
                 packForSend(data, remote.id, remote.port.uint16)
                 await client.twriter.write(data)
@@ -109,14 +109,17 @@ proc processConnection(client: Connection) {.async.} =
 
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
+            
         #close
         try:
-            if not client.closed:
-                await client.twriter.write(closeSignalData(remote.id))
+            if client.closed:
+                client = await acquireClientConnection()
+                if client != nil: 
+                    await client.twriter.write(closeSignalData(remote.id))
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
-
+        context.outbounds.remove(remote)
         await remote.closeWait()
 
     proc proccessClient() {.async.} =
@@ -240,9 +243,9 @@ proc poolFrame(create_count: uint = 0) =
             echo "TlsHandsahke complete."
             conn.trusted = TrustStatus.yes
 
-            conn.transp.reader.cancel()
-            await stepsAsync(1)
-            conn.transp.reader = nil
+            # conn.transp.reader.cancel()
+            # await stepsAsync(1)
+            # conn.transp.reader = nil
 
             asyncCheck processConnection(conn)
             context.free_peer_outbounds.add conn
@@ -277,7 +280,7 @@ proc start*(){.async.} =
     while true:
         poolFrame()
         await sleepAsync(5.secs)
-    
+
     # await sleepAsync(2.secs)
     # poolFrame()
 
