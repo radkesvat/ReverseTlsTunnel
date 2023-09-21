@@ -110,14 +110,12 @@ proc processConnection(client: Connection) {.async.} =
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
-        echo "remote closed !"
         #close
         try:
             if client == nil or client.closed:
                 client = await acquireClientConnection()
             if client != nil:   
                 await client.twriter.write(closeSignalData(remote.id))
-                echo "SENT CLOSE SIGNAL FOR ", remote.id
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
@@ -160,7 +158,7 @@ proc processConnection(client: Connection) {.async.} =
                         context.outbounds.with(cid, child_remote):
                             context.outbounds.remove(child_remote)
                             child_remote.close()
-                            echo "close mux client"
+                            if globals.log_conn_destory: echo "close mux client"
 
                     continue
                 let readable = min(boundary, data.len().uint16)
@@ -201,16 +199,6 @@ proc processConnection(client: Connection) {.async.} =
                         poolFrame()
 
 
-                # if client.trusted == TrustStatus.pending:
-                #     var trust = monitorData(data)
-                #     if trust:
-                #         client.trusted = TrustStatus.yes
-                #         print "Fake Reverse Handshake Complete !"
-
-                #     else:
-                #         echo "[proccessClient] Target server was not a trusted tunnel client, closing..."
-                #         client.trusted = TrustStatus.no
-                #         break
 
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
@@ -228,7 +216,6 @@ proc processConnection(client: Connection) {.async.} =
     try:
         asyncCheck proccessClient()
     except:
-        echo "[Server] root level exception"
         print getCurrentExceptionMsg()
 
 proc poolFrame(create_count: uint = 0) =

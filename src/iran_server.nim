@@ -244,14 +244,11 @@ proc processConnection(client: Connection) {.async.} =
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
-        #client closed!
         #close
-        echo "closed ", client.id
         try:
             if remote == nil or remote.closed:
                 remote = await acquireRemoteConnection()
             if remote != nil:
-                echo "SENT SIG CLOSE ", client.id
                 await remote.writer.write(closeSignalData(client.id))
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
