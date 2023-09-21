@@ -250,7 +250,7 @@ proc processConnection(client: Connection) {.async.} =
         try:
             if remote == nil or remote.closed:
                 remote = await acquireRemoteConnection()
-            if remote == nil:
+            if remote != nil:
                 echo "SENT SIG CLOSE ", client.id
                 await remote.writer.write(closeSignalData(client.id))
         except:
