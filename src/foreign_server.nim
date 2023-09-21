@@ -141,31 +141,27 @@ proc processConnection(client: Connection) {.async.} =
                         discard await client.treader.readOnce(addr data, 0); continue
 
          
+                if boundary == 0:
+                    let width = int(globals.full_tls_record_len + globals.mux_record_len)
+                    data.setLen width
+                    await client.treader.readExactly(addr data[0], width)
+                    copyMem(addr boundary, addr data[3], sizeof(boundary))
+                    if boundary == 0: break
+                    copyMem(addr cid, addr data[globals.full_tls_record_len], sizeof(cid))
+                    copyMem(addr port, addr data[globals.full_tls_record_len.int + sizeof(cid)], sizeof(port))
+                    copyMem(addr flag, addr data[globals.full_tls_record_len.int + sizeof(cid) + sizeof(port)], sizeof(flag))
+                    cid = cid xor boundary
+                    port = port xor boundary
+                    flag = flag xor boundary.uint8
+                    boundary-=globals.mux_record_len.uint16
                     if boundary == 0:
-                        let width = int(globals.full_tls_record_len + globals.mux_record_len)
-                        data.setLen width
-                        await client.treader.readExactly(addr data[0], width)
-                        copyMem(addr boundary, addr data[3], sizeof(boundary))
-                        if boundary == 0: break
-
-
-                        copyMem(addr cid, addr data[globals.full_tls_record_len], sizeof(cid))
-                        copyMem(addr port, addr data[globals.full_tls_record_len.int + sizeof(cid)], sizeof(port))
-                        copyMem(addr flag, addr data[globals.full_tls_record_len.int + sizeof(cid) + sizeof(port)], sizeof(flag))
-                        cid = cid xor boundary
-                        port = port xor boundary
-                        flag = flag xor boundary.uint8
-
-                        boundary-=globals.mux_record_len.uint16
-                        if boundary == 0:
-                            context.outbounds.with(cid, child_remote):
-                                child_remote.close()
-                                context.outbounds.remove(child_remote)
-                        continue
-
-                    let readable = min(boundary, data.len().uint16)
-                    boundary -= readable; data.setlen readable
-                    await client.treader.readExactly(addr data[0], readable.int)
+                        context.outbounds.with(cid, child_remote):
+                            child_remote.close()
+                            context.outbounds.remove(child_remote)
+                    continue
+                let readable = min(boundary, data.len().uint16)
+                boundary -= readable; data.setlen readable
+                await client.treader.readExactly(addr data[0], readable.int)
 
 
                 if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes from client"
@@ -190,7 +186,7 @@ proc processConnection(client: Connection) {.async.} =
                                 context.outbounds.remove cid
 
                     else:
-                        var remote= await remoteTrusted(if globals.multi_port: port.Port else: globals.next_route_port)
+                        var remote = await remoteTrusted(if globals.multi_port: port.Port else: globals.next_route_port)
                         remote.id = cid
                         context.outbounds.register(remote)
                         asyncCheck processRemote(remote)
