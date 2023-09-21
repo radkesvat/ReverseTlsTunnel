@@ -186,7 +186,7 @@ proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketSc
                     let treader = newAsyncStreamReader(transp)
                     let twriter = newAsyncStreamWriter(transp)
                     # let flags:set[TLSFlags] =  {TLSFlags.NoVerifyHost,TLSFlags.NoVerifyServerName}
-                    let flags: set[TLSFlags] = {TLSFlags.CustomStopAfterHandShake}
+                    let flags: set[TLSFlags] = {}
 
                     let tls = newTLSClientAsyncStream(treader, twriter, hostname, flags = flags)
                     let res = Connection(

@@ -51,7 +51,7 @@ task build_server, "builds server":
     switch("warning", "BareExcept:off")
     
     
-    # switch("d", "useMalloc")
+    switch("d", "useMalloc")
 
     switch("d", "asyncBackend=chronos")
     switch("d", "asyncBackend:chronos")

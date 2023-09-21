@@ -240,7 +240,7 @@ proc poolFrame(create_count: uint = 0) =
             echo "TlsHandsahke complete."
             conn.trusted = TrustStatus.yes
 
-            # conn.transp.reader.cancel()
+            conn.transp.reader.cancel()
             await stepsAsync(1)
             conn.transp.reader = nil
 
