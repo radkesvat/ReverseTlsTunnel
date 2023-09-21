@@ -116,6 +116,7 @@ proc processConnection(client: Connection) {.async.} =
                 client = await acquireClientConnection()
                 if client != nil: 
                     await client.twriter.write(closeSignalData(remote.id))
+                    echo "SENT CLOSE SIGNAL FOR ", remote.id
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
@@ -156,10 +157,10 @@ proc processConnection(client: Connection) {.async.} =
                     boundary-=globals.mux_record_len.uint16
                     if boundary == 0:
                         context.outbounds.with(cid, child_remote):
+                            context.outbounds.remove(child_remote)
                             child_remote.close()
                             echo "close mux client"
 
-                            context.outbounds.remove(child_remote)
                     continue
                 let readable = min(boundary, data.len().uint16)
                 boundary -= readable; data.setlen readable
