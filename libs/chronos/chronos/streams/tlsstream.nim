@@ -29,7 +29,8 @@ type
     EnforceServerPref,    # Server: Enforce server preferences
     NoRenegotiation,      # Server: Reject renegotiations requests
     TolerateNoClientAuth, # Server: Disable strict client authentication
-    FailOnAlpnMismatch    # Server: Fail on application protocol mismatch
+    FailOnAlpnMismatch,    # Server: Fail on application protocol mismatch
+    CustomStopAfterHandShake    # Custom Flag ! Will not read from socket after handshake
 
   TLSKeyType {.pure.} = enum
     RSA, EC
@@ -93,6 +94,7 @@ type
     writer*: TLSStreamWriter
     mainLoop*: Future[void]
     trustAnchors: TrustAnchorStore
+    stopafterhandshake: bool
 
   SomeTLSStreamType* = TLSStreamReader|TLSStreamWriter|TLSAsyncStream
 
@@ -336,6 +338,8 @@ proc tlsLoop*(stream: TLSAsyncStream) {.async.} =
             stream.writer.handshaked = true
             if not(isNil(stream.writer.handshakeFut)):
               stream.writer.handshakeFut.complete()
+            if stream.stopafterhandshake:
+              break
           sendAppFut = tlsWriteApp(engine, stream.writer)
     else:
       sendAppFut.readAndReset()
@@ -500,6 +504,10 @@ proc newTLSClientAsyncStream*(rsource: AsyncStreamReader,
   )
   res.reader = reader
   res.writer = writer
+
+
+  if TLSFlags.CustomStopAfterHandShake in flags:
+    res.stopafterhandshake = true
 
   if TLSFlags.NoVerifyHost in flags:
     sslClientInitFull(res.ccontext, addr res.x509, nil, 0)

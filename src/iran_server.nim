@@ -60,7 +60,6 @@ proc acquireRemoteConnection(): Future[Connection] {.async.} =
             remote = context.available_peer_inbounds[0]
             if remote != nil:
                 if remote.closed or remote.exhausted:
-                    echo "----------------------------------> REM"
                     context.available_peer_inbounds.remove(remote)
                     continue
 
@@ -125,10 +124,7 @@ proc processTrustedRemote(remote: Connection) {.async.} =
     except:
         if globals.log_conn_error: echo getCurrentExceptionMsg()
     #close
-    echo "----------------------------------> Remote CLSOE-------------"
-    if context.available_peer_inbounds.hasID(remote.id):
-        context.available_peer_inbounds.remove(remote)
-        echo "----------------------------------> MUX CLSOE-------------"
+    context.available_peer_inbounds.remove(remote)
     if not remote.isNil(): await remote.closeWait()
 
 proc processConnection(client: Connection) {.async.} =

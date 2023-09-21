@@ -235,9 +235,9 @@ proc poolFrame(create_count: uint = 0) =
             echo "TlsHandsahke complete."
             conn.trusted = TrustStatus.yes
 
-            conn.transp.reader.cancel()
-            await stepsAsync(1)
-            conn.transp.reader = nil
+            # conn.transp.reader.cancel()
+            # await stepsAsync(1)
+            # conn.transp.reader = nil
 
             asyncCheck processConnection(conn)
             context.free_peer_outbounds.add conn
@@ -269,10 +269,10 @@ proc start*(){.async.} =
     echo &"Mode Foreign Server:  {globals.listen_addr} <-> ({globals.final_target_domain} with ip {globals.final_target_ip})"
     # trackIdleConnections(context.free_peer_outbounds, globals.pool_age)
     #just to make sure we always willing to connect to the peer
-    # while true:
-    #     poolFrame()
-    #     await sleepAsync(5.secs)
+    while true:
+        poolFrame()
+        await sleepAsync(5.secs)
     
-    await sleepAsync(2.secs)
-    poolFrame()
+    # await sleepAsync(2.secs)
+    # poolFrame()
 
