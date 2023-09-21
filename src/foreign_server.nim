@@ -115,9 +115,9 @@ proc processConnection(client: Connection) {.async.} =
         try:
             if client == nil or client.closed:
                 client = await acquireClientConnection()
-               
-            await client.twriter.write(closeSignalData(remote.id))
-            echo "SENT CLOSE SIGNAL FOR ", remote.id
+            if client != nil:   
+                await client.twriter.write(closeSignalData(remote.id))
+                echo "SENT CLOSE SIGNAL FOR ", remote.id
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
@@ -189,9 +189,7 @@ proc processConnection(client: Connection) {.async.} =
                             if not child_remote.closed():
                                 await child_remote.writer.write(data)
                                 if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
-                            else:
-                                await client.twriter.write(closeSignalData(cid))
-                                context.outbounds.remove cid
+
 
                     else:
                         var remote = await remoteTrusted(if globals.multi_port: port.Port else: globals.next_route_port)
