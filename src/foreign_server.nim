@@ -110,6 +110,7 @@ proc processConnection(client: Connection) {.async.} =
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
+        echo "remote closed !"
         #close
         try:
             if client == nil or client.closed:
