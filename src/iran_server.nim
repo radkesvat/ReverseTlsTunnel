@@ -59,6 +59,7 @@ proc acquireRemoteConnection(): Future[Connection] {.async.} =
         remote = context.available_peer_inbounds[0]
         if remote != nil:
             if remote.closed or remote.exhausted:
+                echo "----------------------------------> REM"
                 context.available_peer_inbounds.remove(remote)
                 continue
 
@@ -76,8 +77,6 @@ proc connectTargetSNI(): Future[Connection] {.async.} =
     return new_remote
 
 proc processConnection(client: Connection) {.async.} =
-    var processRemoteFuture: Future[void]
-
     proc closeLine(remote, client: Connection) {.async.} =
         if globals.log_conn_destory: echo "closed client & remote"
         if remote != nil:
@@ -149,6 +148,8 @@ proc processConnection(client: Connection) {.async.} =
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
         #close
+        echo "----------------------------------> Remote CLSOE-------------"
+
         context.available_peer_inbounds.remove(remote)
         if not remote.isNil(): await remote.closeWait()
 
