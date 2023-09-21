@@ -14,8 +14,8 @@ var mode*: RunMode = RunMode.iran
 # [Log Options]true
 const log_conn_create* = true
 const log_data_len* = false
-const log_conn_destory* = false
-const log_conn_error* = false
+const log_conn_destory* = true
+const log_conn_error* = true
 
 # [TLS]
 let tls13_record_layer* = "\x17\x03\x03" 
