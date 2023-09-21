@@ -125,6 +125,7 @@ proc processConnection(client: Connection) {.async.} =
         var boundary: uint16 = 0
         var cid: uint16
         var port: uint16
+        var flag: uint8
 
         try:
             while not client.closed:
@@ -151,8 +152,10 @@ proc processConnection(client: Connection) {.async.} =
 
                         copyMem(addr cid, addr data[globals.full_tls_record_len], sizeof(cid))
                         copyMem(addr port, addr data[globals.full_tls_record_len.int + sizeof(cid)], sizeof(port))
+                        copyMem(addr flag, addr data[globals.full_tls_record_len.int + sizeof(cid) + sizeof(port)], sizeof(flag))
                         cid = cid xor boundary
                         port = port xor boundary
+                        flag = flag xor boundary.uint8
 
                         boundary-=globals.mux_record_len.uint16
                         if boundary == 0:
@@ -168,7 +171,9 @@ proc processConnection(client: Connection) {.async.} =
                     await client.treader.readExactly(addr data[0], data.len)
                 if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes from client"
 
-
+                if DataFlags.junk in cast[TransferFlags](flag):
+                    if globals.log_data_len: echo &"[proccessClient] {data.len()} discarded from client"
+                    continue
 
                 #write
                 if client.isTrusted():

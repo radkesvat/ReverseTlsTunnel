@@ -13,7 +13,7 @@ var mode*: RunMode = RunMode.iran
 
 # [Log Options]true
 const log_conn_create* = true
-const log_data_len* = false
+const log_data_len* = true
 const log_conn_destory* = true
 const log_conn_error* = true
 
@@ -29,10 +29,11 @@ var pool_size*: uint = 16
 var pool_age*: uint = 10
 var max_idle_time*: uint = 600 #secs (default TCP RFC is 3600)
 var max_pool_unused_time*: uint = 60 #secs
-
 let mux_record_len*:uint32 = 5 #2bytes port 2bytes id 1byte reserved
-var mux_width*:uint32 = 16
+var mux_width*:uint32 = 2
 
+# [Noise]
+var noise_ratio*:uint = 0
 
 
 # [Routes]
@@ -231,7 +232,7 @@ proc init*() =
                         pool_size = parseInt(p.val).uint
                         print pool_size
 
-                    of "pool_age":
+                    of "pool-age":
                         pool_age = parseInt(p.val).uint
                         print pool_age
 
@@ -239,6 +240,9 @@ proc init*() =
                         mux_width = parseInt(p.val).uint32
                         print mux_width
 
+                    of "noise-ratio":
+                        noise_ratio = parseInt(p.val).uint32
+                        print noise_ratio
 
                     of "trust_time":
                         trust_time = parseInt(p.val).uint

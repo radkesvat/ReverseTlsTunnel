@@ -120,7 +120,13 @@ proc processTrustedRemote(remote: Connection) {.async.} =
                 else:
                     context.user_inbounds.remove(child_client)
                     await remote.writer.write(closeSignalData(child_client.id))
-           
+
+            if globals.noise_ratio != 0:
+                data.packForSend(remote.id,remote.port.uint16,flags = {DataFlags.junk})
+                for _ in 0..<globals.noise_ratio:
+                    await remote.writer.write(data)
+                    if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
+                    
     except:
         if globals.log_conn_error: echo getCurrentExceptionMsg()
     #close
@@ -232,6 +238,13 @@ proc processConnection(client: Connection) {.async.} =
                     data.packForSend(client.id, client.port.uint16)
                 await remote.writer.write(data)
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
+                
+                if globals.noise_ratio != 0:
+                    data.flagForSend(flags = {DataFlags.junk})
+                    for _ in 0..<globals.noise_ratio:
+                        await remote.writer.write(data)
+                        if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
+                    
 
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()

@@ -1,6 +1,13 @@
 from globals import nil
 import random, strutils
 
+type
+    DataFlags* {.size: sizeof(uint8), pure.} = enum
+        junk
+
+
+    TransferFlags* = set[DataFlags]
+
 # proc `+`*(x: ptr[uint32],y:int): ptr[uint32] =
 
 #   return cast[ptr[uint32]](cast[uint](x) + y.uint)
@@ -79,8 +86,19 @@ proc unPackForRead*(data: var string) =
     decrypt data
 
 
-proc packForSend*(data: var string, cid: uint16, port: uint16, flags: uint8 = 0) =
+proc flagForSend*(data: var string, flags: TransferFlags) =
+    let width = globals.full_tls_record_len.int+sizeof(uint16)+sizeof(uint16) + sizeof(flags)
+    if data.len < width: data.setLen(width)
+
+    let size: uint16 = 0
+    copyMem(addr size, addr data[0 + globals.tls13_record_layer.len()], sizeof(size))
+
+    let e_flags: uint8 = cast[uint8](flags) xor size.uint8
+    copyMem(addr data[0 + globals.full_tls_record_len.int+sizeof(uint16)+sizeof(uint16)], addr e_flags, sizeof(e_flags))
+
+proc packForSend*(data: var string, cid: uint16, port: uint16, flags: TransferFlags = {}) =
     let width = globals.full_tls_record_len.int+sizeof(port)+sizeof(cid) + sizeof(flags)
+    if data.len < width: data.setLen(width)
 
     let size: uint16 = data.len().uint16 - globals.full_tls_record_len.uint16
     copyMem(addr data[0], addr globals.tls13_record_layer[0], globals.tls13_record_layer.len())
@@ -88,7 +106,7 @@ proc packForSend*(data: var string, cid: uint16, port: uint16, flags: uint8 = 0)
 
     let e_cid: uint16 = cid xor size
     let e_port: uint16 = port xor size
-    let e_flags: uint8 = flags xor size.uint8
+    let e_flags: uint8 = cast[uint8](flags) xor size.uint8
 
 
     copyMem(addr data[0 + globals.full_tls_record_len.int], addr e_cid, sizeof(e_cid))
