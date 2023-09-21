@@ -240,7 +240,7 @@ proc init*() =
                         mux_width = parseInt(p.val).uint32
                         print mux_width
 
-                    of "noise-ratio":
+                    of "noise":
                         noise_ratio = parseInt(p.val).uint32
                         print noise_ratio
 

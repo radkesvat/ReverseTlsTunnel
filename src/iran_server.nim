@@ -239,7 +239,7 @@ proc processConnection(client: Connection) {.async.} =
                 await remote.writer.write(data)
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
                 
-                if globals.noise_ratio != 0:
+                if globals.noise_ratio != 0 and remote.isTrusted:
                     data.flagForSend(flags = {DataFlags.junk})
                     for _ in 0..<globals.noise_ratio:
                         await remote.writer.write(data)
