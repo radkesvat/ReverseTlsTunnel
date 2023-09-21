@@ -64,7 +64,7 @@ proc acquireRemoteConnection(): Future[Connection] {.async.} =
                     continue
 
                 inc remote.counter
-                remote.exhausted = remote.counter == globals.mux_width
+                remote.exhausted = remote.counter >= globals.mux_width
                 return remote
         await sleepAsync(10)
     return nil

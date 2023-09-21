@@ -295,6 +295,10 @@ proc init*() =
         echo "specify the password  --password:{something}"
         exit = true
 
+    if mux_width == 0:
+        echo "mux-width cannot be less than 1 !"
+        exit = true
+
     if exit: quit("Application did not start due to above logs.")
 
     if terminate_secs != 0:
