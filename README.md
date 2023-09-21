@@ -30,7 +30,7 @@
 
 # نحوه استفاده 
 
- # روش اول (نصب با اسکریپت)
+ ## روش اول (نصب با اسکریپت)
  
  ```
  bash <(curl -fsSL https://raw.githubusercontent.com/Ptechgithub/ReverseTlsTunnel/main/RtTunnel.sh)
@@ -38,6 +38,8 @@
  
  ![1](https://raw.githubusercontent.com/Ptechgithub/configs/main/media/1.jpg)
  
+ 
+ ## روش دوم
 وارد پوشه ی مورد نظرتون برای نصب برنامه بشید مثلا /root
 و کلا برنامه یه فایل هست نصب خاصی نداره فقط فایل دانلود میشه توی همون مسیر که هستین و بهتره بوزر root باشین 
 
