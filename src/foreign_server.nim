@@ -109,7 +109,7 @@ proc processConnection(client: Connection) {.async.} =
 
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
-            
+
         #close
         try:
             if client.closed:
@@ -221,6 +221,7 @@ proc processConnection(client: Connection) {.async.} =
 
         #close
         poolFrame()
+        context.used_peer_outbounds.remove(client)
         context.free_peer_outbounds.remove(client)
         await client.closeWait()
 
