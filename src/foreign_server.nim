@@ -123,7 +123,7 @@ proc processConnection(client: Connection) {.async.} =
         await remote.closeWait()
 
     proc proccessClient() {.async.} =
-        var remote: Connection = nil
+       
         var data = newString(len = 0)
         var boundary: uint16 = 0
         var cid: uint16
@@ -136,15 +136,11 @@ proc processConnection(client: Connection) {.async.} =
                 data.setlen client.treader.tsource.offset
                 if data.len() == 0:
                     if client.treader.atEof():
-                        if client.isTrusted:
-                            break
-                        else:
-                            await closeLine(client, remote)
-                            return
+                        break
                     else:
                         discard await client.treader.readOnce(addr data, 0); continue
 
-                if client.isTrusted:
+         
                     if boundary == 0:
                         let width = int(globals.full_tls_record_len + globals.mux_record_len)
                         data.setLen width
@@ -170,8 +166,8 @@ proc processConnection(client: Connection) {.async.} =
                     let readable = min(boundary, data.len().uint16)
                     boundary -= readable; data.setlen readable
                     await client.treader.readExactly(addr data[0], readable.int)
-                else:
-                    await client.treader.readExactly(addr data[0], data.len)
+
+
                 if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes from client"
 
                 if DataFlags.junk in cast[TransferFlags](flag):
@@ -184,18 +180,17 @@ proc processConnection(client: Connection) {.async.} =
 
                     if context.outbounds.hasID(cid):
                         context.outbounds.with(cid, child_remote):
-                            remote = child_remote
                             if not isSet(child_remote.estabilished): await child_remote.estabilished.wait()
                             #write
                             if not child_remote.closed():
                                 await child_remote.writer.write(data)
-                                if globals.log_data_len: echo &"XXXXXXXXXXXXX[proccessClient] {data.len()} bytes -> remote"
+                                if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
                             else:
                                 await client.twriter.write(closeSignalData(cid))
                                 context.outbounds.remove cid
 
                     else:
-                        remote = await remoteTrusted(if globals.multi_port: port.Port else: globals.next_route_port)
+                        var remote = await remoteTrusted(if globals.multi_port: port.Port else: globals.next_route_port)
                         remote.id = cid
                         context.outbounds.register(remote)
                         asyncCheck processRemote(remote)
