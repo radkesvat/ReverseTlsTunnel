@@ -190,7 +190,7 @@ proc processConnection(client: Connection) {.async.} =
                                 context.outbounds.remove cid
 
                     else:
-                        var remote = await remoteTrusted(if globals.multi_port: port.Port else: globals.next_route_port)
+                        var remote= await remoteTrusted(if globals.multi_port: port.Port else: globals.next_route_port)
                         remote.id = cid
                         context.outbounds.register(remote)
                         asyncCheck processRemote(remote)
