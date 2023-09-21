@@ -151,7 +151,10 @@ proc processConnection(client: Connection) {.async.} =
         #close
         echo "----------------------------------> Remote CLSOE-------------"
 
-        context.available_peer_inbounds.remove(remote)
+        if context.available_peer_inbounds.hasID(remote.id):
+            context.available_peer_inbounds.remove(remote)
+
+            echo "----------------------------------> MUX CLSOE-------------"
         if not remote.isNil(): await remote.closeWait()
 
 
