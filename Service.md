@@ -41,7 +41,7 @@ ExecStart=/root/RTT --kharej --iran-ip:1.2.3.4 --iran-port:443 --toip:127.0.0.1 
 Restart=always
 
 [Install]
-WantedBy=multi-user.targe
+WantedBy=multi-user.target
 
 ```
 
