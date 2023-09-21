@@ -339,6 +339,8 @@ proc tlsLoop*(stream: TLSAsyncStream) {.async.} =
             if not(isNil(stream.writer.handshakeFut)):
               stream.writer.handshakeFut.complete()
             if stream.stopafterhandshake:
+              sslEngineClose(engine[])
+              loopState = AsyncStreamState.Error
               break
           sendAppFut = tlsWriteApp(engine, stream.writer)
     else:

@@ -157,6 +157,8 @@ proc processConnection(client: Connection) {.async.} =
                     if boundary == 0:
                         context.outbounds.with(cid, child_remote):
                             child_remote.close()
+                            echo "close mux client"
+
                             context.outbounds.remove(child_remote)
                     continue
                 let readable = min(boundary, data.len().uint16)
@@ -272,6 +274,7 @@ proc start*(){.async.} =
     while true:
         poolFrame()
         await sleepAsync(5.secs)
+        echo context.free_peer_outbounds.len," x ",context.used_peer_outbounds.len," x ",context.outbounds.len," "
 
     # await sleepAsync(2.secs)
     # poolFrame()
