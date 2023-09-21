@@ -261,7 +261,7 @@ template trackIdleConnections*(cons: var Connections, age: uint) =
             )
         proc tracker(){.async.} =
             while true:
-                await sleepAsync(1000)
+                await sleepAsync(age.int.secs)
                 checkAndRemove()
         asyncCheck tracker()
 
