@@ -112,7 +112,7 @@ proc processConnection(client: Connection) {.async.} =
 
         #close
         try:
-            if client.closed:
+            if client == nil or client.closed:
                 client = await acquireClientConnection()
                 if client != nil:
                     await client.twriter.write(closeSignalData(remote.id))

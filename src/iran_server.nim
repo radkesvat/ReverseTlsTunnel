@@ -102,8 +102,9 @@ proc processTrustedRemote(remote: Connection) {.async.} =
                 cid = cid xor boundary
                 boundary-=globals.mux_record_len.uint16
                 if boundary == 0:
+                    echo "--------------------------------------------- look at ", cid
                     context.user_inbounds.with(cid, child_client):
-                        echo "CLOSED CUZ SIGNAL ", cid
+                        echo "----------------------------------------------------- SIGNAL ", cid
                         child_client.close()
                         context.user_inbounds.remove(child_client)
                 continue
@@ -118,10 +119,7 @@ proc processTrustedRemote(remote: Connection) {.async.} =
                 if not child_client.closed:
                     await child_client.writer.write(data)
                     if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client "
-                else:
-                    context.user_inbounds.remove(child_client)
-                    await remote.writer.write(closeSignalData(child_client.id))
-
+  
             if globals.noise_ratio != 0:
                 data.packForSend(remote.id,remote.port.uint16,flags = {DataFlags.junk})
                 for _ in 0..<globals.noise_ratio:
