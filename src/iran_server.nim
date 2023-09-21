@@ -103,8 +103,8 @@ proc processTrustedRemote(remote: Connection) {.async.} =
                 boundary-=globals.mux_record_len.uint16
                 if boundary == 0:
                     context.user_inbounds.with(cid, child_client):
-                        child_client.close()
                         echo "CLOSED CUZ SIGNAL ", cid
+                        child_client.close()
                         context.user_inbounds.remove(child_client)
                 continue
             let readable = min(boundary, data.len().uint16)

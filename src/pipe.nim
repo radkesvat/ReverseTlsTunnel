@@ -129,7 +129,7 @@ proc closeSignalData*(cid: uint16): string =
     let e_cid: uint16 = cid xor size
 
     copyMem(addr data[0], addr globals.tls13_record_layer[0], globals.tls13_record_layer.len())
-    copyMem(addr data[0 + globals.tls13_record_layer.len], addr size, sizeof(size))
+    copyMem(addr data[0 + globals.tls13_record_layer.len()], addr size, sizeof(size))
 
 
     copyMem(addr data[0 + globals.full_tls_record_len.int], addr e_cid, sizeof(e_cid))

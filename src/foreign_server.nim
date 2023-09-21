@@ -114,7 +114,7 @@ proc processConnection(client: Connection) {.async.} =
         try:
             if client.closed:
                 client = await acquireClientConnection()
-                if client != nil: 
+                if client != nil:
                     await client.twriter.write(closeSignalData(remote.id))
                     echo "SENT CLOSE SIGNAL FOR ", remote.id
         except:
@@ -124,7 +124,7 @@ proc processConnection(client: Connection) {.async.} =
         await remote.closeWait()
 
     proc proccessClient() {.async.} =
-       
+
         var data = newString(len = 0)
         var boundary: uint16 = 0
         var cid: uint16
@@ -141,7 +141,7 @@ proc processConnection(client: Connection) {.async.} =
                     else:
                         discard await client.treader.readOnce(addr data, 0); continue
 
-         
+
                 if boundary == 0:
                     let width = int(globals.full_tls_record_len + globals.mux_record_len)
                     data.setLen width
@@ -154,7 +154,7 @@ proc processConnection(client: Connection) {.async.} =
                     cid = cid xor boundary
                     port = port xor boundary
                     flag = flag xor boundary.uint8
-                    boundary-=globals.mux_record_len.uint16
+                    boundary -= globals.mux_record_len.uint16
                     if boundary == 0:
                         context.outbounds.with(cid, child_remote):
                             context.outbounds.remove(child_remote)
@@ -176,7 +176,7 @@ proc processConnection(client: Connection) {.async.} =
                 if context.free_peer_outbounds.hasID(client.id):
                     context.free_peer_outbounds.remove(client)
                     context.used_peer_outbounds.register(client)
-                
+
                 #write
                 if client.isTrusted():
                     unPackForRead(data)
@@ -278,7 +278,7 @@ proc start*(){.async.} =
     while true:
         poolFrame()
         await sleepAsync(5.secs)
-        echo context.free_peer_outbounds.len," x ",context.used_peer_outbounds.len," x ",context.outbounds.len," "
+        echo context.free_peer_outbounds.len, " x ", context.used_peer_outbounds.len, " x ", context.outbounds.len, " "
 
     # await sleepAsync(2.secs)
     # poolFrame()
