@@ -241,8 +241,8 @@ proc poolFrame(create_count: uint = 0) =
             conn.trusted = TrustStatus.yes
 
             # conn.transp.reader.cancel()
-            # await stepsAsync(1)
-            # conn.transp.reader = nil
+            await stepsAsync(1)
+            conn.transp.reader = nil
 
             asyncCheck processConnection(conn)
             context.free_peer_outbounds.add conn
