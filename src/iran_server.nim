@@ -56,16 +56,17 @@ proc generateFinishHandShakeData(): string =
 proc acquireRemoteConnection(): Future[Connection] {.async.} =
     var remote: Connection = nil
     for i in 0..<200:
-        remote = context.available_peer_inbounds[0]
-        if remote != nil:
-            if remote.closed or remote.exhausted:
-                echo "----------------------------------> REM"
-                context.available_peer_inbounds.remove(remote)
-                continue
+        if  context.available_peer_inbounds.len != 0:
+            remote = context.available_peer_inbounds[0]
+            if remote != nil:
+                if remote.closed or remote.exhausted:
+                    echo "----------------------------------> REM"
+                    context.available_peer_inbounds.remove(remote)
+                    continue
 
-            inc remote.counter
-            remote.exhausted = remote.counter == globals.mux_width
-            return remote
+                inc remote.counter
+                remote.exhausted = remote.counter == globals.mux_width
+                return remote
         await sleepAsync(10)
     return nil
 
@@ -257,7 +258,7 @@ proc processConnection(client: Connection) {.async.} =
             client.trusted = TrustStatus.no
             remote = await acquireRemoteConnection() #associate peer
             if remote != nil:
-                if globals.log_conn_create: echo &"[createNewCon][Succ] Associated a peer connection"
+                if globals.log_conn_create: echo "Associated a peer connection, cid: ",remote.id
                 context.user_inbounds.register(client)
 
             else:
