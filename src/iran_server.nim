@@ -140,8 +140,6 @@ proc processConnection(client: Connection) {.async.} =
         else:
             await client.closeWait()
 
-
-
     proc processUntrustedRemote(remote: Connection) {.async.} =
         var data = newString(len = 0)
         try:
