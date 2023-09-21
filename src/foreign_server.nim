@@ -172,6 +172,10 @@ proc processConnection(client: Connection) {.async.} =
                     if globals.log_data_len: echo &"[proccessClient] {data.len()} discarded from client"
                     continue
 
+                if context.free_peer_outbounds.hasID(client.id):
+                    context.free_peer_outbounds.remove(client)
+                    context.used_peer_outbounds.register(client)
+                
                 #write
                 if client.isTrusted():
                     unPackForRead(data)
@@ -195,8 +199,7 @@ proc processConnection(client: Connection) {.async.} =
                         await remote.writer.write(data)
                         if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
                         poolFrame()
-                        context.free_peer_outbounds.remove(client)
-                        context.used_peer_outbounds.register(client)
+
 
                 # if client.trusted == TrustStatus.pending:
                 #     var trust = monitorData(data)
