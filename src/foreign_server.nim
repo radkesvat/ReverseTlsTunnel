@@ -175,6 +175,7 @@ proc processConnection(client: Connection) {.async.} =
                 if context.free_peer_outbounds.hasID(client.id):
                     context.free_peer_outbounds.remove(client)
                     context.used_peer_outbounds.register(client)
+                    poolFrame()
 
                 #write
                 if client.isTrusted():
@@ -196,7 +197,6 @@ proc processConnection(client: Connection) {.async.} =
                         asyncCheck processRemote(remote)
                         await remote.writer.write(data)
                         if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
-                        poolFrame()
 
 
 
@@ -232,9 +232,8 @@ proc poolFrame(create_count: uint = 0) =
             # conn.transp.reader = nil
 
             asyncCheck processConnection(conn)
-            context.free_peer_outbounds.add conn
-
             await conn.twriter.write(generateFinishHandShakeData())
+            context.free_peer_outbounds.add conn
 
         except TLSStreamProtocolError as exc:
             echo "Tls error, handshake failed because:"
@@ -253,9 +252,9 @@ proc poolFrame(create_count: uint = 0) =
         elif i < globals.pool_size:
             count = 1
 
-
-    for i in 0..<count:
-        asyncCheck create()
+    if count > 0:
+        for _ in 0..<count:
+            asyncCheck create()
 
 proc start*(){.async.} =
     echo &"Mode Foreign Server:  {globals.listen_addr} <-> ({globals.final_target_domain} with ip {globals.final_target_ip})"
@@ -264,7 +263,8 @@ proc start*(){.async.} =
     while true:
         poolFrame()
         await sleepAsync(5.secs)
-        echo context.free_peer_outbounds.len, " x ", context.used_peer_outbounds.len, " x ", context.outbounds.len, " "
+        echo "free: ",context.free_peer_outbounds.len,
+             "  iran: ", context.used_peer_outbounds.len, " core: ", context.outbounds.len
 
     # await sleepAsync(2.secs)
     # poolFrame()
