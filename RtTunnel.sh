@@ -63,10 +63,28 @@ configure_arguments() {
     if [ "$server_choice" == "2" ]; then
         read -p "Please Enter (IRAN IP) : " server_ip
         read -p "Please Enter Password (Please choose the same password on both servers): " password
-        arguments="--kharej --iran-ip:$server_ip --iran-port:443 --toip:127.0.0.1 --toport:multiport --password:$password --sni:$sni --terminate:24"
+
+        read -p "Do you want to use mux? (yes/no): " use_mux
+        if [ "$use_mux" == "yes" ]; then
+            read -p "Enter mux-width (default: 2): " mux_width
+            mux_width=${mux_width:-2}
+        else
+            mux_width=1
+        fi
+
+        arguments="--kharej --iran-ip:$server_ip --iran-port:443 --toip:127.0.0.1 --toport:multiport --password:$password --sni:$sni --mux-width:$mux_width --terminate:24"
     elif [ "$server_choice" == "1" ]; then
         read -p "Please Enter Password (Please choose the same password on both servers): " password
-        arguments="--iran --lport:23-65535 --sni:$sni --password:$password --terminate:24"
+
+        read -p "Do you want to use mux? (yes/no): " use_mux
+        if [ "$use_mux" == "yes" ]; then
+            read -p "Enter mux-width (default: 2): " mux_width
+            mux_width=${mux_width:-2}
+        else
+            mux_width=1
+        fi
+
+        arguments="--iran --lport:23-65535 --sni:$sni --password:$password --mux-width:$mux_width --terminate:24"
     else
         echo "Invalid choice. Please enter '1' or '2'."
         exit 1
