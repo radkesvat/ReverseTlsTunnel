@@ -74,7 +74,14 @@ configure_arguments() {
         arguments="--kharej --iran-ip:$server_ip --iran-port:443 --toip:127.0.0.1 --toport:multiport --password:$password --sni:$sni --mux-width:$mux_width --terminate:24"
     elif [ "$server_choice" == "1" ]; then
         read -p "Please Enter Password (Please choose the same password on both servers): " password
-        arguments="--iran --lport:23-65535 --sni:$sni --password:$password --mux-width:$mux_width --terminate:24"
+        read -p "Do you want to use fake upload? (yes/no): " use_fake_upload
+        if [ "$use_fake_upload" == "yes" ]; then
+            read -p "Enter upload-to-download ratio (e.g., 5 for 5:1 ratio): " upload_ratio
+            upload_ratio=$((upload_ratio - 1))
+            arguments="--iran --lport:23-65535 --sni:$sni --password:$password --mux-width:$mux_width --noise:$upload_ratio --terminate:24"
+        else
+            arguments="--iran --lport:23-65535 --sni:$sni --password:$password --mux-width:$mux_width --terminate:24"
+        fi
     else
         echo "Invalid choice. Please enter '1' or '2'."
         exit 1
@@ -152,7 +159,14 @@ configure_arguments2() {
 
     elif [ "$server_choice" == "1" ]; then
         read -p "Please Enter Password (Please choose the same password on both servers): " password
-        arguments="--iran --lport:23-65535 --password:$password --sni:$sni --mux-width:$mux_width --terminate:24"
+        read -p "Do you want to use fake upload? (yes/no): " use_fake_upload
+        if [ "$use_fake_upload" == "yes" ]; then
+            read -p "Enter upload-to-download ratio (e.g., 5 for 5:1 ratio): " upload_ratio
+            upload_ratio=$((upload_ratio - 1))
+            arguments="--iran --lport:23-65535 --password:$password --sni:$sni --mux-width:$mux_width --noise:$upload_ratio --terminate:24"
+        else
+            arguments="--iran --lport:23-65535 --password:$password --sni:$sni --mux-width:$mux_width --terminate:24"
+        fi
         
         num_ips=0
         while true; do
