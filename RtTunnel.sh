@@ -143,7 +143,12 @@ configure_arguments2() {
         read -p "Please Enter Password (Please choose the same password on both servers): " password
 
         if [ "$is_main_server" == "yes" ]; then
-            arguments="--kharej --iran-ip:$server_ip --iran-port:443 --toip:127.0.0.1 --toport:multiport --password:$password --sni:$sni --terminate:24"
+            read -p "Do you want to use mux? (yes/no): " use_mux
+            mux_width=2
+            if [ "$use_mux" == "no" ]; then
+                mux_width=1
+            fi
+            arguments="--kharej --iran-ip:$server_ip --iran-port:443 --toip:127.0.0.1 --toport:multiport --password:$password --sni:$sni --mux-width:$mux_width --terminate:24"
         elif [ "$is_main_server" == "no" ]; then
             read -p "Enter your main IP (VPN Server):  " main_ip
             arguments="--kharej --iran-ip:$server_ip --iran-port:443 --toip:$main_ip --toport:multiport --password:$password --sni:$sni --terminate:24"
@@ -154,7 +159,12 @@ configure_arguments2() {
 
     elif [ "$server_choice" == "1" ]; then
         read -p "Please Enter Password (Please choose the same password on both servers): " password
-        arguments="--iran --lport:23-65535 --password:$password --sni:$sni --terminate:24"
+        read -p "Do you want to use mux? (yes/no): " use_mux
+        mux_width=2
+        if [ "$use_mux" == "no" ]; then
+            mux_width=1
+        fi
+        arguments="--iran --lport:23-65535 --password:$password --sni:$sni --mux-width:$mux_width --terminate:24"
         
         num_ips=0
         while true; do
