@@ -164,7 +164,6 @@ nohup ./RTT --iran  --lport:443  --sni:splus.ir --password:123 &
 
 بازم اگه مشکلی خوردین و حل نشد issue بزنید تا چک کنیم 
 
-برای این تونل اپدیت  stable شدن Mux در برنامه است...
 
 * * *
 
