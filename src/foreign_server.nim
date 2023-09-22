@@ -117,9 +117,8 @@ proc processConnection(client: Connection) {.async.} =
                 client = await acquireClientConnection()
             if client != nil:   
                 await client.twriter.write(closeSignalData(remote.id))
-                await sleepAsync(5)
         except:
-            if globals.log_conn_error: echo getCurrentExceptionMsg()
+            echo getCurrentExceptionMsg()
 
         context.outbounds.remove(remote)
         remote.close()

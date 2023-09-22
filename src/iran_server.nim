@@ -112,12 +112,15 @@ proc processTrustedRemote(remote: Connection) {.async.} =
             if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
             
             # write
-            context.user_inbounds.with(cid, child_client):
-                unPackForRead(data)
-                if not child_client.closed:
-                    await child_client.writer.write(data)
-                    if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client "
-  
+            if  context.user_inbounds.hasID(cid):
+                context.user_inbounds.with(cid, child_client):
+                    unPackForRead(data)
+                    if not child_client.closed:
+                        await child_client.writer.write(data)
+                        if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client "
+            else:#golden line
+                await remote.writer.write(closeSignalData(cid))
+
             if globals.noise_ratio != 0:
                 data.packForSend(remote.id,remote.port.uint16,flags = {DataFlags.junk})
                 for _ in 0..<globals.noise_ratio:
@@ -250,9 +253,8 @@ proc processConnection(client: Connection) {.async.} =
                 remote = await acquireRemoteConnection()
             if remote != nil:
                 await remote.writer.write(closeSignalData(client.id))
-                await sleepAsync(5)
         except:
-            if globals.log_conn_error: echo getCurrentExceptionMsg()
+            echo getCurrentExceptionMsg()
 
         client.close()
         context.user_inbounds.remove(client)
