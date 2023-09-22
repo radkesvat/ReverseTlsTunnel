@@ -33,10 +33,10 @@
  ## روش اول (نصب با اسکریپت)
  
  ```
- bash <(curl -fsSL https://raw.githubusercontent.com/Ptechgithub/ReverseTlsTunnel/main/RtTunnel.sh)
+ bash <(curl -fsSL https://raw.githubusercontent.com/Ptechgithub/ReverseTlsTunnel/master/RtTunnel.sh)
  ```
  
- ![1](https://raw.githubusercontent.com/Ptechgithub/configs/master/media/1.jpg)
+ ![1](https://raw.githubusercontent.com/Ptechgithub/configs/main/media/1.jpg)
  
  - [آموزش در کانال @IR_TECH](https://youtube.com/watch?v=1mj1fhA2X6s)
 - به صورت سرویس نصب میشود 
