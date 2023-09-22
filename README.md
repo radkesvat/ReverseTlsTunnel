@@ -51,7 +51,7 @@
 
 با این دستور برنامه رو دانلود کنید هم سرور ایران و هم خارج
 ```sh
-wget  "https://raw.githubusercontent.com/radkesvat/ReverseTlsTunnel/main/install.sh" -O install.sh && chmod +x install.sh && bash install.sh 
+wget  "https://raw.githubusercontent.com/radkesvat/ReverseTlsTunnel/master/install.sh" -O install.sh && chmod +x install.sh && bash install.sh 
 ```
 
 و مراحل را دنبال کنید:
