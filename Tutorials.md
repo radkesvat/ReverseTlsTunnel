@@ -33,7 +33,7 @@
 
 
 
-آموزش ویدویی کانال Mr Bluepoint
+آموزش ویدویی کانال Mr Bluepoint  که لطف کردن یک اسکریپت برای نصب آسان و مدیریت ساده تر ارایه کردن.
 [لینک](https://www.youtube.com/watch?v=E5oyiKVSERE)
 
 
