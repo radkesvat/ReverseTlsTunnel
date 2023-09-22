@@ -30,6 +30,22 @@
 
 # نحوه استفاده 
 
+ ## روش اول (نصب با اسکریپت)
+ 
+ ```
+ bash <(curl -fsSL https://raw.githubusercontent.com/Ptechgithub/ReverseTlsTunnel/main/RtTunnel.sh)
+ ```
+ 
+ ![1](https://raw.githubusercontent.com/Ptechgithub/configs/main/media/1.jpg)
+ 
+ - [آموزش در کانال @IR_TECH](https://youtube.com/watch?v=1mj1fhA2X6s)
+- به صورت سرویس نصب میشود 
+- از پورت 23 تا 65535 میتوانید استفاده کنید. 
+- پورت 1 تا 22 قابل استفاده نیستند. 
+- از SNI و پسورد یکسان روی هر دو سرور جهت اتصال به یکدیگر استفاده کنید.
+- فایل RTT پس از کامپایل در مسیر ReverseTlsTunnel/dist ذخیره میشود.
+ 
+ ## روش دوم
 وارد پوشه ی مورد نظرتون برای نصب برنامه بشید مثلا /root
 و کلا برنامه یه فایل هست نصب خاصی نداره فقط فایل دانلود میشه توی همون مسیر که هستین و بهتره بوزر root باشین 
 
