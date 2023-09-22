@@ -162,7 +162,7 @@ configure_arguments2() {
 
     elif [ "$server_choice" == "1" ]; then
         read -p "Please Enter Password (Please choose the same password on both servers): " password
-        arguments="--iran --lport:23-65535 --password:$password --sni:$sni --terminate:24"
+        arguments="--iran --lport:23-65535 --password:$password --sni:$sni --mux-width:$mux_width --terminate:24"
         
         num_ips=0
         while true; do
