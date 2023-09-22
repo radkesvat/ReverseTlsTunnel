@@ -33,6 +33,11 @@
 
 
 
+آموزش ویدویی کانال Mr Bluepoint
+[لینک](https://www.youtube.com/watch?v=E5oyiKVSERE)
+
+
+
 
 ***
 آموزش متنی سگارو
