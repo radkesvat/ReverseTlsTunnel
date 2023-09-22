@@ -263,7 +263,8 @@ proc start*(){.async.} =
     while true:
         poolFrame()
         await sleepAsync(5.secs)
-        echo context.free_peer_outbounds.len, " x ", context.used_peer_outbounds.len, " x ", context.outbounds.len, " "
+        echo "free: ",context.free_peer_outbounds.len,
+             "  iran: ", context.used_peer_outbounds.len, " core: ", context.outbounds.len
 
     # await sleepAsync(2.secs)
     # poolFrame()
