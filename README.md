@@ -33,7 +33,7 @@
  ## روش اول (نصب با اسکریپت)
  
  ```
- bash <(curl -fsSL https://raw.githubusercontent.com/Ptechgithub/ReverseTlsTunnel/master/RtTunnel.sh)
+ bash <(curl -fsSL https://raw.githubusercontent.com/Ptechgithub/ReverseTlsTunnel/main/RtTunnel.sh)
  ```
  
  ![1](https://raw.githubusercontent.com/Ptechgithub/configs/main/media/1.jpg)
@@ -51,7 +51,7 @@
 
 با این دستور برنامه رو دانلود کنید هم سرور ایران و هم خارج
 ```sh
-wget  "https://raw.githubusercontent.com/radkesvat/ReverseTlsTunnel/master/install.sh" -O install.sh && chmod +x install.sh && bash install.sh 
+wget  "https://raw.githubusercontent.com/radkesvat/ReverseTlsTunnel/main/install.sh" -O install.sh && chmod +x install.sh && bash install.sh 
 ```
 
 و مراحل را دنبال کنید:
