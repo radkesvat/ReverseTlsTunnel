@@ -250,7 +250,7 @@ proc poolFrame(create_count: uint = 0) =
 
 
     if count == 0:
-        var i = context.free_peer_outbounds.len().uint + context.pending_free_outbounds
+        var i = uint(context.free_peer_outbounds.len() + context.pending_free_outbounds)
 
         if i < globals.pool_size div 2:
             count = 2 
