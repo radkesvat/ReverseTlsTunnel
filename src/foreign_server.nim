@@ -8,6 +8,7 @@ from globals import nil
 type
     ServerConnectionPoolContext = object
         free_peer_outbounds: Connections
+        pending_free_outbounds:int
         used_peer_outbounds: Connections
         outbounds: Connections
 
@@ -223,6 +224,7 @@ proc poolFrame(create_count: uint = 0) =
 
     proc create() {.async.} =
         try:
+            inc context.pending_free_outbounds
             var conn = await connect(initTAddress(globals.iran_addr, globals.iran_port), SocketScheme.Secure, globals.final_target_domain)
             echo "TlsHandsahke complete."
             conn.trusted = TrustStatus.yes
@@ -233,22 +235,25 @@ proc poolFrame(create_count: uint = 0) =
 
             asyncCheck processConnection(conn)
             await conn.twriter.write(generateFinishHandShakeData())
+            dec context.pending_free_outbounds
             context.free_peer_outbounds.add conn
 
         except TLSStreamProtocolError as exc:
             echo "Tls error, handshake failed because:"
             echo exc.msg
+            dec context.pending_free_outbounds
 
         except CatchableError as exc:
             echo "Connection failed because:"
             echo exc.name, ": ", exc.msg
+            dec context.pending_free_outbounds
 
 
     if count == 0:
-        var i = context.free_peer_outbounds.len().uint
+        var i = context.free_peer_outbounds.len().uint + context.pending_free_outbounds
 
         if i < globals.pool_size div 2:
-            count = 2
+            count = 2 
         elif i < globals.pool_size:
             count = 1
 
@@ -258,7 +263,7 @@ proc poolFrame(create_count: uint = 0) =
 
 proc start*(){.async.} =
     echo &"Mode Foreign Server:  {globals.listen_addr} <-> ({globals.final_target_domain} with ip {globals.final_target_ip})"
-    trackIdleConnections(context.free_peer_outbounds, globals.pool_age)
+    # trackIdleConnections(context.free_peer_outbounds, globals.pool_age)
     #just to make sure we always willing to connect to the peer
     while true:
         poolFrame()
