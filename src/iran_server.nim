@@ -56,7 +56,7 @@ proc generateFinishHandShakeData(): string =
 proc acquireRemoteConnection(): Future[Connection] {.async.} =
     var remote: Connection = nil
     for i in 0..<200:
-        if  context.available_peer_inbounds.len != 0:
+        if context.available_peer_inbounds.len != 0:
             remote = context.available_peer_inbounds[0]
             if remote != nil:
                 if remote.closed or remote.exhausted:
@@ -68,6 +68,7 @@ proc acquireRemoteConnection(): Future[Connection] {.async.} =
                 return remote
         await sleepAsync(10)
     return nil
+
 
 proc connectTargetSNI(): Future[Connection] {.async.} =
     let address = initTAddress(globals.final_target_ip, globals.final_target_port)
@@ -86,7 +87,7 @@ proc processTrustedRemote(remote: Connection) {.async.} =
             data.setlen remote.reader.tsource.offset
             if data.len() == 0:
                 if remote.reader.atEof():
-                    break      
+                    break
                 else:
                     discard await remote.reader.readOnce(addr data, 0)
                     continue
@@ -97,7 +98,7 @@ proc processTrustedRemote(remote: Connection) {.async.} =
                 await remote.reader.readExactly(addr data[0], width)
                 copyMem(addr boundary, addr data[3], sizeof(boundary))
                 if boundary == 0: break
-                
+
                 copyMem(addr cid, addr data[globals.full_tls_record_len], sizeof(cid))
                 cid = cid xor boundary
                 boundary-=globals.mux_record_len.uint16
@@ -110,23 +111,23 @@ proc processTrustedRemote(remote: Connection) {.async.} =
             boundary -= readable; data.setlen readable
             await remote.reader.readExactly(addr data[0], readable.int)
             if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
-            
+
             # write
-            if  context.user_inbounds.hasID(cid):
+            if context.user_inbounds.hasID(cid):
                 context.user_inbounds.with(cid, child_client):
                     unPackForRead(data)
                     if not child_client.closed:
                         await child_client.writer.write(data)
                         if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client "
-            else:#golden line
+            else:
                 await remote.writer.write(closeSignalData(cid))
 
             if globals.noise_ratio != 0:
-                data.packForSend(remote.id,remote.port.uint16,flags = {DataFlags.junk})
+                data.packForSend(remote.id, remote.port.uint16, flags = {DataFlags.junk})
                 for _ in 0..<globals.noise_ratio:
                     await remote.writer.write(data)
                     if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
-                    
+
     except:
         if globals.log_conn_error: echo getCurrentExceptionMsg()
     #close
@@ -154,10 +155,10 @@ proc processConnection(client: Connection) {.async.} =
                     else:
                         discard await remote.reader.readOnce(addr data, 0)
                         continue
-               
+
                 await remote.reader.readExactly(addr data[0], data.len)
                 if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
-                
+
                 # write
                 await client.writer.write(data)
                 if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client "
@@ -167,7 +168,7 @@ proc processConnection(client: Connection) {.async.} =
         await remote.closeWait()
         if not client.isTrusted():
             await client.closeWait()
-            
+
 
     proc processClient(remote: Connection) {.async.} =
         var remote = remote
@@ -194,7 +195,7 @@ proc processConnection(client: Connection) {.async.} =
 
                 #trust based route
                 if client.trusted == TrustStatus.pending:
-                  
+
                     var trust = monitorData(data)
                     if trust:
                         #peer connection
@@ -228,7 +229,7 @@ proc processConnection(client: Connection) {.async.} =
                 #write
                 if remote.closed:
                     remote = await acquireRemoteConnection()
-                    if remote == nil: 
+                    if remote == nil:
                         echo &"[Error] left without connection, closes forcefully."
                         await closeLine(client, remote); return
 
@@ -236,13 +237,13 @@ proc processConnection(client: Connection) {.async.} =
                     data.packForSend(client.id, client.port.uint16)
                 await remote.writer.write(data)
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
-                
+
                 if globals.noise_ratio != 0 and remote.isTrusted:
                     data.flagForSend(flags = {DataFlags.junk})
                     for _ in 0..<globals.noise_ratio:
                         await remote.writer.write(data)
                         if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
-                    
+
 
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
@@ -282,7 +283,7 @@ proc processConnection(client: Connection) {.async.} =
             client.trusted = TrustStatus.no
             remote = await acquireRemoteConnection() #associate peer
             if remote != nil:
-                if globals.log_conn_create: echo "Associated a peer connection, cid: ",remote.id
+                if globals.log_conn_create: echo "Associated a peer connection, cid: ", remote.id
                 context.user_inbounds.register(client)
 
             else:

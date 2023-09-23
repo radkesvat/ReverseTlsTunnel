@@ -179,25 +179,21 @@ proc processConnection(client: Connection) {.async.} =
                     poolFrame()
 
                 #write
-                if client.isTrusted():
-                    unPackForRead(data)
-
-                    if context.outbounds.hasID(cid):
-                        context.outbounds.with(cid, child_remote):
-                            if not isSet(child_remote.estabilished): await child_remote.estabilished.wait()
-                            #write
-                            if not child_remote.closed():
-                                await child_remote.writer.write(data)
-                                if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
-
-
-                    else:
-                        var remote = await remoteTrusted(if globals.multi_port: port.Port else: globals.next_route_port)
-                        remote.id = cid
-                        context.outbounds.register(remote)
-                        asyncCheck processRemote(remote)
-                        await remote.writer.write(data)
-                        if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
+                unPackForRead(data)
+                if context.outbounds.hasID(cid):
+                    context.outbounds.with(cid, child_remote):
+                        if not isSet(child_remote.estabilished): await child_remote.estabilished.wait()
+                        #write
+                        if not child_remote.closed():
+                            await child_remote.writer.write(data)
+                            if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
+                else:
+                    var remote = await remoteTrusted(if globals.multi_port: port.Port else: globals.next_route_port)
+                    remote.id = cid
+                    context.outbounds.register(remote)
+                    asyncCheck processRemote(remote)
+                    await remote.writer.write(data)
+                    if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
 
 
 
