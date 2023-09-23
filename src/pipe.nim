@@ -28,18 +28,14 @@ type
 
 # per byte = consume more cpu (testing)
 proc encrypt(data: var string, start = 0) =
-    var i = start
-    while i < data.len() - start:
+    for i in start..<data.len():
         # data[i] = chr(rotateRightBits(uint8(data[i]), globals.sh5))
-        data[i] = chr(cast[uint8](data[i]) xor cast[uint8](globals.sh5))
-        i += 1
-proc decrypt(data: var string) =
-    var i = 0
-    while i < data.len():
-        # data[i] = chr(rotateLeftBits(uint8(data[i]), globals.sh5))
-        data[i] = chr(cast[uint8](data[i]) xor cast[uint8](globals.sh5))
-        i += 1
+        data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
 
+proc decrypt(data: var string) =
+    for i in 0..<data.len():
+        # data[i] = chr(rotateLeftBits(uint8(data[i]), globals.sh5))
+        data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
 
 # proc muxPack(cid: uint32, port: uint16, data: string): string =
 #     result = newString(len = globals.mux_chunk_size)
