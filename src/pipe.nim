@@ -8,35 +8,35 @@ type
 
     TransferFlags* = set[DataFlags]
 
-proc `+`*(x: ptr[uint32],y:uint): ptr[uint32] =
-  return cast[ptr[uint32]](cast[uint](x) + y)
+# proc `+`*(x: ptr[uint32],y:uint): ptr[uint32] =
+#   return cast[ptr[uint32]](cast[uint](x) + y)
 
 # proc `+`(a:pointer,p:pointer): pointer =
 #   result = cast[pointer](cast[int](a) + 1 * sizeof(p))
   
-proc encrypt(data: var string, start = 0) =
-    let len = (data.len() - start) div 4
-    var address = cast[ptr[uint32]](addr data[start])
-    for i in 0..<len:
-        (address+i.uint)[] = `xor`((address+i.uint)[], globals.sh4)
+# proc encrypt(data_pure: var string, start = 0) =
+#     let len = (data.len() - start) div 4
+#     var data = cast[seq[uint32]](data_pure)
+#     for i in 0..<len:
+#         data[i] = `xor`(data[i], globals.sh4)
 
-
-proc decrypt(data: var string) =
-    var address =cast[ptr[uint32]](addr data[0])
-    for i in 0 ..< (data.len() div 4):
-        (address+i.uint)[] = `xor`((address+i.uint)[], globals.sh4)
-
-# per byte = consume more cpu (testing)
-# proc encrypt(data: var string, start = 0) =
-#     for i in start..<data.len():
-#         # data[i] = chr(rotateRightBits(uint8(data[i]), globals.sh5))
-#         data[i] = chr(cast[uint8](data[i]) xor cast[uint8](globals.sh5))
 
 # proc decrypt(data: var string) =
-#     for i in 0..<data.len():
-#         # data[i] = chr(rotateLeftBits(uint8(data[i]), globals.sh5))
+#     var address =cast[ptr[uint32]](addr data[0])
+#     for i in 0 ..< (data.len() div 4):
+#         (address+i.uint)[] = `xor`((address+i.uint)[], globals.sh4)
 
-#         data[i] = chr(cast[uint8](data[i]) xor cast[uint8](globals.sh5))
+# per byte = consume more cpu (testing)
+proc encrypt(data: var string, start = 0) =
+    for i in start..<data.len():
+        # data[i] = chr(rotateRightBits(uint8(data[i]), globals.sh5))
+        data[i] = chr(cast[uint8](data[i]) xor cast[uint8](globals.sh5))
+        # i +=2
+proc decrypt(data: var string) =
+    for i in 0..<data.len():
+        # data[i] = chr(rotateLeftBits(uint8(data[i]), globals.sh5))
+        data[i] = chr(cast[uint8](data[i]) xor cast[uint8](globals.sh5))
+        # i +=2
 
 
 # proc muxPack(cid: uint32, port: uint16, data: string): string =
