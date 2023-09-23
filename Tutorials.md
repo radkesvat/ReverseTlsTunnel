@@ -32,9 +32,13 @@
 [لینک](https://youtu.be/lkH-IP7-Jag)
 
 
+آموزش ویدویی کانال Mehran V2ray
+[لینک](https://www.youtube.com/watch?v=DiR5igPVVfc&t=29s)
+
 
 آموزش ویدویی کانال Mr Bluepoint  که لطف کردن یک اسکریپت برای نصب آسان و مدیریت ساده تر ارایه کردن.
 [لینک](https://www.youtube.com/watch?v=E5oyiKVSERE)
+
 
 
 
