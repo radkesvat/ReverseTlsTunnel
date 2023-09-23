@@ -31,12 +31,12 @@ proc encrypt(data: var string, start = 0) =
     for i in start..<data.len():
         # data[i] = chr(rotateRightBits(uint8(data[i]), globals.sh5))
         data[i] = chr(cast[uint8](data[i]) xor cast[uint8](globals.sh5))
-        # i +=2
+        i +=2
 proc decrypt(data: var string) =
     for i in 0..<data.len():
         # data[i] = chr(rotateLeftBits(uint8(data[i]), globals.sh5))
         data[i] = chr(cast[uint8](data[i]) xor cast[uint8](globals.sh5))
-        # i +=2
+        i +=2
 
 
 # proc muxPack(cid: uint32, port: uint16, data: string): string =
