@@ -220,9 +220,10 @@ proc processConnection(client: Connection) {.async.} =
                         if (epochTime().uint - client.creation_time) > globals.trust_time:
                             #user connection but no peer connected yet
                             #peer connection but couldnt finish handshake in time
-                            client.trusted = TrustStatus.no
-                            await closeLine(client, remote)
-                            return
+                            # client.trusted = TrustStatus.no
+                            # await closeLine(client, remote)
+                            # return
+                            discard
                     first_packet = false
 
 
