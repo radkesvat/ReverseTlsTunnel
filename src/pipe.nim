@@ -28,7 +28,7 @@ type
 
 # per byte = consume more cpu (testing)
 proc encrypt(data: var string, start = 0) =
-    var i = 0
+    var i = start
     for x in start..<data.len():
         # data[i] = chr(rotateRightBits(uint8(data[i]), globals.sh5))
         data[i] = chr(cast[uint8](data[i]) xor cast[uint8](globals.sh5))
