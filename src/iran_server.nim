@@ -265,7 +265,7 @@ proc processConnection(client: Connection) {.async.} =
                     remote.close()
                     if globals.log_conn_destory: echo "Closed a exhausted mux connection"
 
-            if remote == nil or remote.closed:
+            else:
                 remote = await acquireRemoteConnection()
                 if not (remote == nil or remote.closed):
                     await remote.writer.write(closeSignalData(client.id))
