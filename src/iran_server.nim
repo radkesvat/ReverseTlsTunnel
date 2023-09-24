@@ -252,7 +252,6 @@ proc processConnection(client: Connection) {.async.} =
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
         #close
-
         client.close()
         context.user_inbounds.remove(client)
 

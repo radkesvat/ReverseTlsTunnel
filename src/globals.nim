@@ -4,7 +4,7 @@ import checksums/sha1
 
 # export IpAddress
 
-const version = "4.5"
+const version = "4.6"
 
 type RunMode*{.pure.} = enum
     iran, kharej
@@ -12,10 +12,10 @@ type RunMode*{.pure.} = enum
 var mode*: RunMode = RunMode.iran
 
 # [Log Options]true
-const log_conn_create* = true
-const log_data_len* = false
-const log_conn_destory* = false
-const log_conn_error* = false
+var log_conn_create* = true
+var log_data_len* = false
+var log_conn_destory* = false
+var log_conn_error* = false
 
 # [TLS]
 let tls13_record_layer* = "\x17\x03\x03" 
@@ -251,6 +251,23 @@ proc init*() =
                     of "listen":
                         listen_addr = (p.val)
                         print listen_addr
+
+                    of "log":
+                        case (p.val).parseInt:
+                            of 0:
+                                log_conn_create = false
+                            of 1:
+                                discard
+
+                            of 2:
+                                log_conn_error = true
+                            of 3:
+                                log_conn_destory = true
+                            of 4:
+                                log_data_len = true
+                            else:
+                                quit &"Incorrect value {p.val} for option \"log\" "
+
                     else:
                         echo "Unkown argument ", p.key
                         quit(-1)
