@@ -130,7 +130,7 @@ proc processConnection(client: Connection) {.async.} =
         var cid: uint16
         var port: uint16
         var flag: uint8
-
+        var moved:bool = false
         try:
             while not client.closed:
                 #read
@@ -142,7 +142,8 @@ proc processConnection(client: Connection) {.async.} =
                         discard await client.treader.readOnce(addr data, 0); continue
 
                 
-                if context.free_peer_outbounds.hasID(client.id):
+                if not moved and context.free_peer_outbounds.hasID(client.id):
+                    moved = true
                     context.free_peer_outbounds.remove(client)
                     context.used_peer_outbounds.register(client)
                     poolFrame()
