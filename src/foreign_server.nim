@@ -141,6 +141,12 @@ proc processConnection(client: Connection) {.async.} =
                     else:
                         discard await client.treader.readOnce(addr data, 0); continue
 
+                
+                if context.free_peer_outbounds.hasID(client.id):
+                    context.free_peer_outbounds.remove(client)
+                    context.used_peer_outbounds.register(client)
+                    poolFrame()
+
 
                 if boundary == 0:
                     let width = int(globals.full_tls_record_len + globals.mux_record_len)
@@ -165,18 +171,13 @@ proc processConnection(client: Connection) {.async.} =
                 let readable = min(boundary, data.len().uint16)
                 boundary -= readable; data.setlen readable
                 await client.treader.readExactly(addr data[0], readable.int)
-
-
                 if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes from client"
+
+
 
                 if DataFlags.junk in cast[TransferFlags](flag):
                     if globals.log_data_len: echo &"[proccessClient] {data.len()} discarded from client"
                     continue
-
-                if context.free_peer_outbounds.hasID(client.id):
-                    context.free_peer_outbounds.remove(client)
-                    context.used_peer_outbounds.register(client)
-                    poolFrame()
 
                 #write
                 unPackForRead(data)
@@ -194,8 +195,6 @@ proc processConnection(client: Connection) {.async.} =
                     asyncCheck processRemote(remote)
                     await remote.writer.write(data)
                     if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
-
-
 
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
