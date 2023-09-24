@@ -160,8 +160,9 @@ proc processConnection(client: Connection) {.async.} =
                 if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
 
                 # write
-                await client.writer.write(data)
-                if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client "
+                if not client.closed:
+                    await client.writer.write(data)
+                    if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client "
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
         #close
@@ -231,12 +232,13 @@ proc processConnection(client: Connection) {.async.} =
                 if remote.closed:
                     remote = await acquireRemoteConnection()
                     if remote == nil:
-                        echo &"[Error] left without connection, closes forcefully."
+                        if globals.log_conn_error: echo &"[Error] left without connection, closes forcefully."
                         await closeLine(client, remote); return
 
                 if remote.isTrusted:
                     data.packForSend(client.id, client.port.uint16)
                 await remote.writer.write(data)
+
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
 
                 if globals.noise_ratio != 0 and remote.isTrusted:
@@ -249,24 +251,27 @@ proc processConnection(client: Connection) {.async.} =
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
-        #close 
-        
+        #close
+
         client.close()
         context.user_inbounds.remove(client)
+
+
         try:
-            if remote == nil or remote.closed:
-                remote = await acquireRemoteConnection()
-            if remote != nil:
+            if not (remote == nil or remote.closed):
                 await remote.writer.write(closeSignalData(client.id))
                 remote.counter.dec
                 if remote.counter <= 0 and remote.exhausted:
                     context.available_peer_inbounds.remove(remote)
                     remote.close()
-                    echo "Closed a exhausted mux connection"
+                    if globals.log_conn_destory: echo "Closed a exhausted mux connection"
+
+            if remote == nil or remote.closed:
+                remote = await acquireRemoteConnection()
+                if not (remote == nil or remote.closed):
+                    await remote.writer.write(closeSignalData(client.id))
         except:
             echo getCurrentExceptionMsg()
-
-
 
 
 
