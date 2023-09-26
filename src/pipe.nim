@@ -26,16 +26,18 @@ type
 #     for i in 0 ..< (data.len() div 4):
 #         (address+i.uint)[] = `xor`((address+i.uint)[], globals.sh4)
 
-# per byte = consume more cpu (testing)
 proc encrypt(data: var string, start = 0) =
-    for i in start..<data.len():
-        # data[i] = chr(rotateRightBits(uint8(data[i]), globals.sh5))
-        data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
+    var i: int = start
+    while i < data.len():
+        data[i] = chr(uint8(data[i]) xor cast[uint8](0xabcdef))
+        i += 4
 
 proc decrypt(data: var string) =
-    for i in 0..<data.len():
-        # data[i] = chr(rotateLeftBits(uint8(data[i]), globals.sh5))
-        data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
+    var i: int = 0
+    while i < data.len():
+        data[i] = chr(uint8(data[i]) xor cast[uint8](0xabcdef))
+        i += 4
+    
 
 # proc muxPack(cid: uint32, port: uint16, data: string): string =
 #     result = newString(len = globals.mux_chunk_size)
