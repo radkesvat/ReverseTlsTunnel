@@ -269,7 +269,7 @@ proc processConnection(client: Connection) {.async.} =
                 await remote.writer.write(closeSignalData(client.id))     
 
         except:
-            echo getCurrentExceptionMsg()
+            if globals.log_conn_error: echo getCurrentExceptionMsg()
 
 
     #Initialize remote

@@ -175,7 +175,6 @@ proc processConnection(client: Connection) {.async.} =
                 if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes from client"
 
 
-
                 if DataFlags.junk in cast[TransferFlags](flag):
                     if globals.log_data_len: echo &"[proccessClient] {data.len()} discarded from client"
                     continue
@@ -201,9 +200,10 @@ proc processConnection(client: Connection) {.async.} =
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
         #close
-        poolFrame()
         context.used_peer_outbounds.remove(client)
         context.free_peer_outbounds.remove(client)
+        poolFrame()
+
         await client.closeWait()
 
 
