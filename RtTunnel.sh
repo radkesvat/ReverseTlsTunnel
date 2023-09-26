@@ -49,38 +49,81 @@ check_installed() {
     fi
 }
 
+# last or custom version
+install_selected_version() {
+    read -p "Do you want to install the Latest version? [yes/no] default: yes): " choice
+
+    if [[ "$choice" == "no" ]]; then
+        install_rtt_custom
+    else
+        install_rtt
+    fi
+}
+
 # Function to download and install RTT
 install_rtt() {
     wget "https://raw.githubusercontent.com/radkesvat/ReverseTlsTunnel/master/install.sh" -O install.sh && chmod +x install.sh && bash install.sh
 }
 
+
+#custom version
+install_rtt_custom() {
+    if pgrep -x "RTT" > /dev/null; then
+        echo "Tunnel is running! You must stop the tunnel before update. (pkill RTT)"
+        echo "Update is canceled."
+        exit
+    fi
+    # Get custom version
+    read -p "Please Enter your custom version (e.g : 3.6) : " version
+    apt-get update -y
+
+    echo "Downloading ReverseTlsTunnel version : $version"
+
+    printf "\n"
+
+    case $(uname -m) in
+        x86_64)  URL="https://github.com/radkesvat/ReverseTlsTunnel/releases/download/V$version/v${version}_linux_amd64.zip" ;;
+        arm)     URL="https://github.com/radkesvat/ReverseTlsTunnel/releases/download/V$version/v${version}_linux_arm64.zip" ;;
+        aarch64) URL="https://github.com/radkesvat/ReverseTlsTunnel/releases/download/V$version/v${version}_linux_arm64.zip" ;;
+        *)       echo "Unable to determine system architecture."; exit 1 ;;
+    esac
+
+    wget $URL -O v${version}_linux_amd64.zip
+    unzip -o v${version}_linux_amd64.zip
+    chmod +x RTT
+    rm v${version}_linux_amd64.zip
+
+    echo "Finished."
+}
+
+
 # Function to configure arguments based on user's choice
 configure_arguments() {
-    read -p "Which server do you want to use? (Enter '1' for Iran or '2' for Kharej) : " server_choice
-    read -p "Please Enter SNI (default : splus.ir): " sni
-    sni=${sni:-splus.ir}
+    read -p "Which server do you want to use? (Enter '1' for Iran(internal-server) or '2' for Kharej(external-server) ) : " server_choice
+    read -p "Please Enter SNI (default : sheypoor.com): " sni
+    sni=${sni:-sheypoor.com}
     read -p "Do you want to use mux? (yes/no): " use_mux
     mux_width=2
     if [ "$use_mux" == "yes" ]; then
         read -p "Enter mux-width (default: 2): " mux_width
         mux_width=${mux_width:-2}
-    else
-        mux_width=1
+        mux_argument="--mux-width:$mux_width"
     fi
 
+
     if [ "$server_choice" == "2" ]; then
-        read -p "Please Enter (IRAN IP) : " server_ip
+        read -p "Please Enter (IRAN IP(internal-server)) : " server_ip
         read -p "Please Enter Password (Please choose the same password on both servers): " password
-        arguments="--kharej --iran-ip:$server_ip --iran-port:443 --toip:127.0.0.1 --toport:multiport --password:$password --sni:$sni --mux-width:$mux_width --terminate:24"
+        arguments="--kharej --iran-ip:$server_ip --iran-port:443 --toip:127.0.0.1 --toport:multiport --password:$password --sni:$sni $mux_argument--terminate:24"
     elif [ "$server_choice" == "1" ]; then
         read -p "Please Enter Password (Please choose the same password on both servers): " password
         read -p "Do you want to use fake upload? (yes/no): " use_fake_upload
         if [ "$use_fake_upload" == "yes" ]; then
             read -p "Enter upload-to-download ratio (e.g., 5 for 5:1 ratio): " upload_ratio
             upload_ratio=$((upload_ratio - 1))
-            arguments="--iran --lport:23-65535 --sni:$sni --password:$password --mux-width:$mux_width --noise:$upload_ratio --terminate:24"
+            arguments="--iran --lport:23-65535 --sni:$sni --password:$password $mux_argument--noise:$upload_ratio --terminate:24"
         else
-            arguments="--iran --lport:23-65535 --sni:$sni --password:$password --mux-width:$mux_width --terminate:24"
+            arguments="--iran --lport:23-65535 --sni:$sni --password:$password $mux_argument--terminate:24"
         fi
     else
         echo "Invalid choice. Please enter '1' or '2'."
@@ -93,7 +136,7 @@ install() {
     root_access
     check_dependencies
     check_installed
-    install_rtt
+    install_selected_version
     # Change directory to /etc/systemd/system
     cd /etc/systemd/system
 
@@ -130,28 +173,27 @@ check_lbinstalled() {
 
 # Function to configure arguments2 based on user's choice
 configure_arguments2() {
-    read -p "Which server do you want to use? (Enter '1' for Iran or '2' for Kharej) : " server_choice
-    read -p "Please Enter SNI (default : splus.ir): " sni
-    sni=${sni:-splus.ir}
+    read -p "Which server do you want to use? (Enter '1' for Iran(internal-server) or '2' for Kharej(external-server) ) : " server_choice
+    read -p "Please Enter SNI (default : sheypoor.com): " sni
+    sni=${sni:-sheypoor.com}
     read -p "Do you want to use mux? (yes/no): " use_mux
     mux_width=2
     if [ "$use_mux" == "yes" ]; then
         read -p "Enter mux-width (default: 2): " mux_width
         mux_width=${mux_width:-2}
-    else
-        mux_width=1
+        mux_argument="--mux-width:$mux_width"
     fi
 
     if [ "$server_choice" == "2" ]; then
         read -p "Is this your main server (VPN server)? (yes/no): " is_main_server
-        read -p "Please Enter (IRAN IP) : " server_ip
+        read -p "Please Enter (IRAN IP(internal-server)) : " server_ip
         read -p "Please Enter Password (Please choose the same password on both servers): " password
 
         if [ "$is_main_server" == "yes" ]; then
-            arguments="--kharej --iran-ip:$server_ip --iran-port:443 --toip:127.0.0.1 --toport:multiport --password:$password --sni:$sni --mux-width:$mux_width --terminate:24"
+            arguments="--kharej --iran-ip:$server_ip --iran-port:443 --toip:127.0.0.1 --toport:multiport --password:$password --sni:$sni $mux_argument--terminate:24"
         elif [ "$is_main_server" == "no" ]; then
             read -p "Enter your main IP (VPN Server):  " main_ip
-            arguments="--kharej --iran-ip:$server_ip --iran-port:443 --toip:$main_ip --toport:multiport --password:$password --sni:$sni --mux-width:$mux_width --terminate:24"
+            arguments="--kharej --iran-ip:$server_ip --iran-port:443 --toip:$main_ip --toport:multiport --password:$password --sni:$sni $mux_argument--terminate:24"
         else
             echo "Invalid choice for main server. Please enter 'yes' or 'no'."
             exit 1
@@ -163,9 +205,9 @@ configure_arguments2() {
         if [ "$use_fake_upload" == "yes" ]; then
             read -p "Enter upload-to-download ratio (e.g., 5 for 5:1 ratio): " upload_ratio
             upload_ratio=$((upload_ratio - 1))
-            arguments="--iran --lport:23-65535 --password:$password --sni:$sni --mux-width:$mux_width --noise:$upload_ratio --terminate:24"
+            arguments="--iran --lport:23-65535 --password:$password --sni:$sni $mux_argument--noise:$upload_ratio --terminate:24"
         else
-            arguments="--iran --lport:23-65535 --password:$password --sni:$sni --mux-width:$mux_width --terminate:24"
+            arguments="--iran --lport:23-65535 --password:$password --sni:$sni $mux_argument--terminate:24"
         fi
         
         num_ips=0
@@ -191,7 +233,7 @@ load-balancer() {
     root_access
     check_dependencies
     check_lbinstalled
-    install_rtt
+    install_selected_version
     # Change directory to /etc/systemd/system
     cd /etc/systemd/system
     configure_arguments2
@@ -232,7 +274,7 @@ lb_uninstall() {
     sudo rm /etc/systemd/system/lbtunnel.service
     sudo systemctl reset-failed
     sudo rm RTT
-    sudo rm install.sh
+    sudo rm install.sh 2>/dev/nul
 
     echo "Uninstallation completed successfully."
 }
@@ -253,7 +295,7 @@ uninstall() {
     sudo rm /etc/systemd/system/tunnel.service
     sudo systemctl reset-failed
     sudo rm RTT
-    sudo rm install.sh
+    sudo rm install.sh 2>/dev/nul
 
     echo "Uninstallation completed successfully."
 }
