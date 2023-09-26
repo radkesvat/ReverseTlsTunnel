@@ -221,18 +221,25 @@ proc poolFrame(create_count: uint = 0) =
     proc create() {.async.} =
         try:
             inc context.pending_free_outbounds
-            var conn = await connect(initTAddress(globals.iran_addr, globals.iran_port), SocketScheme.Secure, globals.final_target_domain)
-            if globals.log_conn_create: echo "TlsHandsahke complete."
-            conn.trusted = TrustStatus.yes
+            var con_fut =  connect(initTAddress(globals.iran_addr, globals.iran_port), SocketScheme.Secure, globals.final_target_domain)
+            var notimeout = await withTimeout(con_fut,3.secs)
+            if notimeout :
+                var conn = con_fut.read()
+                if globals.log_conn_create: echo "TlsHandsahke complete."
+                conn.trusted = TrustStatus.yes
 
-            # conn.transp.reader.cancel()
-            # await stepsAsync(1)
-            # conn.transp.reader = nil
 
-            asyncCheck processConnection(conn)
-            await conn.twriter.write(generateFinishHandShakeData())
+                context.free_peer_outbounds.add conn                
+                asyncCheck processConnection(conn)
+                await conn.twriter.write(generateFinishHandShakeData())
+
+            else:
+                if globals.log_conn_create: echo "Connecting to iran Timed-out!"
+                
+
             dec context.pending_free_outbounds
-            context.free_peer_outbounds.add conn
+
+           
 
         except TLSStreamProtocolError as exc:
             if globals.log_conn_create: echo "Tls error, handshake failed because:"
