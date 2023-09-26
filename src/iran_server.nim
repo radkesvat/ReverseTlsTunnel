@@ -209,7 +209,6 @@ proc processConnection(client: Connection) {.async.} =
                         remote.close() # close untrusted remote
                         asyncCheck processTrustedRemote(client)
 
-                        # await client.writer.write(generateFinishHandShakeData())
                         return
                     else:
                         if first_packet:

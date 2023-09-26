@@ -253,14 +253,14 @@ proc poolFrame(create_count: uint = 0) =
         elif i < globals.pool_size:
             count = 1
 
-    if count > 0:
+    if count > 0: #yea yea yea yea but for testing, compiler knows what to do here :)
         for _ in 0..<count:
             asyncCheck create()
 
 proc start*(){.async.} =
     echo &"Mode Foreign Server:  {globals.listen_addr} <-> ({globals.final_target_domain} with ip {globals.final_target_ip})"
     # trackIdleConnections(context.free_peer_outbounds, globals.pool_age)
-    #just to make sure we always willing to connect to the peer
+    # just to make sure we always willing to connect to the peer
     while true:
         poolFrame()
         await sleepAsync(5.secs)
