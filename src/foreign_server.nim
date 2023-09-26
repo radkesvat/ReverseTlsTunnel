@@ -8,6 +8,7 @@ from globals import nil
 type
     ServerConnectionPoolContext = object
         free_peer_outbounds: Connections
+        pending_free_outbounds:int
         used_peer_outbounds: Connections
         outbounds: Connections
 
@@ -117,10 +118,10 @@ proc processConnection(client: Connection) {.async.} =
             if client != nil:   
                 await client.twriter.write(closeSignalData(remote.id))
         except:
-            if globals.log_conn_error: echo getCurrentExceptionMsg()
+             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
         context.outbounds.remove(remote)
-        await remote.closeWait()
+        remote.close()
 
     proc proccessClient() {.async.} =
 
@@ -129,7 +130,7 @@ proc processConnection(client: Connection) {.async.} =
         var cid: uint16
         var port: uint16
         var flag: uint8
-
+        var moved:bool = false
         try:
             while not client.closed:
                 #read
@@ -139,6 +140,13 @@ proc processConnection(client: Connection) {.async.} =
                         break
                     else:
                         discard await client.treader.readOnce(addr data, 0); continue
+
+                
+                if not moved and context.free_peer_outbounds.hasID(client.id):
+                    moved = true
+                    context.free_peer_outbounds.remove(client)
+                    context.used_peer_outbounds.register(client)
+                    poolFrame()
 
 
                 if boundary == 0:
@@ -164,49 +172,38 @@ proc processConnection(client: Connection) {.async.} =
                 let readable = min(boundary, data.len().uint16)
                 boundary -= readable; data.setlen readable
                 await client.treader.readExactly(addr data[0], readable.int)
-
-
                 if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes from client"
+
 
                 if DataFlags.junk in cast[TransferFlags](flag):
                     if globals.log_data_len: echo &"[proccessClient] {data.len()} discarded from client"
                     continue
 
-                if context.free_peer_outbounds.hasID(client.id):
-                    context.free_peer_outbounds.remove(client)
-                    context.used_peer_outbounds.register(client)
-                    poolFrame()
-
                 #write
-                if client.isTrusted():
-                    unPackForRead(data)
-
-                    if context.outbounds.hasID(cid):
-                        context.outbounds.with(cid, child_remote):
-                            if not isSet(child_remote.estabilished): await child_remote.estabilished.wait()
-                            #write
-                            if not child_remote.closed():
-                                await child_remote.writer.write(data)
-                                if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
-
-
-                    else:
-                        var remote = await remoteTrusted(if globals.multi_port: port.Port else: globals.next_route_port)
-                        remote.id = cid
-                        context.outbounds.register(remote)
-                        asyncCheck processRemote(remote)
-                        await remote.writer.write(data)
-                        if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
-
-
+                unPackForRead(data)
+                if context.outbounds.hasID(cid):
+                    context.outbounds.with(cid, child_remote):
+                        if not isSet(child_remote.estabilished): await child_remote.estabilished.wait()
+                        #write
+                        if not child_remote.closed():
+                            await child_remote.writer.write(data)
+                            if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
+                else:
+                    var remote = await remoteTrusted(if globals.multi_port: port.Port else: globals.next_route_port)
+                    remote.id = cid
+                    context.outbounds.register(remote)
+                    asyncCheck processRemote(remote)
+                    await remote.writer.write(data)
+                    if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
 
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
         #close
-        poolFrame()
         context.used_peer_outbounds.remove(client)
         context.free_peer_outbounds.remove(client)
+        poolFrame()
+
         await client.closeWait()
 
 
@@ -223,43 +220,54 @@ proc poolFrame(create_count: uint = 0) =
 
     proc create() {.async.} =
         try:
-            var conn = await connect(initTAddress(globals.iran_addr, globals.iran_port), SocketScheme.Secure, globals.final_target_domain)
-            echo "TlsHandsahke complete."
-            conn.trusted = TrustStatus.yes
+            inc context.pending_free_outbounds
+            var con_fut =  connect(initTAddress(globals.iran_addr, globals.iran_port), SocketScheme.Secure, globals.final_target_domain)
+            var notimeout = await withTimeout(con_fut,3.secs)
+            if notimeout :
+                var conn = con_fut.read()
+                if globals.log_conn_create: echo "TlsHandsahke complete."
+                conn.trusted = TrustStatus.yes
 
-            # conn.transp.reader.cancel()
-            # await stepsAsync(1)
-            # conn.transp.reader = nil
 
-            asyncCheck processConnection(conn)
-            await conn.twriter.write(generateFinishHandShakeData())
-            context.free_peer_outbounds.add conn
+                context.free_peer_outbounds.add conn                
+                asyncCheck processConnection(conn)
+                await conn.twriter.write(generateFinishHandShakeData())
+
+            else:
+                if globals.log_conn_create: echo "Connecting to iran Timed-out!"
+                
+
+            dec context.pending_free_outbounds
+
+           
 
         except TLSStreamProtocolError as exc:
-            echo "Tls error, handshake failed because:"
+            if globals.log_conn_create: echo "Tls error, handshake failed because:"
             echo exc.msg
+            dec context.pending_free_outbounds
 
         except CatchableError as exc:
-            echo "Connection failed because:"
+            if globals.log_conn_create: echo "Connection failed because:"
             echo exc.name, ": ", exc.msg
+            dec context.pending_free_outbounds
 
 
     if count == 0:
-        var i = context.free_peer_outbounds.len().uint
+        var i = uint(context.free_peer_outbounds.len() + context.pending_free_outbounds)
 
         if i < globals.pool_size div 2:
-            count = 2
+            count = 2 
         elif i < globals.pool_size:
             count = 1
 
-    if count > 0:
+    if count > 0: #yea yea yea yea but for testing, compiler knows what to do here :)
         for _ in 0..<count:
             asyncCheck create()
 
 proc start*(){.async.} =
     echo &"Mode Foreign Server:  {globals.listen_addr} <-> ({globals.final_target_domain} with ip {globals.final_target_ip})"
-    trackIdleConnections(context.free_peer_outbounds, globals.pool_age)
-    #just to make sure we always willing to connect to the peer
+    # trackIdleConnections(context.free_peer_outbounds, globals.pool_age)
+    # just to make sure we always willing to connect to the peer
     while true:
         poolFrame()
         await sleepAsync(5.secs)

@@ -76,6 +76,8 @@ task build_server, "builds server":
         switch("passL", " -s")
         switch("debuginfo", "off")
         switch("passC", "-DNDEBUG")
+        switch("passC", "-flto")
+        switch("passL", "-flto")
 
         switch("obj_checks","off")
         switch("field_checks","off")

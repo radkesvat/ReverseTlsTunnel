@@ -4,7 +4,7 @@ import checksums/sha1
 
 # export IpAddress
 
-const version = "4.2"
+const version = "4.9"
 
 type RunMode*{.pure.} = enum
     iran, kharej
@@ -12,10 +12,10 @@ type RunMode*{.pure.} = enum
 var mode*: RunMode = RunMode.iran
 
 # [Log Options]true
-const log_conn_create* = true
-const log_data_len* = false
-const log_conn_destory* = false
-const log_conn_error* = false
+var log_conn_create* = true
+var log_data_len* = false
+var log_conn_destory* = false
+var log_conn_error* = false
 
 # [TLS]
 let tls13_record_layer* = "\x17\x03\x03" 
@@ -25,12 +25,12 @@ let full_tls_record_len*:uint = tls13_record_layer.len().uint + tls13_record_lay
 
 # [Connection]
 var trust_time*: uint = 3 #secs
-var pool_size*: uint = 16
+var pool_size*: uint = 24
 var pool_age*: uint = 60
-var max_idle_time*: uint = 600 #secs (default TCP RFC is 3600)
 var max_pool_unused_time*: uint = 60 #secs
 let mux_record_len*:uint32 = 5 #2bytes port 2bytes id 1byte reserved
-var mux_width*:uint32 = 2
+var mux_width*:uint32 = 1 # 1 -> disabeld
+
 
 # [Noise]
 var noise_ratio*:uint = 0
@@ -251,6 +251,23 @@ proc init*() =
                     of "listen":
                         listen_addr = (p.val)
                         print listen_addr
+
+                    of "log":
+                        case (p.val).parseInt:
+                            of 0:
+                                log_conn_create = false
+                            of 1:
+                                discard
+
+                            of 2:
+                                log_conn_error = true
+                            of 3:
+                                log_conn_destory = true
+                            of 4:
+                                log_data_len = true
+                            else:
+                                quit &"Incorrect value {p.val} for option \"log\" "
+
                     else:
                         echo "Unkown argument ", p.key
                         quit(-1)
@@ -324,6 +341,7 @@ proc init*() =
     while sh5 <= 2.uint32 or sh5 >= 223.uint32:
         sh5 = hash(sh5).uint8
 
-
+    if mux_width > 1:
+        pool_size = pool_size div 2
     print password, password_hash, sh1, sh2, sh3, pool_size
     print "\n"
