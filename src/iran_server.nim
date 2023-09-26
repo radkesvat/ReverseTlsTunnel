@@ -262,7 +262,7 @@ proc processConnection(client: Connection) {.async.} =
                 if remote != nil:
                     await remote.writer.write(closeSignalData(client.id))     
             else:
-                await remote.writer.write(closeSignalData(client.id))     
+                await remote.writer.write(closeSignalData(client.id))
                 remote.counter.dec
                 if remote.exhausted and remote.counter == 0:
                     context.available_peer_inbounds.remove(remote)
