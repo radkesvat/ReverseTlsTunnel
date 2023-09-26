@@ -29,14 +29,14 @@ type
 proc encrypt(data: var string, start = 0) =
     var i: int = start
     while i < data.len():
-        data[i] = chr(uint8(data[i]) xor cast[uint8](0xabcdef))
-        i += 4
+        data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
+        i += 1
 
 proc decrypt(data: var string) =
     var i: int = 0
     while i < data.len():
-        data[i] = chr(uint8(data[i]) xor cast[uint8](0xabcdef))
-        i += 4
+        data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
+        i += 1
     
 
 # proc muxPack(cid: uint32, port: uint16, data: string): string =
