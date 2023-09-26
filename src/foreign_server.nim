@@ -118,7 +118,7 @@ proc processConnection(client: Connection) {.async.} =
             if client != nil:   
                 await client.twriter.write(closeSignalData(remote.id))
         except:
-            echo getCurrentExceptionMsg()
+             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
         context.outbounds.remove(remote)
         remote.close()
@@ -222,7 +222,7 @@ proc poolFrame(create_count: uint = 0) =
         try:
             inc context.pending_free_outbounds
             var conn = await connect(initTAddress(globals.iran_addr, globals.iran_port), SocketScheme.Secure, globals.final_target_domain)
-            echo "TlsHandsahke complete."
+            if globals.log_conn_create: echo "TlsHandsahke complete."
             conn.trusted = TrustStatus.yes
 
             # conn.transp.reader.cancel()
@@ -235,12 +235,12 @@ proc poolFrame(create_count: uint = 0) =
             context.free_peer_outbounds.add conn
 
         except TLSStreamProtocolError as exc:
-            echo "Tls error, handshake failed because:"
+            if globals.log_conn_create: echo "Tls error, handshake failed because:"
             echo exc.msg
             dec context.pending_free_outbounds
 
         except CatchableError as exc:
-            echo "Connection failed because:"
+            if globals.log_conn_create: echo "Connection failed because:"
             echo exc.name, ": ", exc.msg
             dec context.pending_free_outbounds
 

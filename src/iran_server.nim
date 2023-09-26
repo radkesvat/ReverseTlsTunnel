@@ -53,7 +53,7 @@ proc generateFinishHandShakeData(): string =
     return random_trust_data
 
 
-proc acquireRemoteConnection(): Future[Connection] {.async.} =
+proc acquireRemoteConnection(mark = true): Future[Connection] {.async.} =
     var remote: Connection = nil
     for i in 0..<200:
         if context.available_peer_inbounds.len != 0:
@@ -62,13 +62,13 @@ proc acquireRemoteConnection(): Future[Connection] {.async.} =
                 if remote.closed or remote.exhausted:
                     context.available_peer_inbounds.remove(remote)
                     continue
-
-                inc remote.counter
-                remote.exhausted = remote.counter >= globals.mux_width
+                
+                if mark:
+                    inc remote.counter
+                    remote.exhausted = remote.counter >= globals.mux_width
                 return remote
         await sleepAsync(10)
     return nil
-
 
 proc connectTargetSNI(): Future[Connection] {.async.} =
     let address = initTAddress(globals.final_target_ip, globals.final_target_port)
@@ -101,12 +101,13 @@ proc processTrustedRemote(remote: Connection) {.async.} =
 
                 copyMem(addr cid, addr data[globals.full_tls_record_len], sizeof(cid))
                 cid = cid xor boundary
-                boundary-=globals.mux_record_len.uint16
+                boundary -= globals.mux_record_len.uint16
                 if boundary == 0:
                     context.user_inbounds.with(cid, child_client):
                         child_client.close()
                         context.user_inbounds.remove(child_client)
                 continue
+
             let readable = min(boundary, data.len().uint16)
             boundary -= readable; data.setlen readable
             await remote.reader.readExactly(addr data[0], readable.int)
@@ -132,7 +133,7 @@ proc processTrustedRemote(remote: Connection) {.async.} =
         if globals.log_conn_error: echo getCurrentExceptionMsg()
     #close
     context.available_peer_inbounds.remove(remote)
-    if not remote.isNil(): await remote.closeWait()
+    await remote.closeWait()
 
 proc processConnection(client: Connection) {.async.} =
     proc closeLine(remote, client: Connection) {.async.} =
@@ -230,6 +231,7 @@ proc processConnection(client: Connection) {.async.} =
 
                 #write
                 if remote.closed:
+                    remote.close()
                     remote = await acquireRemoteConnection()
                     if remote == nil:
                         if globals.log_conn_error: echo &"[Error] left without connection, closes forcefully."
@@ -247,7 +249,6 @@ proc processConnection(client: Connection) {.async.} =
                         await remote.writer.write(data)
                         if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
 
-
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
@@ -255,24 +256,21 @@ proc processConnection(client: Connection) {.async.} =
         client.close()
         context.user_inbounds.remove(client)
 
-
         try:
-            if not (remote == nil or remote.closed):
-                await remote.writer.write(closeSignalData(client.id))
+            if remote.closed:
+                remote = await acquireRemoteConnection(mark = false)
+            else:
                 remote.counter.dec
-                if remote.counter <= 0 and remote.exhausted:
+                if remote.exhausted and remote.counter == 0:
                     context.available_peer_inbounds.remove(remote)
                     remote.close()
                     if globals.log_conn_destory: echo "Closed a exhausted mux connection"
 
-            else:
-                remote = await acquireRemoteConnection()
-                if not (remote == nil or remote.closed):
-                    await remote.writer.write(closeSignalData(client.id))
+            if remote != nil:
+                await remote.writer.write(closeSignalData(client.id))     
+
         except:
             echo getCurrentExceptionMsg()
-
-
 
 
     #Initialize remote

@@ -4,7 +4,7 @@ import checksums/sha1
 
 # export IpAddress
 
-const version = "4.6"
+const version = "4.7"
 
 type RunMode*{.pure.} = enum
     iran, kharej
@@ -25,12 +25,12 @@ let full_tls_record_len*:uint = tls13_record_layer.len().uint + tls13_record_lay
 
 # [Connection]
 var trust_time*: uint = 3 #secs
-var pool_size*: uint = 16
+var pool_size*: uint = 8
 var pool_age*: uint = 60
-var max_idle_time*: uint = 600 #secs (default TCP RFC is 3600)
 var max_pool_unused_time*: uint = 60 #secs
 let mux_record_len*:uint32 = 5 #2bytes port 2bytes id 1byte reserved
-var mux_width*:uint32 = 2
+var mux_width*:uint32 = 1 # 1 -> disabeld
+
 
 # [Noise]
 var noise_ratio*:uint = 0
