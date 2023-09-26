@@ -258,15 +258,18 @@ proc processConnection(client: Connection) {.async.} =
         try:
             if remote.closed:
                 remote = await acquireRemoteConnection(mark = false)
+
+                if remote != nil:
+                    await remote.writer.write(closeSignalData(client.id))     
             else:
+                await remote.writer.write(closeSignalData(client.id))     
                 remote.counter.dec
                 if remote.exhausted and remote.counter == 0:
                     context.available_peer_inbounds.remove(remote)
                     remote.close()
                     if globals.log_conn_destory: echo "Closed a exhausted mux connection"
 
-            if remote != nil:
-                await remote.writer.write(closeSignalData(client.id))     
+            
 
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
