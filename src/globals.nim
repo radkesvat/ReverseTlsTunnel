@@ -4,7 +4,7 @@ import checksums/sha1
 
 # export IpAddress
 
-const version = "4.7"
+const version = "4.8"
 
 type RunMode*{.pure.} = enum
     iran, kharej
@@ -25,7 +25,7 @@ let full_tls_record_len*:uint = tls13_record_layer.len().uint + tls13_record_lay
 
 # [Connection]
 var trust_time*: uint = 3 #secs
-var pool_size*: uint = 8
+var pool_size*: uint = 24
 var pool_age*: uint = 60
 var max_pool_unused_time*: uint = 60 #secs
 let mux_record_len*:uint32 = 5 #2bytes port 2bytes id 1byte reserved
@@ -341,6 +341,7 @@ proc init*() =
     while sh5 <= 2.uint32 or sh5 >= 223.uint32:
         sh5 = hash(sh5).uint8
 
-
+    if mux_width > 1:
+        pool_size = pool_size div 2
     print password, password_hash, sh1, sh2, sh3, pool_size
     print "\n"
