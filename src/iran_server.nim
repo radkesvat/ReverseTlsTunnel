@@ -270,7 +270,6 @@ proc processConnection(client: Connection) {.async.} =
                     if globals.log_conn_destory: echo "Closed a exhausted mux connection"
 
             
-
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 

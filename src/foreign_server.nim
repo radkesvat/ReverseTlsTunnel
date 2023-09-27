@@ -219,8 +219,9 @@ proc poolFrame(create_count: uint = 0) =
     var count = create_count
 
     proc create() {.async.} =
+        inc context.pending_free_outbounds
+
         try:
-            inc context.pending_free_outbounds
             var con_fut =  connect(initTAddress(globals.iran_addr, globals.iran_port), SocketScheme.Secure, globals.final_target_domain)
             var notimeout = await withTimeout(con_fut,3.secs)
             if notimeout :
@@ -237,19 +238,16 @@ proc poolFrame(create_count: uint = 0) =
                 if globals.log_conn_create: echo "Connecting to iran Timed-out!"
                 
 
-            dec context.pending_free_outbounds
-
-           
 
         except TLSStreamProtocolError as exc:
             if globals.log_conn_create: echo "Tls error, handshake failed because:"
             echo exc.msg
-            dec context.pending_free_outbounds
 
         except CatchableError as exc:
             if globals.log_conn_create: echo "Connection failed because:"
             echo exc.name, ": ", exc.msg
-            dec context.pending_free_outbounds
+        
+        dec context.pending_free_outbounds
 
 
     if count == 0:
@@ -266,7 +264,7 @@ proc poolFrame(create_count: uint = 0) =
 
 proc start*(){.async.} =
     echo &"Mode Foreign Server:  {globals.listen_addr} <-> ({globals.final_target_domain} with ip {globals.final_target_ip})"
-    # trackIdleConnections(context.free_peer_outbounds, globals.pool_age)
+    trackIdleConnections(context.free_peer_outbounds, globals.pool_age)
     # just to make sure we always willing to connect to the peer
     while true:
         poolFrame()
