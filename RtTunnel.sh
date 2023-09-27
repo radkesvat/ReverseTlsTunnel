@@ -310,6 +310,7 @@ update_services() {
     # Compare the installed version with the latest version
     if [[ "$latest_version" > "$installed_version" ]]; then
         echo "Updating to $latest_version (Installed: $installed_version)..."
+        
         if sudo systemctl is-active --quiet tunnel.service; then
             echo "tunnel.service is active, stopping..."
             sudo systemctl stop tunnel.service > /dev/null 2>&1
@@ -322,12 +323,14 @@ update_services() {
         wget "https://raw.githubusercontent.com/radkesvat/ReverseTlsTunnel/master/install.sh" -O install.sh && chmod +x install.sh && bash install.sh
 
         # Start the previously active service
-        if sudo systemctl is-active --quiet tunnel.service; then
-            echo "Restarting tunnel.service..."
-            sudo systemctl start tunnel.service > /dev/null 2>&1
-        elif sudo systemctl is-active --quiet lbtunnel.service; then
-            echo "Restarting lbtunnel.service..."
-            sudo systemctl start lbtunnel.service > /dev/null 2>&1
+        if sudo systemctl list-units --type=service --all | grep -q 'tunnel.service'; then
+            echo "Starting tunnel.service..."
+            sudo systemctl start tunnel.service
+        fi
+
+        if sudo systemctl list-units --type=service --all | grep -q 'lbtunnel.service'; then
+            echo "Starting lbtunnel.service..."
+            sudo systemctl start lbtunnel.service
         fi
 
         echo "Service updated and restarted successfully."
@@ -388,8 +391,93 @@ compile() {
     echo "RTT file is located at: ReverseTlsTunnel/dist"
 }
 
+# Function to start the tunnel service
+start_tunnel() {
+    # Check if the service is installed
+    if sudo systemctl is-enabled --quiet tunnel.service; then
+        # Service is installed, start it
+        sudo systemctl start tunnel.service > /dev/null 2>&1
 
-#ip & version
+        if sudo systemctl is-active --quiet tunnel.service; then
+            echo "Tunnel service started."
+        else
+            echo "Tunnel service failed to start."
+        fi
+    else
+        echo "Multiport Tunnel is not installed."
+    fi
+}
+
+stop_tunnel() {
+    # Check if the service is installed
+    if sudo systemctl is-enabled --quiet tunnel.service; then
+        # Service is installed, stop it
+        sudo systemctl stop tunnel.service > /dev/null 2>&1
+
+        if sudo systemctl is-active --quiet tunnel.service; then
+            echo "Tunnel service failed to stop."
+        else
+            echo "Tunnel service stopped."
+        fi
+    else
+        echo "Multiport Tunnel is not installed."
+    fi
+}
+
+check_tunnel_status() {
+    # Check the status of the tunnel service
+    if sudo systemctl is-active --quiet tunnel.service; then
+        echo "Multiport is:[running ✔]"
+    else
+        echo "Multiport is:[Not running ✗ ]"
+    fi
+}
+
+# Function to start the tunnel service
+start_lb_tunnel() {
+    # Check if the service is installed
+    if sudo systemctl is-enabled --quiet lbtunnel.service; then
+        # Service is installed, start it
+        sudo systemctl start lbtunnel.service > /dev/null 2>&1
+
+        if sudo systemctl is-active --quiet lbtunnel.service; then
+            echo "Tunnel service started."
+        else
+            echo "Tunnel service failed to start."
+        fi
+    else
+        echo "Load-Balancer is not installed."
+    fi
+}
+
+
+stop_lb_tunnel() {
+    # Check if the service is installed
+    if sudo systemctl is-enabled --quiet lbtunnel.service; then
+        # Service is installed, stop it
+        sudo systemctl stop lbtunnel.service > /dev/null 2>&1
+
+        if sudo systemctl is-active --quiet lbtunnel.service; then
+            echo "Load-Balancer failed to stop."
+        else
+            echo "Load-Balancer stopped."
+        fi
+    else
+        echo "Load-Balancer is not installed."
+    fi
+}
+
+check_lb_tunnel_status() {
+    # Check the status of the load balancer tunnel service
+    if sudo systemctl is-active --quiet lbtunnel.service; then
+        echo "Load balancer is:[running ✔]"
+    else
+        echo "Load balancer is:[Not running ✗ ]"
+    fi
+}
+
+
+#ip  & version
 myip=$(hostname -I | awk '{print $1}')
 version=$(./RTT -v 2>&1 | grep -o 'version="[0-9.]*"')
 
@@ -397,16 +485,25 @@ version=$(./RTT -v 2>&1 | grep -o 'version="[0-9.]*"')
 clear
 echo "By --> Peyman * Github.com/Ptechgithub * "
 echo "Your IP is: ($myip) "
-echo ""
+echo "**********************"
+check_tunnel_status
+check_lb_tunnel_status
+echo "**********************"
 echo " --------#- Reverse Tls Tunnel -#--------"
 echo "1) Install (Multiport)"
 echo "2) Uninstall (Multiport)"
+echo "3) Start Multiport"
+echo "4) Stop Multiport"
+echo "5) Check Status"
 echo " ----------------------------"
-echo "3) Install Load-balancer"
-echo "4) Uninstall Load-balancer"
+echo "6) Install Load-balancer"
+echo "7) Uninstall Load-balancer"
+echo "8) Start Load Balancer"
+echo "9) Stop Load Balancer"
+echo "10) Check status"
 echo " ----------------------------"
-echo "5) Update RTT"
-echo "6) Compile RTT"
+echo "11) Update RTT"
+echo "12) Compile RTT"
 echo "0) Exit"
 echo " --------------$version--------------"
 read -p "Please choose: " choice
@@ -419,15 +516,33 @@ case $choice in
         uninstall
         ;;
     3)
-        load-balancer
+        start_tunnel
         ;;
     4)
-        lb_uninstall
-       ;;
-    5) 
-        update_services
-       ;;
+        stop_tunnel
+        ;;
+    5)
+        check_tunnel_status
+        ;;
     6)
+        load-balancer
+        ;;
+    7)
+        lb_uninstall
+        ;;
+    8)
+        start_lb_tunnel
+        ;;
+    9)
+        stop_lb_tunnel
+        ;;
+    10)
+        check_lb_tunnel_status
+        ;;
+    11) 
+        update_services
+        ;;
+    12)
         compile
         ;;
     0)   
@@ -435,5 +550,5 @@ case $choice in
         ;;
     *)
         echo "Invalid choice. Please try again."
-        ;;
+       ;;
 esac
