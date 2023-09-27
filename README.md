@@ -98,6 +98,17 @@ wget  "https://raw.githubusercontent.com/radkesvat/ReverseTlsTunnel/master/insta
 
 
 # مشکلات و دیباگ
+***
+دوستان اگه با پنل سنایی مصرف cpu هی میره بالا و میاد پایین ؛‌ تنها راه حلی که دوستان پیدا کردند انیه که به نسخه 1.6.1 پنل برگردین
+من این رو چک کنم و دیدم که مشکل cpu و رم که توسط xui گرفته میشد رو برطرف کرده و آروم شده همه چی
+
+
+```sh
+bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh) v1.6.1
+```
+
+***
+
 
 برای اینکه برنامه بعد از بسته شدن ssh ؛ بسته نشه و ران بمونه از nohup یا [service](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/Service.md) استفاده کنید 
 
