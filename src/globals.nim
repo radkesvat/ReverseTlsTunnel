@@ -1,43 +1,45 @@
 import chronos
-import dns_resolve, hashes, print, parseopt,strutils, random, net, osproc, strformat
+import dns_resolve, hashes, print, parseopt, strutils, random, net, osproc, strformat
 import checksums/sha1
 
-# export IpAddress
 
-const version = "5.0"
+const version = "5.1"
 
 type RunMode*{.pure.} = enum
-    iran, kharej
+    unspecified, iran, kharej
 
-var mode*: RunMode = RunMode.iran
+var mode*: RunMode = RunMode.unspecified
 
-# [Log Options]true
+# [Log Options]
 var log_conn_create* = true
 var log_data_len* = false
 var log_conn_destory* = false
 var log_conn_error* = false
 
 # [TLS]
-let tls13_record_layer* = "\x17\x03\x03" 
-let tls13_record_layer_data_len_size*:uint = 2
-let full_tls_record_len*:uint = tls13_record_layer.len().uint + tls13_record_layer_data_len_size
-# var tls_records*:uint = 50
+let tls13_record_layer* = "\x17\x03\x03"
+let tls13_record_layer_data_len_size*: uint = 2
+let full_tls_record_len*: uint = tls13_record_layer.len().uint + tls13_record_layer_data_len_size
+
 
 # [Connection]
 var trust_time*: uint = 3 #secs
 var pool_size*: uint = 24
 var pool_age*: uint = 15
 var max_pool_unused_time*: uint = 60 #secs
-let mux_record_len*:uint32 = 5 #2bytes port 2bytes id 1byte reserved
-var mux_width*:uint32 = 1 # 1 -> disabeld
-
+let mux_record_len*: uint32 = 5 #2bytes port 2bytes id 1byte reserved
+var mux_width*: uint32 = 1 # 1 -> disabeld
+var udp_max_ppc*:uint32 = 5000
+var udp_max_idle_time*:uint = 60 #secs
 
 # [Noise]
-var noise_ratio*:uint = 0
+var noise_ratio*: uint = 0
 
 
 # [Routes]
-var listen_addr* = "0.0.0.0"
+var listen_addr4* = "0.0.0."
+var listen_addr6* = "::"
+
 var listen_port*: Port = 0.Port
 var next_route_addr* = ""
 var next_route_port*: Port = 0.Port
@@ -45,8 +47,8 @@ var iran_addr* = ""
 var iran_port*: Port = 0.Port
 var final_target_domain* = ""
 var final_target_ip*: string
-var trusted_foreign_peers*:seq[IpAddress]
-const final_target_port*:Port = 443.Port # port of the sni host (443 for tls handshake)
+var trusted_foreign_peers*: seq[IpAddress]
+const final_target_port*: Port = 443.Port # port of the sni host (443 for tls handshake)
 var self_ip*: IpAddress
 
 
@@ -64,6 +66,7 @@ var random_str* = newString(len = 2000)
 var disable_ufw* = true
 var reset_iptable* = true
 var keep_system_limit* = false
+var accept_udp* = false
 var terminate_secs* = 0
 var debug_info* = false
 
@@ -77,10 +80,10 @@ var multi_port_additions: seq[Port]
 const SO_ORIGINAL_DST* = 80
 const SOL_IP* = 0
 
-proc isPortFree*(port:Port):bool = 
+proc isPortFree*(port: Port): bool =
     execCmdEx(&"""lsof -i:{port}""").output.len < 3
 
-proc chooseRandomLPort():Port =
+proc chooseRandomLPort(): Port =
     result = block:
         if multi_port_min == 0.Port and multi_port_max == 0.Port:
             multi_port_additions[rand(multi_port_additions.high).int]
@@ -89,8 +92,8 @@ proc chooseRandomLPort():Port =
         else:
             quit("multi port range may not include port 0!")
 
-    if not isPortFree(result):return chooseRandomLPort()
-    
+    if not isPortFree(result): return chooseRandomLPort()
+
 proc iptablesInstalled(): bool {.used.} =
     execCmdEx("""dpkg-query -W --showformat='${Status}\n' iptables|grep "install ok install"""").output != ""
 
@@ -100,14 +103,16 @@ proc resetIptables*() =
     assert 0 == execCmdEx("iptables -t nat -X").exitCode
 
 
+template FWProtocol(): string = (if accept_udp: "all" else: "tcp")
+
 
 proc createIptablesForwardRules*() =
     if reset_iptable: resetIptables()
     if not (multi_port_min == 0.Port or multi_port_max == 0.Port):
-        assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p tcp --dport {multi_port_min}:{multi_port_max} -j REDIRECT --to-port {listen_port}""").exitCode
+        assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p {FWProtocol} --dport {multi_port_min}:{multi_port_max} -j REDIRECT --to-port {listen_port}""").exitCode
 
     for port in multi_port_additions:
-        assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p tcp --dport {port} -j REDIRECT --to-port {listen_port}""").exitCode
+        assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p {FWProtocol} --dport {port} -j REDIRECT --to-port {listen_port}""").exitCode
 
 proc multiportSupported(): bool =
     when defined(windows) or defined(android):
@@ -126,7 +131,7 @@ proc init*() =
     for i in 0..<random_str.len():
         random_str[i] = rand(char.low .. char.high).char
 
-    var p = initOptParser(longNoVal = @["kharej", "iran", "multiport", "keep-ufw", "keep-iptables", "keep-os-limit",  "debug"])
+    var p = initOptParser(longNoVal = @["kharej", "iran", "multiport", "keep-ufw", "keep-iptables", "keep-os-limit", "accept-udp", "debug"])
     while true:
         p.next()
         case p.kind
@@ -137,20 +142,29 @@ proc init*() =
                     of "kharej":
                         mode = RunMode.kharej
                         print mode
+
                     of "iran":
                         mode = RunMode.iran
                         print mode
+
                     of "keep-ufw":
                         disable_ufw = false
+
                     of "keep-iptables":
                         reset_iptable = false
+
                     of "multiport":
                         multiport = true
+
                     of "keep-os-limit":
                         keep_system_limit = true
+
                     of "debug":
                         debug_info = true
 
+                    of "accept-udp":
+                        accept_udp = true
+                        print accept_udp
 
                     else:
                         echo "invalid option"
@@ -177,6 +191,7 @@ proc init*() =
                                 quit("could not parse lport.")
 
                         print listen_port
+
                     of "add-port":
                         if not multiportSupported(): quit(-1)
                         multi_port = true
@@ -186,9 +201,8 @@ proc init*() =
                         multi_port_additions.add p.val.parseInt().Port
 
                     of "peer":
-                        
-                        trusted_foreign_peers.add parseIpAddress(p.val)
 
+                        trusted_foreign_peers.add parseIpAddress(p.val)
 
                     of "toip":
                         next_route_addr = (p.val)
@@ -247,10 +261,13 @@ proc init*() =
                     of "trust_time":
                         trust_time = parseInt(p.val).uint
                         print trust_time
-                    
-                    of "listen":
-                        listen_addr = (p.val)
-                        print listen_addr
+
+                    of "listen4":
+                        listen_addr4 = (p.val)
+                        print listen_addr4
+                    of "listen6":
+                        listen_addr6 = (p.val)
+                        print listen_addr6
 
                     of "log":
                         case (p.val).parseInt:
@@ -281,6 +298,7 @@ proc init*() =
 
     var exit = false
 
+
     case mode:
         of RunMode.kharej:
             if iran_addr.isEmptyOrWhitespace():
@@ -303,7 +321,10 @@ proc init*() =
                 exit = true
             if listen_port == 0.Port and multi_port:
                 listen_port = chooseRandomLPort()
-                    
+        of RunMode.unspecified:
+            quit "specify the mode!. iran or kharej?  --iran or --kharej"
+
+
 
     if final_target_domain.isEmptyOrWhitespace():
         echo "specify the sni for routing --sni:{domain}"
@@ -325,12 +346,10 @@ proc init*() =
             quit(0)
         )
 
-    # if multi_port and listen_addr == "0.0.0.0":
-        # listen_addr = "127.0.0.1"
 
     final_target_ip = resolveIPv4(final_target_domain)
     print "\n"
-    self_ip =  getPrimaryIPAddr(dest = parseIpAddress("8.8.8.8"))
+    self_ip = getPrimaryIPAddr(dest = parseIpAddress("8.8.8.8"))
     password_hash = $(secureHash(password))
     sh1 = hash(password_hash).uint32
     sh2 = hash(sh1).uint32

@@ -1,5 +1,5 @@
 import chronos
-import chronos/streams/[tlsstream]
+import chronos/streams/[tlsstream], chronos/transports/datagram
 import std/[strformat, net, openssl, random]
 import overrides/[asyncnet]
 import print, connection, pipe
@@ -11,6 +11,7 @@ type
         pending_free_outbounds:int
         used_peer_outbounds: Connections
         outbounds: Connections
+        outbounds_udp:UdpConnections
 
 var context = ServerConnectionPoolContext()
 
@@ -21,7 +22,7 @@ proc poolFrame(create_count: uint = 0)
 proc generateFinishHandShakeData(): string =
     #AES default chunk size is 16 so use a multple of 16
     let rlen: uint16 = uint16(16*(6+rand(4)))
-    var random_trust_data: string
+    var random_trust_data: string = newStringOfCap(rlen)
     random_trust_data.setLen(rlen)
 
     copyMem(addr random_trust_data[0], addr(globals.random_str[rand(250)]), rlen)
@@ -82,9 +83,37 @@ proc processConnection(client: Connection) {.async.} =
         else:
             await client.closeWait()
 
+
+    proc processUdpRemote(remote: UdpConnection) {.async.} =
+        var client = client
+        var pbytes = remote.transp.getMessage()
+        var nbytes = len(pbytes)
+        let width = globals.full_tls_record_len.int + globals.mux_record_len.int
+
+        try:
+            #read
+            if nbytes > 0:
+                var data = newStringOfCap(cap = nbytes + width); data.setlen(nbytes + width)
+                copyMem(addr data[0 + width], addr pbytes[0], data.len - width)
+                if globals.log_data_len: echo &"[processUdpRemote] {data.len()} bytes from remote {client.id}"
+
+                #write
+                if client.closed:
+                    client = await acquireClientConnection()
+                    if client == nil:
+                        return
+
+                packForSend(data, remote.id, remote.port.uint16)        
+                await client.twriter.write(data)
+                if globals.log_data_len: echo &"[processUdpRemote] Sent {data.len()} bytes ->  client"
+
+        except:
+            if globals.log_conn_error: echo getCurrentExceptionMsg()
+
+
     proc processRemote(remote: Connection) {.async.} =
         var client = client
-        var data = newString(len = 0)
+        var data = newStringOfCap(4200)
         try:
             while not remote.closed:
                 #read
@@ -125,7 +154,7 @@ proc processConnection(client: Connection) {.async.} =
 
     proc proccessClient() {.async.} =
 
-        var data = newString(len = 0)
+        var data = newStringOfCap(4200)
         var boundary: uint16 = 0
         var cid: uint16
         var port: uint16
@@ -181,20 +210,41 @@ proc processConnection(client: Connection) {.async.} =
 
                 #write
                 unPackForRead(data)
-                if context.outbounds.hasID(cid):
-                    context.outbounds.with(cid, child_remote):
-                        if not isSet(child_remote.estabilished): await child_remote.estabilished.wait()
-                        #write
-                        if not child_remote.closed():
-                            await child_remote.writer.write(data)
-                            if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
+
+                if DataFlags.udp in cast[TransferFlags](flag):
+                    proc handleDatagram(transp: DatagramTransport,
+                        raddr: TransportAddress): Future[void] {.async.} =
+                            var (found,connection) = findUdp(context.outbounds_udp,raddr)
+                            if found:
+                                await processUdpRemote(connection)
+                            
+                    if context.outbounds_udp.hasID(cid):
+                        context.outbounds_udp.with(cid,udp_remote):
+                            udp_remote.hit()
+                            await udp_remote.transp.send(data)
+                    else:
+                        let ta = initTAddress(globals.next_route_addr, if globals.multi_port: port.Port else: globals.next_route_port)
+                        var transp = newDatagramTransport(handleDatagram, remote = ta)
+                        
+                        var connection = UdpConnection.new(transp,ta)
+                        connection.id = cid
+                        context.outbounds_udp.register connection
+                        await connection.transp.send(data)
+
                 else:
-                    var remote = await remoteTrusted(if globals.multi_port: port.Port else: globals.next_route_port)
-                    remote.id = cid
-                    context.outbounds.register(remote)
-                    asyncCheck processRemote(remote)
-                    await remote.writer.write(data)
-                    if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
+                    if context.outbounds.hasID(cid):
+                        context.outbounds.with(cid, child_remote):
+                            if not isSet(child_remote.estabilished): await child_remote.estabilished.wait()
+                            if not child_remote.closed():
+                                await child_remote.writer.write(data)
+                                if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
+                    else:
+                        var remote = await remoteTrusted(if globals.multi_port: port.Port else: globals.next_route_port)
+                        remote.id = cid
+                        context.outbounds.register(remote)
+                        asyncCheck processRemote(remote)
+                        await remote.writer.write(data)
+                        if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
 
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
@@ -263,7 +313,7 @@ proc poolFrame(create_count: uint = 0) =
             asyncCheck create()
 
 proc start*(){.async.} =
-    echo &"Mode Foreign Server:  {globals.listen_addr} <-> ({globals.final_target_domain} with ip {globals.final_target_ip})"
+    echo &"Mode Foreign Server:  {globals.self_ip} <-> {globals.iran_addr} ({globals.final_target_domain} with ip {globals.final_target_ip})"
     trackIdleConnections(context.free_peer_outbounds, globals.pool_age)
     # just to make sure we always willing to connect to the peer
     while true:
@@ -271,6 +321,9 @@ proc start*(){.async.} =
         await sleepAsync(5.secs)
         echo "free: ",context.free_peer_outbounds.len,
              "  iran: ", context.used_peer_outbounds.len, " core: ", context.outbounds.len
+
+
+    trackDeadUdpConnections(context.outbounds_udp,globals.udp_max_idle_time)
 
     # await sleepAsync(2.secs)
     # poolFrame()

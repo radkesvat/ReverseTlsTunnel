@@ -3,7 +3,8 @@ import random, strutils
 
 type
     DataFlags* {.size: sizeof(uint8), pure.} = enum
-        junk
+        junk,
+        udp
 
 
     TransferFlags* = set[DataFlags]
@@ -139,6 +140,8 @@ proc closeSignalData*(cid: uint16): string =
     copyMem(addr data[0 + globals.full_tls_record_len.int+sizeof(e_cid)], addr port, sizeof(port))
     copyMem(addr data[0 + globals.full_tls_record_len.int+sizeof(e_cid)+sizeof(port)], addr flags, sizeof(flags))
     return data
+
+
 #returns connection id
 # proc unPackForReadMux*(data: var string): tuple[cid: uint32, port: uint16] =
 #     decrypt data

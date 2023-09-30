@@ -1,10 +1,6 @@
-import std/macros
-import ospaths
-import std/strformat
-import std/strutils
+import std/[strformat,macros,strutils,ospaths]
 
-
-const Release = true
+const Release = false
 
 
 const libs_dir = "libs"
@@ -24,11 +20,11 @@ template require(package: untyped) =
 task install, "install deps":
     require zippy
     require checksums
-    require chronos
     require stew
     require bearssl
     require httputils
     require unittest2
+    # require chronos
     # require stew
     # require jsony
     # require secp256k1

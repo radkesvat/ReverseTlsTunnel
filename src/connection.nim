@@ -1,7 +1,7 @@
 # import overrides/[asyncnet]
-import chronos,chronos/asyncsync
+import chronos, chronos/asyncsync, chronos/transports/datagram
 import chronos/streams/[asyncstream, tlsstream, boundstream]
-import std/[tables, sequtils, times, strutils, net, random]
+import std/[tables, sequtils, times, strutils, net, random,hashes]
 import globals
 export asyncsync
 
@@ -28,8 +28,8 @@ type
 
 
     Connection* = ref object
-        creation_time*: uint        #creation epochtime
-        id*: uint16                 #global incremental id
+        creation_time*: uint      #creation epochtime
+        id*: uint16               #global incremental id
         case kind*: SocketScheme
         of SocketScheme.NonSecure:
             discard
@@ -40,37 +40,75 @@ type
         transp*: StreamTransport
         reader*: AsyncStreamReader
         writer*: AsyncStreamWriter
-        remoteHostname*: string     # sni
+        remoteHostname*: string   # sni
         state*: SocketState
-        trusted*: TrustStatus       #when fake handshake perfromed
-        estabilished*: AsyncEvent   #connection has started
-        port*: Port                 #the port the socket points to
-        
-        counter*:uint
-        exhausted*:bool
+        trusted*: TrustStatus     #when fake handshake perfromed
+        estabilished*: AsyncEvent #connection has started
+        port*: Port               #the port the socket points to
+        counter*: uint
+        exhausted*: bool
+        udp_packets*: uint32
 
-     
+    UdpConnection* = ref object
+        creation_time*: uint #creation epochtime
+        last_action*:uint    #last action epochtime
+        id*: uint16   
+        transp*: DatagramTransport
+        raddr*: TransportAddress
+        port*: Port               #the port the socket points to
+
 
     Connections* = seq[Connection]
+    UdpConnections* = seq[UdpConnection]
 
-var allConnections: seq[Connection]
 
+
+var et: uint = 0 #last epoch time
 var lgid: uint16 = 1 #last incremental global id
+
 proc new_uid: uint16 =
     result = lgid
     inc lgid
 
-var et: uint = 0 #last epoch time
+
+
+
+
+template hit*(conn: UdpConnection)= conn.last_action = et
+
+proc findUdp*(conns:UdpConnections, raddr: TransportAddress): tuple[result: bool, connection: UdpConnection] =
+    for el in conns:
+        if el.raddr == raddr:
+            el.hit()
+            return (true,el)
+    return (false,nil)
+
+# proc id*(x: UdpConnection): int =
+#     ## Computes a Hash from `x`.
+#     var h: Hash = 0
+#     case x.raddr.family
+#         of AddressFamily.IPv4:
+#             h = h !& hash(x.raddr.address_v4)
+#         of AddressFamily.IPv6:
+#             h = h !& hash(x.raddr.address_v6)
+#         of AddressFamily.Unix:
+#             h = h !& hash(x.raddr.address_un)
+#         of AddressFamily.None:
+#             h = h !& hash("None")
+        
+#     h = h !& hash(x.raddr.port)
+#     result = int(!$h)
+
 
 proc isTrusted*(con: Connection): bool = con.trusted == TrustStatus.yes
 
-proc hasID*(cons: var Connections, id: uint16): bool =
+proc hasID*(cons: Connections or UdpConnections, cid: uint16): bool =
     for el in cons:
-        if el.id == id:
+        if cid == el.id:
             return true
     return false
 
-template with*(cons: Connections, cid: uint16, name: untyped, action: untyped) =
+template with*(cons: Connections or UdpConnections, cid: uint16, name: untyped, action: untyped) =
     block withconnection:
         for el in cons:
             var `name` {.inject.} = el
@@ -78,9 +116,9 @@ template with*(cons: Connections, cid: uint16, name: untyped, action: untyped) =
                 action
                 break withconnection
 
-proc remove*(cons: var Connections, con: Connection or uint16) =
+proc remove*(cons: var (Connections or UdpConnections), con: Connection or  UdpConnection or uint16) =
     var index = -1
-    when con is Connection:
+    when con is Connection or con is UdpConnection:
         for i, el in cons:
             if el.id == con.id:
                 index = i
@@ -88,8 +126,9 @@ proc remove*(cons: var Connections, con: Connection or uint16) =
         for i, el in cons:
             if el.id == con:
                 index = i
+    
     if index != -1:
-        cons.delete index
+        cons.delete(index)
 
 # proc remove*(cons: var seq[uint32], id: uint16) =
 #     let i = cons.find(id)
@@ -97,7 +136,7 @@ proc remove*(cons: var Connections, con: Connection or uint16) =
 #         cons.del(i)
 
 
-proc grab*(cons: var Connections): Connection =
+proc grab*(cons: var Connections ): Connection =
     if cons.len() == 0: return nil
     result = cons[0]
     cons.del(0)
@@ -112,10 +151,16 @@ proc randomPick*(cons: var Connections): Connection =
     # result.register_start_time = 0
 
 
-proc register*(cons: var Connections, con: Connection) =
+proc register*(cons: var (Connections or UdpConnections), con: Connection or var UdpConnection) =
     # con.register_start_time = et
     cons.add con
 
+
+
+template close*(conn: UdpConnection)= conn.transp.close()
+template closeWait*(conn: UdpConnection):untyped = conn.transp.closeWait()
+template join*(conn: UdpConnection)= conn.transp.join()
+template closed*(conn: UdpConnection): bool = conn.transp.closed()
 
 proc closed*(conn: Connection): bool =
     case conn.kind
@@ -124,6 +169,7 @@ proc closed*(conn: Connection): bool =
     of SocketScheme.Secure:
         return conn.reader.closed and conn.writer.closed and
             conn.treader.closed and conn.twriter.closed
+
 
 proc close*(conn: Connection) =
     if not(isNil(conn.reader)) and not(conn.reader.closed()):
@@ -138,6 +184,9 @@ proc close*(conn: Connection) =
         conn.twriter.close()
     conn.transp.close()
     conn.state = SocketState.Closing
+
+
+
 
 proc closeWait*(conn: Connection) {.async.} =
     ## Close HttpClientConnectionRef instance ``conn`` and free all the resources.
@@ -162,6 +211,17 @@ proc closeWait*(conn: Connection) {.async.} =
         await conn.transp.closeWait()
         conn.state = SocketState.Closed
 
+
+proc new*(ctype: typedesc[UdpConnection], transp: DatagramTransport, raddr: TransportAddress): UdpConnection =
+    result = UdpConnection(
+        id: new_uid(),
+        creation_time: et,
+        last_action: et,
+        transp: transp,
+        raddr: raddr
+    )
+
+
 proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketScheme = SocketScheme.NonSecure, hostname: string = ""): Future[
         Connection] {.async.} =
     if scheme == SocketScheme.Secure:
@@ -179,7 +239,7 @@ proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketSc
                     writer: newAsyncStreamWriter(transp),
                     state: SocketState.Connecting,
                     remoteHostname: hostname,
-                    estabilished:newAsyncEvent()
+                    estabilished: newAsyncEvent()
                     )
                     res
                 of SocketScheme.Secure:
@@ -200,7 +260,7 @@ proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketSc
                     tls: tls,
                     state: SocketState.Connecting,
                     remoteHostname: hostname,
-                    estabilished:newAsyncEvent()
+                    estabilished: newAsyncEvent()
 
                     )
                     res
@@ -255,16 +315,32 @@ template trackIdleConnections*(cons: var Connections, age: uint) =
                 if x.creation_time != 0:
                     if et - x.creation_time > age:
                         x.close()
-                        if globals.log_conn_destory: echo "[Controller] closed a idle connection, ",et - x.creation_time
+                        if globals.log_conn_destory: echo "[Controller] closed a idle connection, ", et - x.creation_time
                         return false
                 return true
             )
         proc tracker(){.async.} =
             while true:
-                await sleepAsync(age.int.secs)
+                await sleepAsync(timer.seconds(age.int))
                 checkAndRemove()
         asyncCheck tracker()
 
+template trackDeadUdpConnections*(cons: var UdpConnections, age: uint) =
+    block:
+        proc checkAndRemove() =
+            cons.keepIf(proc(x: UdpConnection): bool =
+                if x.last_action != 0:
+                    if et - x.last_action > age:
+                        x.close()
+                        if globals.log_conn_destory: echo "[Controller] closed a dead udp connection, ", et - x.last_action
+                        return false
+                return true
+            )
+        proc tracker() {.async.} =
+            while true:
+                await sleepAsync(timer.seconds(age.int))
+                checkAndRemove()
+        asyncCheck tracker()
 
 proc startController*() {.async.} =
     while true:
