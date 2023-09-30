@@ -49,38 +49,81 @@ check_installed() {
     fi
 }
 
+# last or custom version
+install_selected_version() {
+    read -p "Do you want to install the Latest version? [yes/no] default: yes): " choice
+
+    if [[ "$choice" == "no" ]]; then
+        install_rtt_custom
+    else
+        install_rtt
+    fi
+}
+
 # Function to download and install RTT
 install_rtt() {
     wget "https://raw.githubusercontent.com/radkesvat/ReverseTlsTunnel/master/install.sh" -O install.sh && chmod +x install.sh && bash install.sh
 }
 
+
+#custom version
+install_rtt_custom() {
+    if pgrep -x "RTT" > /dev/null; then
+        echo "Tunnel is running! You must stop the tunnel before update. (pkill RTT)"
+        echo "Update is canceled."
+        exit
+    fi
+    # Get custom version
+    read -p "Please Enter your custom version (e.g : 3.6) : " version
+    apt-get update -y
+
+    echo "Downloading ReverseTlsTunnel version : $version"
+
+    printf "\n"
+
+    case $(uname -m) in
+        x86_64)  URL="https://github.com/radkesvat/ReverseTlsTunnel/releases/download/V$version/v${version}_linux_amd64.zip" ;;
+        arm)     URL="https://github.com/radkesvat/ReverseTlsTunnel/releases/download/V$version/v${version}_linux_arm64.zip" ;;
+        aarch64) URL="https://github.com/radkesvat/ReverseTlsTunnel/releases/download/V$version/v${version}_linux_arm64.zip" ;;
+        *)       echo "Unable to determine system architecture."; exit 1 ;;
+    esac
+
+    wget $URL -O v${version}_linux_amd64.zip
+    unzip -o v${version}_linux_amd64.zip
+    chmod +x RTT
+    rm v${version}_linux_amd64.zip
+
+    echo "Finished."
+}
+
+
 # Function to configure arguments based on user's choice
 configure_arguments() {
-    read -p "Which server do you want to use? (Enter '1' for Iran or '2' for Kharej) : " server_choice
-    read -p "Please Enter SNI (default : splus.ir): " sni
-    sni=${sni:-splus.ir}
+    read -p "Which server do you want to use? (Enter '1' for Iran(internal-server) or '2' for Kharej(external-server) ) : " server_choice
+    read -p "Please Enter SNI (default : sheypoor.com): " sni
+    sni=${sni:-sheypoor.com}
     read -p "Do you want to use mux? (yes/no): " use_mux
     mux_width=2
     if [ "$use_mux" == "yes" ]; then
         read -p "Enter mux-width (default: 2): " mux_width
         mux_width=${mux_width:-2}
-    else
-        mux_width=1
+        mux_argument="--mux-width:$mux_width"
     fi
 
+
     if [ "$server_choice" == "2" ]; then
-        read -p "Please Enter (IRAN IP) : " server_ip
+        read -p "Please Enter (IRAN IP(internal-server)) : " server_ip
         read -p "Please Enter Password (Please choose the same password on both servers): " password
-        arguments="--kharej --iran-ip:$server_ip --iran-port:443 --toip:127.0.0.1 --toport:multiport --password:$password --sni:$sni --mux-width:$mux_width --terminate:24"
+        arguments="--kharej --iran-ip:$server_ip --iran-port:443 --toip:127.0.0.1 --toport:multiport --password:$password --sni:$sni $mux_argument--terminate:24"
     elif [ "$server_choice" == "1" ]; then
         read -p "Please Enter Password (Please choose the same password on both servers): " password
         read -p "Do you want to use fake upload? (yes/no): " use_fake_upload
         if [ "$use_fake_upload" == "yes" ]; then
             read -p "Enter upload-to-download ratio (e.g., 5 for 5:1 ratio): " upload_ratio
             upload_ratio=$((upload_ratio - 1))
-            arguments="--iran --lport:23-65535 --sni:$sni --password:$password --mux-width:$mux_width --noise:$upload_ratio --terminate:24"
+            arguments="--iran --lport:23-65535 --sni:$sni --password:$password $mux_argument--noise:$upload_ratio --terminate:24"
         else
-            arguments="--iran --lport:23-65535 --sni:$sni --password:$password --mux-width:$mux_width --terminate:24"
+            arguments="--iran --lport:23-65535 --sni:$sni --password:$password $mux_argument--terminate:24"
         fi
     else
         echo "Invalid choice. Please enter '1' or '2'."
@@ -93,7 +136,7 @@ install() {
     root_access
     check_dependencies
     check_installed
-    install_rtt
+    install_selected_version
     # Change directory to /etc/systemd/system
     cd /etc/systemd/system
 
@@ -130,28 +173,27 @@ check_lbinstalled() {
 
 # Function to configure arguments2 based on user's choice
 configure_arguments2() {
-    read -p "Which server do you want to use? (Enter '1' for Iran or '2' for Kharej) : " server_choice
-    read -p "Please Enter SNI (default : splus.ir): " sni
-    sni=${sni:-splus.ir}
+    read -p "Which server do you want to use? (Enter '1' for Iran(internal-server) or '2' for Kharej(external-server) ) : " server_choice
+    read -p "Please Enter SNI (default : sheypoor.com): " sni
+    sni=${sni:-sheypoor.com}
     read -p "Do you want to use mux? (yes/no): " use_mux
     mux_width=2
     if [ "$use_mux" == "yes" ]; then
         read -p "Enter mux-width (default: 2): " mux_width
         mux_width=${mux_width:-2}
-    else
-        mux_width=1
+        mux_argument="--mux-width:$mux_width"
     fi
 
     if [ "$server_choice" == "2" ]; then
         read -p "Is this your main server (VPN server)? (yes/no): " is_main_server
-        read -p "Please Enter (IRAN IP) : " server_ip
+        read -p "Please Enter (IRAN IP(internal-server)) : " server_ip
         read -p "Please Enter Password (Please choose the same password on both servers): " password
 
         if [ "$is_main_server" == "yes" ]; then
-            arguments="--kharej --iran-ip:$server_ip --iran-port:443 --toip:127.0.0.1 --toport:multiport --password:$password --sni:$sni --mux-width:$mux_width --terminate:24"
+            arguments="--kharej --iran-ip:$server_ip --iran-port:443 --toip:127.0.0.1 --toport:multiport --password:$password --sni:$sni $mux_argument--terminate:24"
         elif [ "$is_main_server" == "no" ]; then
             read -p "Enter your main IP (VPN Server):  " main_ip
-            arguments="--kharej --iran-ip:$server_ip --iran-port:443 --toip:$main_ip --toport:multiport --password:$password --sni:$sni --mux-width:$mux_width --terminate:24"
+            arguments="--kharej --iran-ip:$server_ip --iran-port:443 --toip:$main_ip --toport:multiport --password:$password --sni:$sni $mux_argument--terminate:24"
         else
             echo "Invalid choice for main server. Please enter 'yes' or 'no'."
             exit 1
@@ -163,9 +205,9 @@ configure_arguments2() {
         if [ "$use_fake_upload" == "yes" ]; then
             read -p "Enter upload-to-download ratio (e.g., 5 for 5:1 ratio): " upload_ratio
             upload_ratio=$((upload_ratio - 1))
-            arguments="--iran --lport:23-65535 --password:$password --sni:$sni --mux-width:$mux_width --noise:$upload_ratio --terminate:24"
+            arguments="--iran --lport:23-65535 --password:$password --sni:$sni $mux_argument--noise:$upload_ratio --terminate:24"
         else
-            arguments="--iran --lport:23-65535 --password:$password --sni:$sni --mux-width:$mux_width --terminate:24"
+            arguments="--iran --lport:23-65535 --password:$password --sni:$sni $mux_argument--terminate:24"
         fi
         
         num_ips=0
@@ -191,7 +233,7 @@ load-balancer() {
     root_access
     check_dependencies
     check_lbinstalled
-    install_rtt
+    install_selected_version
     # Change directory to /etc/systemd/system
     cd /etc/systemd/system
     configure_arguments2
@@ -232,7 +274,7 @@ lb_uninstall() {
     sudo rm /etc/systemd/system/lbtunnel.service
     sudo systemctl reset-failed
     sudo rm RTT
-    sudo rm install.sh
+    sudo rm install.sh 2>/dev/nul
 
     echo "Uninstallation completed successfully."
 }
@@ -253,7 +295,7 @@ uninstall() {
     sudo rm /etc/systemd/system/tunnel.service
     sudo systemctl reset-failed
     sudo rm RTT
-    sudo rm install.sh
+    sudo rm install.sh 2>/dev/nul
 
     echo "Uninstallation completed successfully."
 }
@@ -268,6 +310,7 @@ update_services() {
     # Compare the installed version with the latest version
     if [[ "$latest_version" > "$installed_version" ]]; then
         echo "Updating to $latest_version (Installed: $installed_version)..."
+        
         if sudo systemctl is-active --quiet tunnel.service; then
             echo "tunnel.service is active, stopping..."
             sudo systemctl stop tunnel.service > /dev/null 2>&1
@@ -280,12 +323,14 @@ update_services() {
         wget "https://raw.githubusercontent.com/radkesvat/ReverseTlsTunnel/master/install.sh" -O install.sh && chmod +x install.sh && bash install.sh
 
         # Start the previously active service
-        if sudo systemctl is-active --quiet tunnel.service; then
-            echo "Restarting tunnel.service..."
-            sudo systemctl start tunnel.service > /dev/null 2>&1
-        elif sudo systemctl is-active --quiet lbtunnel.service; then
-            echo "Restarting lbtunnel.service..."
-            sudo systemctl start lbtunnel.service > /dev/null 2>&1
+        if sudo systemctl list-units --type=service --all | grep -q 'tunnel.service'; then
+            echo "Starting tunnel.service..."
+            sudo systemctl start tunnel.service
+        fi
+
+        if sudo systemctl list-units --type=service --all | grep -q 'lbtunnel.service'; then
+            echo "Starting lbtunnel.service..."
+            sudo systemctl start lbtunnel.service
         fi
 
         echo "Service updated and restarted successfully."
@@ -346,8 +391,93 @@ compile() {
     echo "RTT file is located at: ReverseTlsTunnel/dist"
 }
 
+# Function to start the tunnel service
+start_tunnel() {
+    # Check if the service is installed
+    if sudo systemctl is-enabled --quiet tunnel.service; then
+        # Service is installed, start it
+        sudo systemctl start tunnel.service > /dev/null 2>&1
 
-#ip & version
+        if sudo systemctl is-active --quiet tunnel.service; then
+            echo "Tunnel service started."
+        else
+            echo "Tunnel service failed to start."
+        fi
+    else
+        echo "Multiport Tunnel is not installed."
+    fi
+}
+
+stop_tunnel() {
+    # Check if the service is installed
+    if sudo systemctl is-enabled --quiet tunnel.service; then
+        # Service is installed, stop it
+        sudo systemctl stop tunnel.service > /dev/null 2>&1
+
+        if sudo systemctl is-active --quiet tunnel.service; then
+            echo "Tunnel service failed to stop."
+        else
+            echo "Tunnel service stopped."
+        fi
+    else
+        echo "Multiport Tunnel is not installed."
+    fi
+}
+
+check_tunnel_status() {
+    # Check the status of the tunnel service
+    if sudo systemctl is-active --quiet tunnel.service; then
+        echo "Multiport is:[running ✔]"
+    else
+        echo "Multiport is:[Not running ✗ ]"
+    fi
+}
+
+# Function to start the tunnel service
+start_lb_tunnel() {
+    # Check if the service is installed
+    if sudo systemctl is-enabled --quiet lbtunnel.service; then
+        # Service is installed, start it
+        sudo systemctl start lbtunnel.service > /dev/null 2>&1
+
+        if sudo systemctl is-active --quiet lbtunnel.service; then
+            echo "Tunnel service started."
+        else
+            echo "Tunnel service failed to start."
+        fi
+    else
+        echo "Load-Balancer is not installed."
+    fi
+}
+
+
+stop_lb_tunnel() {
+    # Check if the service is installed
+    if sudo systemctl is-enabled --quiet lbtunnel.service; then
+        # Service is installed, stop it
+        sudo systemctl stop lbtunnel.service > /dev/null 2>&1
+
+        if sudo systemctl is-active --quiet lbtunnel.service; then
+            echo "Load-Balancer failed to stop."
+        else
+            echo "Load-Balancer stopped."
+        fi
+    else
+        echo "Load-Balancer is not installed."
+    fi
+}
+
+check_lb_tunnel_status() {
+    # Check the status of the load balancer tunnel service
+    if sudo systemctl is-active --quiet lbtunnel.service; then
+        echo "Load balancer is:[running ✔]"
+    else
+        echo "Load balancer is:[Not running ✗ ]"
+    fi
+}
+
+
+#ip  & version
 myip=$(hostname -I | awk '{print $1}')
 version=$(./RTT -v 2>&1 | grep -o 'version="[0-9.]*"')
 
@@ -355,16 +485,25 @@ version=$(./RTT -v 2>&1 | grep -o 'version="[0-9.]*"')
 clear
 echo "By --> Peyman * Github.com/Ptechgithub * "
 echo "Your IP is: ($myip) "
-echo ""
+echo "**********************"
+check_tunnel_status
+check_lb_tunnel_status
+echo "**********************"
 echo " --------#- Reverse Tls Tunnel -#--------"
 echo "1) Install (Multiport)"
 echo "2) Uninstall (Multiport)"
+echo "3) Start Multiport"
+echo "4) Stop Multiport"
+echo "5) Check Status"
 echo " ----------------------------"
-echo "3) Install Load-balancer"
-echo "4) Uninstall Load-balancer"
+echo "6) Install Load-balancer"
+echo "7) Uninstall Load-balancer"
+echo "8) Start Load Balancer"
+echo "9) Stop Load Balancer"
+echo "10) Check status"
 echo " ----------------------------"
-echo "5) Update RTT"
-echo "6) Compile RTT"
+echo "11) Update RTT"
+echo "12) Compile RTT"
 echo "0) Exit"
 echo " --------------$version--------------"
 read -p "Please choose: " choice
@@ -377,15 +516,33 @@ case $choice in
         uninstall
         ;;
     3)
-        load-balancer
+        start_tunnel
         ;;
     4)
-        lb_uninstall
-       ;;
-    5) 
-        update_services
-       ;;
+        stop_tunnel
+        ;;
+    5)
+        check_tunnel_status
+        ;;
     6)
+        load-balancer
+        ;;
+    7)
+        lb_uninstall
+        ;;
+    8)
+        start_lb_tunnel
+        ;;
+    9)
+        stop_lb_tunnel
+        ;;
+    10)
+        check_lb_tunnel_status
+        ;;
+    11) 
+        update_services
+        ;;
+    12)
         compile
         ;;
     0)   
@@ -393,5 +550,5 @@ case $choice in
         ;;
     *)
         echo "Invalid choice. Please try again."
-        ;;
+       ;;
 esac
