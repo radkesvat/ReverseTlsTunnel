@@ -1,5 +1,5 @@
 import std/[strformat, strutils, random, endians]
-import chronos , chronos/transports/datagram , chronos/osdefs
+import chronos , chronos/transports/[datagram,ipnet] , chronos/osdefs
 import times, print, connection, pipe
 from globals import nil
 
@@ -215,7 +215,7 @@ proc processTcpConnection(client: Connection) {.async.} =
 
                 if globals.log_data_len: echo &"[processClient] {data.len()} bytes from client {client.id}"
 
-             #trust based route
+                #trust based route
                 if client.trusted == TrustStatus.pending:
 
                     var trust = monitorData(data)
@@ -233,17 +233,20 @@ proc processTcpConnection(client: Connection) {.async.} =
                     else:
                         if first_packet:
                             if not data.contains(globals.final_target_domain):
+                                if globals.trusted_foreign_peers.len != 0 or  context.peer_ip != IpAddress():
+                                    #user wants to use panel via iran ip
+                                    client.trusted = TrustStatus.pending
+                                else:
+                                    echo "[Error] user connection but no peer connected yet."
+                                    await closeLine(client, remote)
+                                    return
+                        if not (globals.trusted_foreign_peers.len != 0 or  context.peer_ip != IpAddress()):
+                            if (epochTime().uint - client.creation_time) > globals.trust_time:
                                 #user connection but no peer connected yet
+                                #peer connection but couldnt finish handshake in time
                                 client.trusted = TrustStatus.no
-                                echo "[Error] user connection but no peer connected yet."
                                 await closeLine(client, remote)
                                 return
-                        if (epochTime().uint - client.creation_time) > globals.trust_time:
-                            #user connection but no peer connected yet
-                            #peer connection but couldnt finish handshake in time
-                            client.trusted = TrustStatus.no
-                            await closeLine(client, remote)
-                            return
 
                     first_packet = false
 
@@ -296,11 +299,18 @@ proc processTcpConnection(client: Connection) {.async.} =
     #Initialize remote
     try:
         var remote: Connection = nil
-        if globals.trusted_foreign_peers.len != 0 and
-            client.transp.remoteAddress.address in globals.trusted_foreign_peers:
-            #load balancer connection
-            remote = await connectTargetSNI()
-            asyncCheck processUntrustedRemote(remote)
+        if globals.trusted_foreign_peers.len != 0 :
+                if isV4Mapped(client.transp.remoteAddress):
+                    let ipv4 = toIPv4(client.transp.remoteAddress).address
+                    if ipv4 in globals.trusted_foreign_peers:
+                        #load balancer connection
+                        remote = await connectTargetSNI()
+                        asyncCheck processUntrustedRemote(remote)
+                else:
+                    if client.transp.remoteAddress.address in globals.trusted_foreign_peers:
+                        #load balancer connection
+                        remote = await connectTargetSNI()
+                        asyncCheck processUntrustedRemote(remote)
 
         elif context.peer_ip != IpAddress() and
             context.peer_ip != client.transp.remoteAddress.address:
