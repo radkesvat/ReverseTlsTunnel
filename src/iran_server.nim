@@ -378,7 +378,6 @@ proc processUdpPacket(client:UdpConnection) {.async.} =
             if globals.log_conn_create: echo "Associated a peer connection, cid: ", remote.id
         else:
             echo &"[AssociatedCon][Error] left without connection, closes forcefully."
-            await client.closeWait()
             return
         await processClient(remote)
 
@@ -475,15 +474,15 @@ proc start*(){.async.} =
 
                 asyncCheck processUdpPacket(connection)
 
-        var address4 = initTAddress(globals.listen_addr4, globals.listen_port.Port)
+        # var address4 = initTAddress(globals.listen_addr4, globals.listen_port.Port)
         var address6 = initTAddress(globals.listen_addr6, globals.listen_port.Port)
 
-        var dgramServer4 = newDatagramTransport(handleDatagram, local = address4,flags = {ReuseAddr})
-        echo &"Started udp server  {globals.listen_addr4}:{globals.listen_port}"
+        # var dgramServer4 = newDatagramTransport(handleDatagram, local = address4,flags = {ReuseAddr})
+        # echo &"Started udp server  {globals.listen_addr4}:{globals.listen_port}"
         var dgramServer6 = newDatagramTransport6(handleDatagram, local = address6,flags = {ReuseAddr})
         echo &"Started udp server  {globals.listen_addr6}:{globals.listen_port}"
 
-        await dgramServer4.join() and dgramServer6.join()
+        await dgramServer6.join()
         echo "Udp server ended."
 
     # trackIdleConnections(context.available_peer_inbounds, globals.pool_age)
