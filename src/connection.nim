@@ -83,6 +83,16 @@ proc findUdp*(conns:UdpConnections, raddr: TransportAddress): tuple[result: bool
             return (true,el)
     return (false,nil)
 
+
+proc findUdp*(conns:UdpConnections, filedesc: AsyncFD): tuple[result: bool, connection: UdpConnection] =
+    for el in conns:
+        if el.transp.fd == filedesc:
+            el.hit()
+            return (true,el)
+    return (false,nil)
+
+
+
 # proc id*(x: UdpConnection): int =
 #     ## Computes a Hash from `x`.
 #     var h: Hash = 0
