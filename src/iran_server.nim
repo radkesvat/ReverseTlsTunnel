@@ -380,7 +380,7 @@ proc processUdpPacket(client:UdpConnection) {.async.} =
             remote = context.available_peer_inbounds.randomPick() 
             if remote != nil and not remote.closed:
                 break
-            
+
         if remote != nil:
             if globals.log_conn_create: echo "Associated a peer connection, cid: ", remote.id
         else:
@@ -430,7 +430,10 @@ proc start*(){.async.} =
 
         let server: StreamServer =
             try:
-                createStreamServer(address, serveStreamClient, {ReuseAddr})
+                var flags = {ServerFlags.TcpNoDelay, ServerFlags.ReuseAddr}
+                if globals.keep_system_limit:
+                    flags.excl ServerFlags.TcpNoDelay
+                createStreamServer(address, serveStreamClient, flags = flags)
             except TransportOsError as exc:
                 raise exc
             except CatchableError as exc:
