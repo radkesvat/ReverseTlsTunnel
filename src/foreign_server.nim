@@ -73,6 +73,7 @@ proc acquireClientConnection(): Future[Connection] {.async.} =
     return nil
 
 
+
 proc processConnection(client: Connection) {.async.} =
 
 
@@ -86,12 +87,13 @@ proc processConnection(client: Connection) {.async.} =
 
     proc processUdpRemote(remote: UdpConnection) {.async.} =
         var client = client
-        var pbytes = remote.transp.getMessage()
-        var nbytes = len(pbytes)
+      
         let width = globals.full_tls_record_len.int + globals.mux_record_len.int
 
         try:
             #read
+            var pbytes = remote.transp.getMessage()
+            var nbytes = len(pbytes)
             if nbytes > 0:
                 var data = newStringOfCap(cap = nbytes + width); data.setlen(nbytes + width)
                 copyMem(addr data[0 + width], addr pbytes[0], data.len - width)
@@ -107,7 +109,8 @@ proc processConnection(client: Connection) {.async.} =
                 packForSend(data, remote.id, remote.port.uint16,flags = {DataFlags.udp})        
                 await client.twriter.write(data)
                 if globals.log_data_len: echo &"[processUdpRemote] Sent {data.len()} bytes ->  client (udp)"
-
+            else:
+                quit "0 byte udp income"
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 

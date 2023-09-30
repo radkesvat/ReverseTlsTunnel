@@ -9,6 +9,7 @@ type
         listener: StreamServer
         user_inbounds: Connections
         user_inbounds_udp: UdpConnections
+        listener_udp: DatagramTransport
         available_peer_inbounds: Connections
         peer_ip: IpAddress
 
@@ -128,7 +129,7 @@ proc processTrustedRemote(remote: Connection) {.async.} =
                     child_client.hit()
                     
                     if not child_client.closed:
-                        await child_client.transp.sendTo(child_client.raddr, data)
+                        await child_client.sendTo(child_client.raddr, data)
                         if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
                     inc remote.udp_packets; if remote.udp_packets > globals.udp_max_ppc: remote.close()
                     
@@ -362,7 +363,8 @@ proc processUdpPacket(client:UdpConnection) {.async.} =
 
                 client.hit()
                 inc remote.udp_packets; if remote.udp_packets > globals.udp_max_ppc: remote.close()
-
+            else:
+                quit "0 byte udp income"
 
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
@@ -482,10 +484,10 @@ proc start*(){.async.} =
 
         # var dgramServer4 = newDatagramTransport(handleDatagram, local = address4,flags = {ReuseAddr})
         # echo &"Started udp server  {globals.listen_addr4}:{globals.listen_port}"
-        var dgramServer6 = newDatagramTransport6(handleDatagram, local = address6,flags = {ReuseAddr})
+        context.listener_udp = newDatagramTransport6(handleDatagram, local = address6,flags = {ReuseAddr})
         echo &"Started udp server  {globals.listen_addr6}:{globals.listen_port}"
 
-        await dgramServer6.join()
+        await context.listener_udp.join()
         echo "Udp server ended."
 
     # trackIdleConnections(context.available_peer_inbounds, globals.pool_age)
