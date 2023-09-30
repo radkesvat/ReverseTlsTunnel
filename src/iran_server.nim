@@ -362,9 +362,8 @@ proc processUdpPacket(client:UdpConnection) {.async.} =
 
                 client.hit()
                 inc remote.udp_packets; if remote.udp_packets > globals.udp_max_ppc: remote.close()
-            else:
-                client.close()
-                context.user_inbounds_udp.remove(client)
+
+
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
