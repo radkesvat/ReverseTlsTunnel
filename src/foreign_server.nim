@@ -95,7 +95,7 @@ proc processConnection(client: Connection) {.async.} =
             if nbytes > 0:
                 var data = newStringOfCap(cap = nbytes + width); data.setlen(nbytes + width)
                 copyMem(addr data[0 + width], addr pbytes[0], data.len - width)
-                if globals.log_data_len: echo &"[processUdpRemote] {data.len()} bytes from remote {client.id}"
+                if globals.log_data_len: echo &"[processUdpRemote] {data.len()} bytes from remote {client.id} (udp)"
 
                 #write
                 if client.closed:
@@ -103,9 +103,9 @@ proc processConnection(client: Connection) {.async.} =
                     if client == nil:
                         return
 
-                packForSend(data, remote.id, remote.port.uint16)        
+                packForSend(data, remote.id, remote.port.uint16,flags = {DataFlags.udp})        
                 await client.twriter.write(data)
-                if globals.log_data_len: echo &"[processUdpRemote] Sent {data.len()} bytes ->  client"
+                if globals.log_data_len: echo &"[processUdpRemote] Sent {data.len()} bytes ->  client (udp)"
 
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
@@ -133,7 +133,7 @@ proc processConnection(client: Connection) {.async.} =
                     client = await acquireClientConnection()
                     if client == nil: break
 
-                packForSend(data, remote.id, remote.port.uint16,flags = {DataFlags.udp})
+                packForSend(data, remote.id, remote.port.uint16)
                 await client.twriter.write(data)
                 if globals.log_data_len: echo &"[processRemote] Sent {data.len()} bytes ->  client"
 

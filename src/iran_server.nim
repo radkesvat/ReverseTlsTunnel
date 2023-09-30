@@ -177,7 +177,7 @@ proc processTcpConnection(client: Connection) {.async.} =
                         continue
 
                 await remote.reader.readExactly(addr data[0], data.len)
-                if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
+                if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote "
 
                 # write
                 if not client.closed:
