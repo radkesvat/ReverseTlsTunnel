@@ -350,7 +350,7 @@ proc processUdpPacket(client:UdpConnection) {.async.} =
                         if globals.log_conn_error: echo &"[Error] left without connection, closes forcefully."
                         return
 
-                data.packForSend(client.id, client.port.uint16)
+                data.packForSend(client.id, client.port.uint16,flags = {DataFlags.udp})
                 await remote.writer.write(data)
 
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"

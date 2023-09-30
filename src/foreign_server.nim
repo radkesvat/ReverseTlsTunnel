@@ -133,7 +133,7 @@ proc processConnection(client: Connection) {.async.} =
                     client = await acquireClientConnection()
                     if client == nil: break
 
-                packForSend(data, remote.id, remote.port.uint16)
+                packForSend(data, remote.id, remote.port.uint16,flags = {DataFlags.udp})
                 await client.twriter.write(data)
                 if globals.log_data_len: echo &"[processRemote] Sent {data.len()} bytes ->  client"
 
