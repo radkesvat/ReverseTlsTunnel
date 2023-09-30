@@ -13,6 +13,9 @@
 
 [راهنمای آیپی v6](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/Ipv6.md)
 
+[راهنمای فوروارد UDP](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/Udp.md)
+
+
 
  حتما با اجرای دوباره دستور نصب همیشه اپدیت کنید
  
