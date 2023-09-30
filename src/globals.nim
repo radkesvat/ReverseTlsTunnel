@@ -43,7 +43,7 @@ var listen_addr6* = "::"
 var listen_port*: Port = 0.Port
 var next_route_addr* = ""
 var next_route_port*: Port = 0.Port
-# var iran_addr* = ""
+var iran_addr* = ""
 var iran_port*: Port = 0.Port
 var final_target_domain* = ""
 var final_target_ip*: string
