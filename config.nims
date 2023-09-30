@@ -1,6 +1,6 @@
 import std/[strformat,macros,strutils,ospaths]
 
-const Release = false
+const Release = true
 
 
 const libs_dir = "libs"
