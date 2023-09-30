@@ -101,6 +101,7 @@ proc processConnection(client: Connection) {.async.} =
                 if client.closed:
                     client = await acquireClientConnection()
                     if client == nil:
+                        echo "[Error] no client for udp ! "
                         return
 
                 packForSend(data, remote.id, remote.port.uint16,flags = {DataFlags.udp})        

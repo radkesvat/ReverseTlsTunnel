@@ -29,8 +29,8 @@ var pool_age*: uint = 15
 var max_pool_unused_time*: uint = 60 #secs
 let mux_record_len*: uint32 = 5 #2bytes port 2bytes id 1byte reserved
 var mux_width*: uint32 = 1 # 1 -> disabeld
-var udp_max_ppc*:uint32 = 5000
-var udp_max_idle_time*:uint = 60 #secs
+var udp_max_ppc*:uint32 = 10000
+var udp_max_idle_time*:uint = 600 #secs
 
 # [Noise]
 var noise_ratio*: uint = 0
