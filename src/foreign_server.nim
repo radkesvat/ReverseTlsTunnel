@@ -214,7 +214,7 @@ proc processConnection(client: Connection) {.async.} =
                 if DataFlags.udp in cast[TransferFlags](flag):
                     proc handleDatagram(transp: DatagramTransport,
                         raddr: TransportAddress): Future[void] {.async.} =
-                            var (found,connection) = findUdp(context.outbounds_udp,raddr)
+                            var (found,connection) = findUdp(context.outbounds_udp,transp.localAddress)
                             if found:
                                 await processUdpRemote(connection)
                             
@@ -228,7 +228,7 @@ proc processConnection(client: Connection) {.async.} =
                         let ta = initTAddress(globals.next_route_addr, if globals.multi_port: port.Port else: globals.next_route_port)
                         var transp = newDatagramTransport(handleDatagram, remote = ta)
                         
-                        var connection = UdpConnection.new(transp,ta)
+                        var connection = UdpConnection.new(transp,transp.localAddress)
                         connection.id = cid
                         context.outbounds_udp.register connection
                         await connection.transp.send(data)
