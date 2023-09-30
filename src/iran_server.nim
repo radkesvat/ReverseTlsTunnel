@@ -300,6 +300,7 @@ proc processTcpConnection(client: Connection) {.async.} =
     try:
         var remote: Connection = nil
         if globals.trusted_foreign_peers.len != 0 :
+
                 if isV4Mapped(client.transp.remoteAddress):
                     let ipv4 = toIPv4(client.transp.remoteAddress).address
                     if ipv4 in globals.trusted_foreign_peers:
@@ -312,22 +313,23 @@ proc processTcpConnection(client: Connection) {.async.} =
                         remote = await connectTargetSNI()
                         asyncCheck processUntrustedRemote(remote)
 
-        elif context.peer_ip != IpAddress() and
-            context.peer_ip != client.transp.remoteAddress.address:
-            if globals.log_conn_create: echo "Real User connected !"
-            client.trusted = TrustStatus.no
-            remote = await acquireRemoteConnection() #associate peer
-            if remote != nil:
-                if globals.log_conn_create: echo "Associated a peer connection, cid: ", remote.id
-                context.user_inbounds.register(client)
+        if remote == nil:
+            if context.peer_ip != IpAddress() and
+                context.peer_ip != client.transp.remoteAddress.address:
+                if globals.log_conn_create: echo "Real User connected !"
+                client.trusted = TrustStatus.no
+                remote = await acquireRemoteConnection() #associate peer
+                if remote != nil:
+                    if globals.log_conn_create: echo "Associated a peer connection, cid: ", remote.id
+                    context.user_inbounds.register(client)
 
+                else:
+                    echo &"[AssociatedCon][Error] left without connection, closes forcefully."
+                    await client.closeWait()
+                    return
             else:
-                echo &"[AssociatedCon][Error] left without connection, closes forcefully."
-                await client.closeWait()
-                return
-        else:
-            remote = await connectTargetSNI()
-            asyncCheck processUntrustedRemote(remote)
+                remote = await connectTargetSNI()
+                asyncCheck processUntrustedRemote(remote)
 
         asyncCheck processClient(remote)
 
