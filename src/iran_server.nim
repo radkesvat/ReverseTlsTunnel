@@ -129,7 +129,7 @@ proc processTrustedRemote(remote: Connection) {.async.} =
                     child_client.hit()
                     
                     if not child_client.closed:
-                        await child_client.sendTo(child_client.raddr, data)
+                        await child_client.transp.sendTo(child_client.raddr, data)
                         if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
                     inc remote.udp_packets; if remote.udp_packets > globals.udp_max_ppc: remote.close()
                     
