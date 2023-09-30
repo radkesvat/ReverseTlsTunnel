@@ -371,7 +371,11 @@ proc processUdpPacket(client:UdpConnection) {.async.} =
     #Initialize remote
     try:
         if globals.log_conn_create: echo "Real User connected (UDP) !"
-        var remote = await acquireRemoteConnection(mark = false) #associate peer
+
+        var remote = await acquireRemoteConnection(not client.mark) #associate peer
+
+        if not client.mark:
+            client.mark = true
         
         if remote != nil:
             if globals.log_conn_create: echo "Associated a peer connection, cid: ", remote.id

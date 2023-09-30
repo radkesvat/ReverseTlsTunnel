@@ -56,7 +56,7 @@ type
         transp*: DatagramTransport
         raddr*: TransportAddress
         port*: Port               #the port the socket points to
-
+        mark*:bool
 
     Connections* = seq[Connection]
     UdpConnections* = seq[UdpConnection]
