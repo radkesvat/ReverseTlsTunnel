@@ -128,9 +128,9 @@ proc processTrustedRemote(remote: Connection) {.async.} =
                     unPackForRead(data)
                     child_client.hit()
                     
-                    if not child_client.closed:
-                        await child_client.transp.sendTo(child_client.raddr, data)
-                        if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
+                    await child_client.transp.sendTo(child_client.raddr, data)
+                    if globals.log_data_len: echo &"[processRemote] {data.len()} bytes -> client"
+                    
                     inc remote.udp_packets; if remote.udp_packets > globals.udp_max_ppc: remote.close()
                     
             else:
@@ -363,8 +363,7 @@ proc processUdpPacket(client:UdpConnection) {.async.} =
 
                 client.hit()
                 inc remote.udp_packets; if remote.udp_packets > globals.udp_max_ppc: remote.close()
-            else:
-                quit "0 byte udp income"
+   
 
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()

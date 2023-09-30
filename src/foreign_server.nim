@@ -96,21 +96,20 @@ proc processConnection(client: Connection) {.async.} =
             var nbytes = len(pbytes)
             if nbytes > 0:
                 var data = newStringOfCap(cap = nbytes + width); data.setlen(nbytes + width)
-                copyMem(addr data[0 + width], addr pbytes[0], data.len - width)
-                if globals.log_data_len: echo &"[processUdpRemote] {data.len()} bytes from remote {client.id} (udp)"
+                copyMem(addr data[0 + width], addr pbytes[0], nbytes)
+                if globals.log_data_len: echo &"[processUdpRemote] {nbytes} bytes from remote {client.id} (udp)"
 
                 #write
                 if client.closed:
                     client = await acquireClientConnection()
                     if client == nil:
-                        echo "[Error] no client for udp ! "
+                        echo "[Error] no client for udp !"
                         return
 
                 packForSend(data, remote.id, remote.port.uint16,flags = {DataFlags.udp})        
                 await client.twriter.write(data)
                 if globals.log_data_len: echo &"[processUdpRemote] Sent {data.len()} bytes ->  client (udp)"
-            else:
-                quit "0 byte udp income"
+
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
