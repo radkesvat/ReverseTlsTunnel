@@ -451,7 +451,7 @@ proc start*(){.async.} =
                     connection = UdpConnection.new(transp,raddr)
                     context.user_inbounds_udp.register connection
 
-                let address = connection.transp.remoteAddress()
+                let address = raddr
                 if globals.log_conn_create: print "Connected client: ", address
 
                 if globals.multi_port:
