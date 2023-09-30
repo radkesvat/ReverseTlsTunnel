@@ -130,7 +130,7 @@ proc processTrustedRemote(remote: Connection) {.async.} =
                     
                     await child_client.transp.sendTo(child_client.raddr, data)
                     if globals.log_data_len: echo &"[processRemote] {data.len()} bytes -> client"
-                    
+
                     inc remote.udp_packets; if remote.udp_packets > globals.udp_max_ppc: remote.close()
                     
             else:
@@ -453,6 +453,7 @@ proc start*(){.async.} =
                 if not found: 
                     connection = UdpConnection.new(transp,raddr)
                     context.user_inbounds_udp.register connection
+                    echo "----------------------------------------------------------------------------------------"
 
                 let address = raddr
                 if globals.log_conn_create: print "Connected client: ", address
