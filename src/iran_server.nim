@@ -438,7 +438,7 @@ proc start*(){.async.} =
             globals.createIptablesForwardRules()
 
         server.start()
-        echo &"Started tcp server... {globals.listen_addr6}:{globals.listen_port}"
+        echo &"Started tcp server  {globals.listen_addr6}:{globals.listen_port}"
 
 
     proc startUdpListener() {.async.} =
@@ -479,7 +479,10 @@ proc start*(){.async.} =
         var address6 = initTAddress(globals.listen_addr6, globals.listen_port.Port)
 
         var dgramServer4 = newDatagramTransport(handleDatagram, local = address4,flags = {ReuseAddr})
+        echo &"Started udp server  {globals.listen_addr4}:{globals.listen_port}"
         var dgramServer6 = newDatagramTransport6(handleDatagram, local = address6,flags = {ReuseAddr})
+        echo &"Started udp server  {globals.listen_addr6}:{globals.listen_port}"
+
         await dgramServer4.join() and dgramServer6.join()
         echo "Udp server ended."
 
