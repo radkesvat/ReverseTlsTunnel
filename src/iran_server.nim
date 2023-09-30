@@ -490,6 +490,8 @@ proc start*(){.async.} =
 
         # var dgramServer4 = newDatagramTransport(handleDatagram, local = address4,flags = {ReuseAddr})
         # echo &"Started udp server  {globals.listen_addr4}:{globals.listen_port}"
+                var flags = {ServerFlags.TcpNoDelay, ServerFlags.ReuseAddr}
+
         context.listener_udp = newDatagramTransport6(handleDatagram, local = address6,flags = {ReuseAddr})
         echo &"Started udp server  {globals.listen_addr6}:{globals.listen_port}"
 
