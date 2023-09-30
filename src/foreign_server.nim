@@ -222,6 +222,8 @@ proc processConnection(client: Connection) {.async.} =
                         context.outbounds_udp.with(cid,udp_remote):
                             udp_remote.hit()
                             await udp_remote.transp.send(data)
+                            if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote (presist udp)"
+
                     else:
                         let ta = initTAddress(globals.next_route_addr, if globals.multi_port: port.Port else: globals.next_route_port)
                         var transp = newDatagramTransport(handleDatagram, remote = ta)
@@ -230,6 +232,8 @@ proc processConnection(client: Connection) {.async.} =
                         connection.id = cid
                         context.outbounds_udp.register connection
                         await connection.transp.send(data)
+                        if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote (udp)"
+                        
 
                 else:
                     if context.outbounds.hasID(cid):
