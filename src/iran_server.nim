@@ -215,7 +215,7 @@ proc processTcpConnection(client: Connection) {.async.} =
 
                 if globals.log_data_len: echo &"[processClient] {data.len()} bytes from client {client.id}"
 
-                #trust based route
+             #trust based route
                 if client.trusted == TrustStatus.pending:
 
                     var trust = monitorData(data)
@@ -233,23 +233,19 @@ proc processTcpConnection(client: Connection) {.async.} =
                     else:
                         if first_packet:
                             if not data.contains(globals.final_target_domain):
-                                if globals.trusted_foreign_peers.len != 0 or  context.peer_ip != IpAddress():
-                                    #user wants to use panel via iran ip
-                                    client.trusted = TrustStatus.pending
-                                else:
-                                    echo "[Error] user connection but no peer connected yet."
-                                    await closeLine(client, remote)
-                                    return
-                        if not (globals.trusted_foreign_peers.len != 0 or  context.peer_ip != IpAddress()):
-                            if (epochTime().uint - client.creation_time) > globals.trust_time:
                                 #user connection but no peer connected yet
-                                #peer connection but couldnt finish handshake in time
                                 client.trusted = TrustStatus.no
+                                echo "[Error] user connection but no peer connected yet."
                                 await closeLine(client, remote)
                                 return
+                        if (epochTime().uint - client.creation_time) > globals.trust_time:
+                            #user connection but no peer connected yet
+                            #peer connection but couldnt finish handshake in time
+                            client.trusted = TrustStatus.no
+                            await closeLine(client, remote)
+                            return
 
                     first_packet = false
-
 
                 #write
                 if remote.closed:
