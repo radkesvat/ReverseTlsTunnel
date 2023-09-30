@@ -30,15 +30,15 @@ var max_pool_unused_time*: uint = 60 #secs
 let mux_record_len*: uint32 = 5 #2bytes port 2bytes id 1byte reserved
 var mux_width*: uint32 = 1 # 1 -> disabeld
 var udp_max_ppc*:uint32 = 500
-var udp_max_idle_time*:uint = 60 #secs
+var udp_max_idle_time*:uint = 15 #secs
 
 # [Noise]
 var noise_ratio*: uint = 0
 
 
 # [Routes]
-var listen_addr4* = "0.0.0.0"
-var listen_addr6* = "::"
+# var listen_addr4* = "0.0.0.0"
+var listen_addr* = "::"
 
 var listen_port*: Port = 0.Port
 var next_route_addr* = ""
@@ -262,12 +262,10 @@ proc init*() =
                         trust_time = parseInt(p.val).uint
                         print trust_time
 
-                    of "listen4":
-                        listen_addr4 = (p.val)
-                        print listen_addr4
-                    of "listen6":
-                        listen_addr6 = (p.val)
-                        print listen_addr6
+    
+                    of "listen":
+                        listen_addr = (p.val)
+                        print listen_addr
 
                     of "log":
                         case (p.val).parseInt:

@@ -426,7 +426,7 @@ proc start*(){.async.} =
                 echo getCurrentExceptionMsg()
 
 
-        var address = initTAddress(globals.listen_addr6, globals.listen_port.Port)
+        var address = initTAddress(globals.listen_addr, globals.listen_port.Port)
 
         let server: StreamServer =
             try:
@@ -447,7 +447,7 @@ proc start*(){.async.} =
             globals.createIptablesForwardRules()
 
         server.start()
-        echo &"Started tcp server  {globals.listen_addr6}:{globals.listen_port}"
+        echo &"Started tcp server  {globals.listen_addr}:{globals.listen_port}"
 
 
     proc startUdpListener() {.async.} =
@@ -459,7 +459,6 @@ proc start*(){.async.} =
                 if not found: 
                     connection = UdpConnection.new(transp,raddr)
                     context.user_inbounds_udp.register connection
-                    echo "----------------------------------------------------------------------------------------"
 
                 let address = raddr
                 if globals.log_conn_create: print "Connected client: ", address
@@ -486,15 +485,13 @@ proc start*(){.async.} =
                 asyncCheck processUdpPacket(connection)
 
         # var address4 = initTAddress(globals.listen_addr4, globals.listen_port.Port)
-        var address6 = initTAddress(globals.listen_addr6, globals.listen_port.Port)
+        var address = initTAddress(globals.listen_addr, globals.listen_port.Port)
 
         # var dgramServer4 = newDatagramTransport(handleDatagram, local = address4,flags = {ReuseAddr})
         # echo &"Started udp server  {globals.listen_addr4}:{globals.listen_port}"
-        var flags = {ServerFlags.TcpNoDelay, ServerFlags.ReuseAddr}
-        if globals.keep_system_limit:
-            flags.excl ServerFlags.TcpNoDelay      
-        context.listener_udp = newDatagramTransport6(handleDatagram, local = address6,flags = flags)
-        echo &"Started udp server  {globals.listen_addr6}:{globals.listen_port}"
+    
+        context.listener_udp = newDatagramTransport6(handleDatagram, local = address,flags = {ServerFlags.ReuseAddr})
+        echo &"Started udp server  {globals.listen_addr}:{globals.listen_port}"
 
         await context.listener_udp.join()
         echo "Udp server ended."

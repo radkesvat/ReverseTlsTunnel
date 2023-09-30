@@ -232,7 +232,6 @@ proc processConnection(client: Connection) {.async.} =
                         var transp = newDatagramTransport(handleDatagram, remote = ta)
                         
                         var connection = UdpConnection.new(transp,ta)
-                        echo "----------------------------------------------------------------------------------------"
 
                         connection.id = cid
                         context.outbounds_udp.register connection
