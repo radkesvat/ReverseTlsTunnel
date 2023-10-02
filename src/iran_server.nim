@@ -436,12 +436,6 @@ proc start*(){.async.} =
                 raise exc
             except CatchableError as exc:
                 raise exc
-
-        when defined windows:
-            if not setSockOpt(server.sock,osdefs.IPPROTO_IPV6,IPV6_V6ONLY,0):
-                echo "[Warning] Failed to bind the Tcp server on both ipv4/6 ! you will only be able to accept ipv6 connections because of this!"
-                echo "the server will start after 10 secconds..."
-                await sleepAsync(timer.seconds(10))
         
         context.listener = server
 
@@ -496,11 +490,6 @@ proc start*(){.async.} =
         # echo &"Started udp server  {globals.listen_addr4}:{globals.listen_port}"
     
         context.listener_udp = newDatagramTransport6(handleDatagram, local = address,flags = {ServerFlags.ReuseAddr})
-        when defined windows:
-            if not setSockOpt(context.listener_udp.fd,osdefs.IPPROTO_IPV6,IPV6_V6ONLY,0):
-                echo "[Warning] Failed to bind the Udp server on both ipv4/6 ! you will only be able to accept ipv6 connections because of this!"
-                echo "the server will start after 10 secconds..."
-                await sleepAsync(timer.seconds(10))
             
         echo &"Started udp server  {globals.listen_addr}:{globals.listen_port}"
 

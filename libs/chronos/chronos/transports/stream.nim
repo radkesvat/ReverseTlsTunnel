@@ -742,6 +742,9 @@ when defined(windows):
         retFuture.fail(getTransportOsError(osLastError()))
         return retFuture
 
+
+
+
       if SocketFlags.ReuseAddr in flags:
         if not(setSockOpt(sock, SOL_SOCKET, SO_REUSEADDR, 1)):
           let err = osLastError()
@@ -1949,6 +1952,11 @@ proc createStreamServer*(host: TransportAddress,
         if wres.isErr():
           raiseTransportOsError(wres.error())
         serverSocket = sock
+
+      if host.family in {AddressFamily.IPv6}:
+        if not setSockOpt(serverSocket,osdefs.IPPROTO_IPV6,IPV6_V6ONLY,0):
+          echo "[Warning] Failed to bind the Tcp server on both ipv4/6 ! The tunnel will only accept ipv6 connections because of this!"
+
       # SO_REUSEADDR is not useful for Unix domain sockets.
       if ServerFlags.ReuseAddr in flags:
         if not(setSockOpt(serverSocket, SOL_SOCKET, SO_REUSEADDR, 1)):
