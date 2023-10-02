@@ -136,14 +136,16 @@ proc processTrustedRemote(remote: Connection) {.async.} =
                         if not child_client.closed:
                             asyncDiscard child_client.writer.write(data)
                             if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
+                            
+                    if globals.noise_ratio != 0:
+                        data.packForSend(remote.id, remote.port.uint16, flags = {DataFlags.junk})
+                        for _ in 0..<globals.noise_ratio:
+                            asyncDiscard remote.writer.write(data)
+                            if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
                 else:
                     asyncDiscard remote.writer.write(closeSignalData(cid))
 
-            if globals.noise_ratio != 0:
-                data.packForSend(remote.id, remote.port.uint16, flags = {DataFlags.junk})
-                for _ in 0..<globals.noise_ratio:
-                    asyncDiscard remote.writer.write(data)
-                    if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
+           
 
     except:
         if globals.log_conn_error: echo getCurrentExceptionMsg()
