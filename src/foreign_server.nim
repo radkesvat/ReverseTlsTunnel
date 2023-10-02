@@ -107,7 +107,7 @@ proc processConnection(client: Connection) {.async.} =
                         return
 
                 packForSend(data, remote.id, remote.port.uint16,flags = {DataFlags.udp})        
-                await client.twriter.write(data)
+                asyncDiscard client.twriter.write(data)
                 if globals.log_data_len: echo &"[processUdpRemote] Sent {data.len()} bytes ->  client (udp)"
 
         except:
@@ -137,7 +137,7 @@ proc processConnection(client: Connection) {.async.} =
                     if client == nil: break
 
                 packForSend(data, remote.id, remote.port.uint16)
-                await client.twriter.write(data)
+                asyncDiscard client.twriter.write(data)
                 if globals.log_data_len: echo &"[processRemote] Sent {data.len()} bytes ->  client"
 
         except:
@@ -244,14 +244,14 @@ proc processConnection(client: Connection) {.async.} =
                         context.outbounds.with(cid, child_remote):
                             if not isSet(child_remote.estabilished): await child_remote.estabilished.wait()
                             if not child_remote.closed():
-                                await child_remote.writer.write(data)
+                                asyncDiscard child_remote.writer.write(data)
                                 if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
                     else:
                         var remote = await remoteTrusted(if globals.multi_port: port.Port else: globals.next_route_port)
                         remote.id = cid
                         context.outbounds.register(remote)
                         asyncCheck processRemote(remote)
-                        await remote.writer.write(data)
+                        asyncDiscard remote.writer.write(data)
                         if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
 
         except:

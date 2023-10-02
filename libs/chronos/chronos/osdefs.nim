@@ -166,7 +166,9 @@ when defined(windows):
     SO_RCVTIMEO* = 0x1006
     SO_ERROR* = 0x1007
     SO_TYPE* = 0x1008
+    IPV6_V6ONLY* = 0x1b
     TCP_NODELAY* = 1
+
 
     STD_INPUT_HANDLE* = 0xFFFF_FFF6'u32
     STD_OUTPUT_HANDLE* = 0xFFFF_FFF5'u32

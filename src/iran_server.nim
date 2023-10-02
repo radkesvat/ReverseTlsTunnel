@@ -124,7 +124,7 @@ proc processTrustedRemote(remote: Connection) {.async.} =
                     unPackForRead(data)
                     child_client.hit()
                     
-                    await child_client.transp.sendTo(child_client.raddr, data)
+                    asyncDiscard child_client.transp.sendTo(child_client.raddr, data)
                     if globals.log_data_len: echo &"[processRemote] {data.len()} bytes -> client"
 
                     inc remote.udp_packets; if remote.udp_packets > globals.udp_max_ppc: remote.close()
@@ -134,10 +134,10 @@ proc processTrustedRemote(remote: Connection) {.async.} =
                     context.user_inbounds.with(cid, child_client):
                         unPackForRead(data)
                         if not child_client.closed:
-                            await child_client.writer.write(data)
+                            asyncDiscard child_client.writer.write(data)
                             if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
                 else:
-                    await remote.writer.write(closeSignalData(cid))
+                    asyncDiscard remote.writer.write(closeSignalData(cid))
 
             if globals.noise_ratio != 0:
                 data.packForSend(remote.id, remote.port.uint16, flags = {DataFlags.junk})
@@ -256,7 +256,7 @@ proc processTcpConnection(client: Connection) {.async.} =
 
                 if remote.isTrusted:
                     data.packForSend(client.id, client.port.uint16)
-                await remote.writer.write(data)
+                asyncDiscard remote.writer.write(data)
 
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
 
@@ -351,7 +351,7 @@ proc processUdpPacket(client:UdpConnection) {.async.} =
                         return
 
                 data.packForSend(client.id, client.port.uint16,flags = {DataFlags.udp})
-                await remote.writer.write(data)
+                asyncDiscard remote.writer.write(data)
 
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
           
@@ -434,6 +434,12 @@ proc start*(){.async.} =
                 raise exc
             except CatchableError as exc:
                 raise exc
+
+        if not setSockOpt(server.sock,osdefs.IPPROTO_IPV6,IPV6_V6ONLY,0):
+            echo "[Warning] Failed to bind the Tcp server on both ipv4/6 ! you will only be able to accept ipv6 connections because of this!"
+            echo "the server will start after 10 secconds..."
+            await sleepAsync(timer.seconds(10))
+        
         context.listener = server
 
         if globals.multi_port:
@@ -487,6 +493,11 @@ proc start*(){.async.} =
         # echo &"Started udp server  {globals.listen_addr4}:{globals.listen_port}"
     
         context.listener_udp = newDatagramTransport6(handleDatagram, local = address,flags = {ServerFlags.ReuseAddr})
+        if not setSockOpt(context.listener_udp.fd,osdefs.IPPROTO_IPV6,IPV6_V6ONLY,0):
+            echo "[Warning] Failed to bind the Udp server on both ipv4/6 ! you will only be able to accept ipv6 connections because of this!"
+            echo "the server will start after 10 secconds..."
+            await sleepAsync(timer.seconds(10))
+        
         echo &"Started udp server  {globals.listen_addr}:{globals.listen_port}"
 
         await context.listener_udp.join()
