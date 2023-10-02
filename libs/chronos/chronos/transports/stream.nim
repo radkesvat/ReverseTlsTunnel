@@ -1029,6 +1029,8 @@ when defined(windows):
               if not(server.loopFuture.finished()):
                 server.clean()
             break
+          of ERROR_NETNAME_DELETED: # radkesvat debugging this code!
+            discard # will retry
           else:
             server.asock.closeSocket()
             raiseOsDefect(ovl.data.errCode, "acceptLoop(): Unable to accept " &
