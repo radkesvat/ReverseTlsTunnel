@@ -142,7 +142,7 @@ proc processTrustedRemote(remote: Connection) {.async.} =
             if globals.noise_ratio != 0:
                 data.packForSend(remote.id, remote.port.uint16, flags = {DataFlags.junk})
                 for _ in 0..<globals.noise_ratio:
-                    asyncCheck remote.writer.write(data)
+                    asyncDiscard remote.writer.write(data)
                     if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
 
     except:
@@ -260,11 +260,6 @@ proc processTcpConnection(client: Connection) {.async.} =
 
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
 
-                if globals.noise_ratio != 0 and remote.isTrusted:
-                    data.flagForSend(flags = {DataFlags.junk})
-                    for _ in 0..<globals.noise_ratio:
-                        asyncCheck remote.writer.write(data)
-                        if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
 
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
@@ -359,11 +354,7 @@ proc processUdpPacket(client:UdpConnection) {.async.} =
                 await remote.writer.write(data)
 
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
-                if globals.noise_ratio != 0:
-                    data.flagForSend(flags = {DataFlags.junk})
-                    for _ in 0..<globals.noise_ratio:
-                        asyncCheck remote.writer.write(data)
-                        if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
+          
 
                 client.hit()
                 inc remote.udp_packets; if remote.udp_packets > globals.udp_max_ppc: remote.close()
