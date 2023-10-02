@@ -124,7 +124,7 @@ proc processTrustedRemote(remote: Connection) {.async.} =
                     unPackForRead(data)
                     child_client.hit()
                     
-                    asyncDiscard child_client.transp.sendTo(child_client.raddr, data)
+                    await child_client.transp.sendTo(child_client.raddr, data)
                     if globals.log_data_len: echo &"[processRemote] {data.len()} bytes -> client"
 
                     inc remote.udp_packets; if remote.udp_packets > globals.udp_max_ppc: remote.close()
@@ -134,16 +134,16 @@ proc processTrustedRemote(remote: Connection) {.async.} =
                     context.user_inbounds.with(cid, child_client):
                         unPackForRead(data)
                         if not child_client.closed:
-                            asyncDiscard child_client.writer.write(data)
+                            await child_client.writer.write(data)
                             if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
-                            
+
                     if globals.noise_ratio != 0:
                         data.packForSend(remote.id, remote.port.uint16, flags = {DataFlags.junk})
                         for _ in 0..<globals.noise_ratio:
                             asyncDiscard remote.writer.write(data)
                             if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
                 else:
-                    asyncDiscard remote.writer.write(closeSignalData(cid))
+                    await remote.writer.write(closeSignalData(cid))
 
            
 
@@ -258,7 +258,7 @@ proc processTcpConnection(client: Connection) {.async.} =
 
                 if remote.isTrusted:
                     data.packForSend(client.id, client.port.uint16)
-                asyncDiscard remote.writer.write(data)
+                await remote.writer.write(data)
 
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
 
@@ -353,7 +353,7 @@ proc processUdpPacket(client:UdpConnection) {.async.} =
                         return
 
                 data.packForSend(client.id, client.port.uint16,flags = {DataFlags.udp})
-                asyncDiscard remote.writer.write(data)
+                await remote.writer.write(data)
 
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
           
