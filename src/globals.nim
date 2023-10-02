@@ -29,8 +29,8 @@ var pool_age*: uint = 15
 var max_pool_unused_time*: uint = 60 #secs
 let mux_record_len*: uint32 = 5 #2bytes port 2bytes id 1byte reserved
 var mux_width*: uint32 = 1 # 1 -> disabeld
-var udp_max_ppc*:uint32 = 500
-var udp_max_idle_time*:uint = 15 #secs
+var udp_max_ppc*: uint32 = 500
+var udp_max_idle_time*: uint = 15 #secs
 
 # [Noise]
 var noise_ratio*: uint = 0
@@ -96,6 +96,9 @@ proc chooseRandomLPort(): Port =
 
 proc iptablesInstalled(): bool {.used.} =
     execCmdEx("""dpkg-query -W --showformat='${Status}\n' iptables|grep "install ok install"""").output != ""
+
+proc lsofInstalled(): bool {.used.} =
+    execCmdEx("""dpkg-query -W --showformat='${Status}\n' lsof|grep "install ok install"""").output != ""
 
 proc resetIptables*() =
     echo "reseting iptable nat"
@@ -262,7 +265,7 @@ proc init*() =
                         trust_time = parseInt(p.val).uint
                         print trust_time
 
-    
+
                     of "listen":
                         listen_addr = (p.val)
                         print listen_addr
@@ -347,7 +350,15 @@ proc init*() =
 
     final_target_ip = resolveIPv4(final_target_domain)
     print "\n"
-    self_ip = getPrimaryIPAddr(dest = parseIpAddress("8.8.8.8"))
+
+    try:
+        self_ip = getPrimaryIPAddr(dest = parseIpAddress("8.8.8.8"))
+    except:
+        try:
+            self_ip = getPrimaryIPAddr(dest = parseIpAddress("2001:4860:4860::8888"))
+        except CatchableError as e:
+            raise e
+
     password_hash = $(secureHash(password))
     sh1 = hash(password_hash).uint32
     sh2 = hash(sh1).uint32

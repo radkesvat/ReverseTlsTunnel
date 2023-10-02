@@ -17,26 +17,22 @@ type
 var context = TunnelConnectionPoolContext()
 
 proc monitorData(data: var string): bool =
-    try:
-        let base = 5 + 7 + `mod`(globals.sh5, 7.uint8)
-        if data.high.uint8 < base + 4: return false
-        var sh1_c: uint32
-        var sh2_c: uint32
+    let base = 5 + 7 + `mod`(globals.sh5, 7.uint8)
+    if data.high.uint8 < base + 4: return false
+    var sh1_c: uint32
+    var sh2_c: uint32
 
-        copyMem(addr sh1_c, addr data[base+0], 4)
-        copyMem(addr sh2_c, addr data[base+4], 4)
+    copyMem(addr sh1_c, addr data[base+0], 4)
+    copyMem(addr sh2_c, addr data[base+4], 4)
+    let chk1 = sh1_c == globals.sh1
+    let chk2 = sh2_c == globals.sh2
 
-        let chk1 = sh1_c == globals.sh1
-        let chk2 = sh2_c == globals.sh2
-
-        if (chk1 and chk2):
-
-            return true
-        else:
-            return false
-
-    except:
+    if (chk1 and chk2):
+        return true
+    else:
         return false
+
+
 
 proc generateFinishHandShakeData(): string =
     let rlen: uint16 = uint16(16*(6+rand(4)))
@@ -146,7 +142,7 @@ proc processTrustedRemote(remote: Connection) {.async.} =
             if globals.noise_ratio != 0:
                 data.packForSend(remote.id, remote.port.uint16, flags = {DataFlags.junk})
                 for _ in 0..<globals.noise_ratio:
-                    await remote.writer.write(data)
+                    asyncCheck remote.writer.write(data)
                     if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
 
     except:
@@ -194,7 +190,7 @@ proc processTcpConnection(client: Connection) {.async.} =
 
     proc processClient(remote: Connection) {.async.} =
         var remote = remote
-        var data = newString(len = 0)
+        var data = newStringOfCap(4200)
         var first_packet = true
         try:
             while not client.closed:
@@ -267,7 +263,7 @@ proc processTcpConnection(client: Connection) {.async.} =
                 if globals.noise_ratio != 0 and remote.isTrusted:
                     data.flagForSend(flags = {DataFlags.junk})
                     for _ in 0..<globals.noise_ratio:
-                        await remote.writer.write(data)
+                        asyncCheck remote.writer.write(data)
                         if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
 
         except:
@@ -366,7 +362,7 @@ proc processUdpPacket(client:UdpConnection) {.async.} =
                 if globals.noise_ratio != 0:
                     data.flagForSend(flags = {DataFlags.junk})
                     for _ in 0..<globals.noise_ratio:
-                        await remote.writer.write(data)
+                        asyncCheck remote.writer.write(data)
                         if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
 
                 client.hit()
@@ -385,8 +381,9 @@ proc processUdpPacket(client:UdpConnection) {.async.} =
         # var remote = await acquireRemoteConnection(not client.mark) #associate peer
         var remote:Connection = nil
         for i in 0..<20:
-            remote = context.available_peer_inbounds.randomPick() 
+            var tmp_remote = context.available_peer_inbounds.randomPick() 
             if remote != nil and not remote.closed:
+                remote = tmp_remote
                 break
 
         if remote != nil:
