@@ -60,7 +60,7 @@ var sh2*: uint32
 var sh3*: uint32
 var sh4*: uint32
 var sh5*: uint8
-var random_str* = newString(len = 2000)
+var random_str* = newString(len = 0)
 
 # [settings]
 var disable_ufw* = true
@@ -130,9 +130,6 @@ proc multiportSupported(): bool =
 
 proc init*() =
     print version
-
-    for i in 0..<random_str.len():
-        random_str[i] = rand(char.low .. char.high).char
 
     var p = initOptParser(longNoVal = @["kharej", "iran", "multiport", "keep-ufw", "keep-iptables", "keep-os-limit", "accept-udp", "debug"])
     while true:
@@ -347,6 +344,10 @@ proc init*() =
             quit(0)
         )
 
+    let rs_capacity =  4200 + (noise_ratio * 4200)
+    random_str = newStringOfCap(rs_capacity); random_str.setLen(rs_capacity)
+    for i in 0..<random_str.len():
+        random_str[i] = rand(char.low .. char.high).char
 
     final_target_ip = resolveIPv4(final_target_domain)
     print "\n"
