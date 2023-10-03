@@ -130,8 +130,9 @@ proc remove*(cons: var (Connections or UdpConnections), con: Connection or  UdpC
     var index = -1
     when con is Connection or con is UdpConnection:
         for i, el in cons:
-            if el.id == con.id:
+            if el == con:
                 index = i
+                
     when con is uint16:
         for i, el in cons:
             if el.id == con:
