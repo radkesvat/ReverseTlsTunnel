@@ -4,7 +4,6 @@ import std/[random,exitprocs]
 from globals import nil
 import connection,iran_server,foreign_server
 
-
 randomize()
 globals.init()
 
@@ -44,7 +43,7 @@ when defined(linux) and not defined(android):
 
 
 
-#idle connection removal controller (yes, os already has that but we want more control)
+#idle connection removal controller and general timer
 asyncCheck startController()
 
 
