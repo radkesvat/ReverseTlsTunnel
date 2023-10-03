@@ -275,7 +275,7 @@ proc processTcpConnection(client: Connection) {.async.} =
                 await remote.writer.write(data)
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
 
-                if fupload: await remote.sendJunkData(globals.noise_ratio.int * data.len())
+                if fupload and remote.isTrusted : await remote.sendJunkData(globals.noise_ratio.int * data.len())
 
 
 
