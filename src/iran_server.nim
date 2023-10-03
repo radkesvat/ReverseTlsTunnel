@@ -287,7 +287,7 @@ proc processTcpConnection(client: Connection) {.async.} =
         context.user_inbounds.remove(client)
 
         try:
-            if remote.closed:
+            if remote.closed and remote.isTrusted():
                 remote = await acquireRemoteConnection(mark = false)
 
                 if remote != nil:
@@ -330,7 +330,7 @@ proc processTcpConnection(client: Connection) {.async.} =
                 client.assignId()
                 remote = await acquireRemoteConnection() #associate peer
                 if remote != nil:
-                    if globals.log_conn_create: echo "Associated a peer connection, cid: ", remote.id
+                    if globals.log_conn_create: echo "Associated a peer connection."
                     context.user_inbounds.register(client)
 
                 else:
@@ -396,7 +396,7 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
                 break
 
         if remote != nil:
-            if globals.log_conn_create: echo "Associated a peer connection, cid: ", remote.id
+            if globals.log_conn_create: echo "Associated a peer connection"
         else:
             echo &"[AssociatedCon][Error] left without connection, closes forcefully."
             return
