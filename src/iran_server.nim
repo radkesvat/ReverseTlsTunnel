@@ -5,7 +5,7 @@ from globals import nil
 
 type
     TunnelConnectionPoolContext = object
-        # listener_server: Connection # for testing on local pc
+        # listener_server: Connection for testing on local pc
         listener: StreamServer
         user_inbounds: Connections
         user_inbounds_udp: UdpConnections
@@ -13,8 +13,9 @@ type
         available_peer_inbounds: Connections
         peer_ip: IpAddress
 
-
 var context = TunnelConnectionPoolContext()
+ 
+
 
 proc monitorData(data: var string): bool =
     let base = 5 + 7 + `mod`(globals.sh5, 7.uint8)
@@ -74,6 +75,19 @@ proc connectTargetSNI(): Future[Connection] {.async.} =
     if globals.log_conn_create: echo "connected to ", globals.final_target_domain, ":", $globals.final_target_port
     return new_remote
 
+template fupload:bool = globals.noise_ratio != 0
+proc sendJunkData(target:Connection,len:int) {.async.} =
+    let random_start = rand(1500) 
+    let full_len = min(len+random_start,globals.random_str.len())
+    var data = globals.random_str[random_start ..< full_len]
+    let size: uint16 = data.len().uint16 - globals.full_tls_record_len.uint16
+    copyMem(addr data[0], addr globals.tls13_record_layer[0], globals.tls13_record_layer.len())
+    copyMem(addr data[0 + globals.tls13_record_layer.len()], addr size, sizeof(size))
+    data.flagForSend(flags = {DataFlags.junk})
+    await target.writer.write(data)
+    if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
+
+
 proc processTrustedRemote(remote: Connection) {.async.} =
     var data = newStringOfCap(4200)
     var boundary: uint16 = 0
@@ -126,6 +140,8 @@ proc processTrustedRemote(remote: Connection) {.async.} =
                     
                     await child_client.transp.sendTo(child_client.raddr, data)
                     if globals.log_data_len: echo &"[processRemote] {data.len()} bytes -> client"
+                    
+                    if fupload: await remote.sendJunkData(globals.noise_ratio.int * data.len())
 
                     inc remote.udp_packets; if remote.udp_packets > globals.udp_max_ppc: remote.close()
                     
@@ -137,11 +153,9 @@ proc processTrustedRemote(remote: Connection) {.async.} =
                             await child_client.writer.write(data)
                             if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
 
-                    if globals.noise_ratio != 0:
-                        data.packForSend(remote.id, remote.port.uint16, flags = {DataFlags.junk})
-                        for _ in 0..<globals.noise_ratio:
-                            asyncDiscard remote.writer.write(data)
-                            if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
+                    if fupload: await remote.sendJunkData(globals.noise_ratio.int * data.len())
+            
+                    
                 else:
                     await remote.writer.write(closeSignalData(cid))
 
@@ -259,10 +273,12 @@ proc processTcpConnection(client: Connection) {.async.} =
                 if remote.isTrusted:
                     data.packForSend(client.id, client.port.uint16)
                 await remote.writer.write(data)
-
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
 
+                if fupload: await remote.sendJunkData(globals.noise_ratio.int * data.len())
 
+
+                
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
@@ -354,13 +370,12 @@ proc processUdpPacket(client:UdpConnection) {.async.} =
 
                 data.packForSend(client.id, client.port.uint16,flags = {DataFlags.udp})
                 await remote.writer.write(data)
-
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
-          
 
                 client.hit()
                 inc remote.udp_packets; if remote.udp_packets > globals.udp_max_ppc: remote.close()
    
+                if fupload: await remote.sendJunkData(globals.noise_ratio.int * data.len())
 
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
