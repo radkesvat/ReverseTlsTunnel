@@ -21,9 +21,13 @@
 [آموزش دوم متنی (اگه با لینوکس آشنایی دارین)
 ](https://ubuntuforums.org/showthread.php?t=1752125)
 
-[آموزش دوم(جزیات کامل ولی طولانی و تخصصی تر)](https://www.youtube.com/watch?v=jD3nmHSOekI)
 
-[آموزش سوم (یه روش دیگه) ](https://www.youtube.com/watch?v=eIivVQ7-TDA&t=5s)
+
+[آموزش ودیویی (جزیات کامل ولی طولانی و تخصصی تر)](https://www.youtube.com/watch?v=jD3nmHSOekI)
+
+
+این آموزش هم یه روش دگه هست پیشناهاد میکنم با روش های بالا راه بندازید اگه نشد این رو ببینید
+[آموزش ودیویی (یه روش دیگه) ](https://www.youtube.com/watch?v=eIivVQ7-TDA&t=5s)
 
 
 
