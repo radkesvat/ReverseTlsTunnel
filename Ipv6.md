@@ -18,7 +18,7 @@
 
 [آموزش اول متنی (اگه با لینوکس آشنایی دارین)](https://tldp.org/HOWTO/Linux+IPv6-HOWTO/ch09s04.html)
 
-[آموزش اول متنی (اگه با لینوکس آشنایی دارین)
+[آموزش دوم متنی (اگه با لینوکس آشنایی دارین)
 ](https://ubuntuforums.org/showthread.php?t=1752125)
 
 [آموزش دوم(جزیات کامل ولی طولانی و تخصصی تر)](https://www.youtube.com/watch?v=jD3nmHSOekI)
