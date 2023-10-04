@@ -15,7 +15,6 @@
 
 3 تاشو اینجا معرفی میکنم: 
 
-[آموزش اول (سر راست تر)](https://www.youtube.com/watch?v=657z71dCcFo)
 
 [آموزش دوم(جزیات کامل ولی طولانی و تخصصی تر)](https://www.youtube.com/watch?v=jD3nmHSOekI)
 
