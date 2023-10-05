@@ -335,7 +335,7 @@ template trackIdleConnections*(cons: var Connections, age: uint) =
             while true:
                 await sleepAsync(timer.seconds(age.int))
                 checkAndRemove()
-        asyncCheck tracker()
+        asyncSpawn tracker()
 
 template trackDeadUdpConnections*(cons: var UdpConnections, age: uint) =
     block:
@@ -352,7 +352,7 @@ template trackDeadUdpConnections*(cons: var UdpConnections, age: uint) =
             while true:
                 await sleepAsync(timer.seconds(age.int))
                 checkAndRemove()
-        asyncCheck tracker()
+        asyncSpawn tracker()
 
 proc startController*() {.async.} =
     while true:
