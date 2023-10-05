@@ -40,51 +40,6 @@ proc decrypt(data: var string) =
         i += 1
     
 
-# proc muxPack(cid: uint32, port: uint16, data: string): string =
-#     result = newString(len = globals.mux_chunk_size)
-#     # copyMem(addr result[0], addr(globals.random_str[rand(250)]), result.len)
-
-#     var totake: uint16 = min(globals.mux_payload_size.uint16, data.len.uint16)
-
-#     copyMem(addr result[0], addr globals.tls13_record_layer[0], 3) #tls header
-#     copyMem(addr result[3], addr totake, 2) #tls len
-#     copyMem(addr result[5], addr port, 2)
-#     copyMem(addr result[7], addr cid, 4)
-
-#     result[11] = rand(char.low .. char.high).char
-
-#     if totake != 0:
-#         copyMem(addr result[12], addr data[0], totake)
-#     else:
-#         discard
-
-#     let diff = globals.mux_payload_size - totake
-#     if diff > 0:
-#         copyMem(addr result[totake+12], addr(globals.random_str[rand(250)]), diff)
-
-# proc muxRead(data: var string): tuple[cid: uint32, port: uint16, data: string] =
-#     var buffer = newString(len = globals.mux_payload_size)
-#     var cid: uint32
-#     var dlen: uint16
-#     var port: uint16
-#     copyMem(addr dlen, addr data[3], 2)
-#     copyMem(addr port, addr data[5], 2)
-
-#     copyMem(addr cid, addr data[7], 4)
-
-#     if dlen != 0:
-#         if dlen > globals.mux_payload_size.uint16 or dlen > data.len.uint16:
-#             return (0.uint32,0, "")
-#         copyMem(addr buffer[0], addr data[12], dlen)
-#         buffer.setLen(dlen)
-#     else:
-#         buffer.setLen(0)
-
-
-#     return (cid,port, buffer)
-
-
-
 
 proc unPackForRead*(data: var string) =
     decrypt data

@@ -11,6 +11,7 @@ type
         user_inbounds_udp: UdpConnections
         listener_udp: DatagramTransport
         available_peer_inbounds: Connections
+        peer_fupload_outbounds:Connections
         peer_ip: IpAddress
 
 var context = TunnelConnectionPoolContext()
@@ -76,9 +77,28 @@ proc connectTargetSNI(): Future[Connection] {.async.} =
     return new_remote
 
 template fupload: bool = globals.noise_ratio != 0
-proc sendJunkData(target: Connection, len: int) {.async.} =
+
+proc sendJunkData(len: int) {.async.} =
+    proc checkorRefill() = 
+        if context.peer_fupload_outbounds.len() < 8:
+            if context.available_peer_inbounds.len != 0:
+                var tr = context.available_peer_inbounds[context.available_peer_inbounds.high]
+                if not tr.closed and not tr.counter > 0:#valid
+                    context.available_peer_inbounds.remove(tr)
+                    context.peer_fupload_outbounds.add tr
+    checkorRefill()
+    var target:Connection = nil
+    for i in 0..<8:
+        var tr:Connection = context.peer_fupload_outbounds.randomPick()
+        if not tr.isNil() and not tr.closed():
+            target = tr;break
+
+    if target.isNil:
+        if globals.log_data_len: echo "could not acquire a connection to send fake traffic."
+        return
+
     let random_start = rand(1500)
-    let full_len = min(len+random_start, globals.random_str.len())
+    let full_len = min((len+random_start) + `mod`((len+random_start),16) , globals.random_str.len())
     var data = globals.random_str[random_start ..< full_len]
     let size: uint16 = data.len().uint16 - globals.full_tls_record_len.uint16
     copyMem(addr data[0], addr globals.tls13_record_layer[0], globals.tls13_record_layer.len())
@@ -141,7 +161,7 @@ proc processTrustedRemote(remote: Connection) {.async.} =
                     await child_client.transp.sendTo(child_client.raddr, data)
                     if globals.log_data_len: echo &"[processRemote] {data.len()} bytes -> client"
 
-                    if fupload: await remote.sendJunkData(globals.noise_ratio.int * data.len())
+                    if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
 
                     inc remote.udp_packets; if remote.udp_packets > globals.udp_max_ppc: remote.close()
 
@@ -153,7 +173,7 @@ proc processTrustedRemote(remote: Connection) {.async.} =
                             await child_client.writer.write(data)
                             if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
 
-                    if fupload: await remote.sendJunkData(globals.noise_ratio.int * data.len())
+                    if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
 
 
                 else:
@@ -259,7 +279,6 @@ proc processTcpConnection(client: Connection) {.async.} =
                                 client.trusted = TrustStatus.no
                                 await closeLine(client, remote)
                                 return
-
                     first_packet = false
 
                 #write
@@ -275,8 +294,7 @@ proc processTcpConnection(client: Connection) {.async.} =
                 await remote.writer.write(data)
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
 
-                if fupload and remote.isTrusted : await remote.sendJunkData(globals.noise_ratio.int * data.len())
-
+                if fupload and remote.isTrusted : await sendJunkData(globals.noise_ratio.int * data.len())
 
 
         except:
@@ -376,7 +394,7 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
                 client.hit()
                 inc remote.udp_packets; if remote.udp_packets > globals.udp_max_ppc: remote.close()
 
-                if fupload: await remote.sendJunkData(globals.noise_ratio.int * data.len())
+                if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
 
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
@@ -404,7 +422,6 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
 
     except:
         printEx()
-
 
 
 proc start*(){.async.} =
@@ -512,7 +529,7 @@ proc start*(){.async.} =
         await context.listener_udp.join()
         echo "Udp server ended."
 
-    # trackIdleConnections(context.available_peer_inbounds, globals.pool_age)
+    trackIdleConnections(context.peer_fupload_outbounds, globals.fakeupload_con_age)
 
     await sleepAsync(200)
     if globals.accept_udp:
