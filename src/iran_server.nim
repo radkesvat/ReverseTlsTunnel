@@ -259,7 +259,7 @@ proc processTcpConnection(client: Connection) {.async.} =
                         context.available_peer_inbounds.register(client)
                         context.peer_ip = client.transp.remoteAddress.address
                         remote.close() # close untrusted remote
-                        asyncCheck processTrustedRemote(client)
+                        asyncSpawn processTrustedRemote(client)
 
                         return
                     else:
@@ -333,12 +333,12 @@ proc processTcpConnection(client: Connection) {.async.} =
                 if ipv4 in globals.trusted_foreign_peers:
                     #load balancer connection
                     remote = await connectTargetSNI()
-                    asyncCheck processUntrustedRemote(remote)
+                    asyncSpawn processUntrustedRemote(remote)
             else:
                 if client.transp.remoteAddress.address in globals.trusted_foreign_peers:
                     #load balancer connection
                     remote = await connectTargetSNI()
-                    asyncCheck processUntrustedRemote(remote)
+                    asyncSpawn processUntrustedRemote(remote)
 
         if remote == nil:
             if context.peer_ip != IpAddress() and
@@ -357,9 +357,9 @@ proc processTcpConnection(client: Connection) {.async.} =
                     return
             else:
                 remote = await connectTargetSNI()
-                asyncCheck processUntrustedRemote(remote)
+                asyncSpawn processUntrustedRemote(remote)
 
-        asyncCheck processClient(remote)
+        asyncSpawn processClient(remote)
 
     except:
         printEx()
@@ -442,6 +442,10 @@ proc start*(){.async.} =
                         echo "multiport failure getting origin port. !"
                         await con.closeWait()
                         return
+                    echo "Info: "
+                    print pbuf
+                    echo pbuf.repr
+
                     bigEndian16(addr origin_port, addr pbuf[2])
 
                     con.port = origin_port.Port
@@ -451,7 +455,7 @@ proc start*(){.async.} =
                     con.port = server.local.port.Port
                     if globals.log_conn_create: print "Connected client: ", address
 
-                asyncCheck processTcpConnection(con)
+                asyncSpawn processTcpConnection(con)
             except:
                 echo "handle client connection error:"
                 echo getCurrentExceptionMsg()
@@ -514,7 +518,7 @@ proc start*(){.async.} =
                 if globals.log_conn_create: print "Connected client: ", address
 
 
-            asyncCheck processUdpPacket(connection)
+            asyncSpawn processUdpPacket(connection)
 
         # var address4 = initTAddress(globals.listen_addr4, globals.listen_port.Port)
         var address = initTAddress(globals.listen_addr, globals.listen_port.Port)
@@ -538,13 +542,15 @@ proc start*(){.async.} =
         echo &"Mode Iran: {globals.self_ip}  handshake: {globals.final_target_domain}"
 
 
-    asyncCheck startTcpListener()
+    asyncSpawn startTcpListener()
     if globals.accept_udp:
         trackDeadUdpConnections(context.user_inbounds_udp, globals.udp_max_idle_time)
-        asyncCheck startUdpListener()
+        asyncSpawn startUdpListener()
 
 
-    # asyncCheck start_server_listener()
+
+
+    # asyncSpawn start_server_listener()
 
 
 
