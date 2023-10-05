@@ -79,7 +79,11 @@ var multi_port_additions: seq[Port]
 
 # [posix constants]
 const SO_ORIGINAL_DST* = 80
+const IP6T_SO_ORIGINAL_DST* =  80
+
 const SOL_IP* = 0
+const SOL_IPV6* = 41
+
 
 proc isPortFree*(port: Port): bool =
     execCmdEx(&"""lsof -i:{port}""").output.len < 3
@@ -98,6 +102,9 @@ proc chooseRandomLPort(): Port =
 proc iptablesInstalled(): bool {.used.} =
     execCmdEx("""dpkg-query -W --showformat='${Status}\n' iptables|grep "install ok install"""").output != ""
 
+proc ip6tablesInstalled(): bool {.used.} =
+    execCmdEx("""dpkg-query -W --showformat='${Status}\n' ip6tables|grep "install ok install"""").output != ""
+
 proc lsofInstalled(): bool {.used.} =
     execCmdEx("""dpkg-query -W --showformat='${Status}\n' lsof|grep "install ok install"""").output != ""
 
@@ -105,11 +112,13 @@ proc resetIptables*() =
     echo "reseting iptable nat"
     assert 0 == execCmdEx("iptables -t nat -F").exitCode
     assert 0 == execCmdEx("iptables -t nat -X").exitCode
-
+    if ip6tablesInstalled():
+        assert 0 == execCmdEx("ip6tables -t nat -F").exitCode
+        assert 0 == execCmdEx("ip6tables -t nat -X").exitCode
 
 template FWProtocol(): string = (if accept_udp: "all" else: "tcp")
 
-
+#ip6tables -t nat -A PREROUTING -p tcp --dport 443:2083 -j REDIRECT --to-port 
 proc createIptablesForwardRules*() =
     if reset_iptable: resetIptables()
     if not (multi_port_min == 0.Port or multi_port_max == 0.Port):
@@ -124,8 +133,16 @@ proc multiportSupported(): bool =
         return false
     else:
         if not iptablesInstalled():
-            echo "multi listen port requires iptables to be installed."
+            echo "multi listen port requires iptables to be installed.  \"apt-get install iptables\""
             return false
+        if not ip6tablesInstalled():
+            echo "multi listen port requires ip6tables to be installed. (ip6tables not iptables !)  \"apt-get install ip6tables\""
+            return false
+        
+        if not lsofInstalled():
+            echo "multi listen port requires lsof to be installed.  install with \"apt-get install lsof\""
+            return false
+        
         return true
 
 

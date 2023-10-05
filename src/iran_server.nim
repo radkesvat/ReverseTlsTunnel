@@ -437,11 +437,15 @@ proc start*(){.async.} =
                 if globals.multi_port:
                     var origin_port: int
                     var size = 16
-                    if not getSockOpt(transp.fd, int(globals.SOL_IP), int(globals.SO_ORIGINAL_DST),
-                    addr pbuf[0], size):
+
+
+                    let sol = int(if isV4Mapped(con.transp.remoteAddress): globals.SOL_IP else: globals.SOL_IPV6)
+                    if not getSockOpt(transp.fd, sol, int(globals.SO_ORIGINAL_DST), addr pbuf[0], size):
                         echo "multiport failure getting origin port. !"
                         await con.closeWait()
                         return
+                    
+                    
                     echo "Info: "
                     print pbuf
                     echo pbuf.repr
@@ -502,7 +506,8 @@ proc start*(){.async.} =
             if globals.multi_port:
                 var origin_port: int
                 var size = 16
-                if not getSockOpt(connection.transp.fd, int(globals.SOL_IP), int(globals.SO_ORIGINAL_DST),
+                let sol = int(if isV4Mapped(connection.transp.remoteAddress): globals.SOL_IP else: globals.SOL_IPV6)
+                if not getSockOpt(connection.transp.fd, sol, int(globals.SO_ORIGINAL_DST),
                 addr pbuf[0], size):
                     echo "multiport failure getting origin port. !"
                     await connection.closeWait()
