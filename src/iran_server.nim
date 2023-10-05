@@ -440,6 +440,7 @@ proc start*(){.async.} =
 
 
                     let sol = int(if isV4Mapped(con.transp.remoteAddress): globals.SOL_IP else: globals.SOL_IPV6)
+                    print sol
                     if not getSockOpt(transp.fd, sol, int(globals.SO_ORIGINAL_DST), addr pbuf[0], size):
                         echo "multiport failure getting origin port. !"
                         await con.closeWait()
