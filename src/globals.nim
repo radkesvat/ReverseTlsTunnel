@@ -3,7 +3,7 @@ import dns_resolve, hashes, print, parseopt, strutils, random, net, osproc, strf
 import checksums/sha1
 
 
-const version = "5.3"
+const version = "5.4"
 
 type RunMode*{.pure.} = enum
     unspecified, iran, kharej
