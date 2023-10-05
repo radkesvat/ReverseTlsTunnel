@@ -123,9 +123,11 @@ proc createIptablesForwardRules*() =
     if reset_iptable: resetIptables()
     if not (multi_port_min == 0.Port or multi_port_max == 0.Port):
         assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p {FWProtocol} --dport {multi_port_min}:{multi_port_max} -j REDIRECT --to-port {listen_port}""").exitCode
+        assert 0 == execCmdEx(&"""ip6tables -t nat -A PREROUTING -p {FWProtocol} --dport {multi_port_min}:{multi_port_max} -j REDIRECT --to-port {listen_port}""").exitCode
 
     for port in multi_port_additions:
         assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p {FWProtocol} --dport {port} -j REDIRECT --to-port {listen_port}""").exitCode
+        assert 0 == execCmdEx(&"""ip6tables -t nat -A PREROUTING -p {FWProtocol} --dport {port} -j REDIRECT --to-port {listen_port}""").exitCode
 
 proc multiportSupported(): bool =
     when defined(windows) or defined(android):
