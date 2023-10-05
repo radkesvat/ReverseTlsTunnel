@@ -14,7 +14,7 @@ if globals.multi_port and globals.reset_iptable and globals.mode == globals.RunM
         globals.resetIptables()
     setControlCHook do(){.noconv.}:
         quit()
-    c_signal(SIGTERM, proc(a: cint){.noconv.} =
+    c_signal(ansi_c.SIGTERM, proc(a: cint){.noconv.} =
         quit()
     )
 
