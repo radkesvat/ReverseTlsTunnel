@@ -229,7 +229,7 @@ proc processConnection(client: Connection) {.async.} =
                         context.outbounds_udp.register connection
                         await connection.transp.send(data)
                         if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote (udp)"
-                        asyncCheck connection.transp.join()
+                        asyncSpawn connection.transp.join()
 
                 else:
                     if context.outbounds.hasID(cid):
@@ -242,7 +242,7 @@ proc processConnection(client: Connection) {.async.} =
                         var remote = await remoteTrusted(if globals.multi_port: port.Port else: globals.next_route_port)
                         remote.id = cid
                         context.outbounds.register(remote)
-                        asyncCheck processRemote(remote)
+                        asyncSpawn processRemote(remote)
                         await remote.writer.write(data)
                         if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
 
@@ -261,7 +261,7 @@ proc processConnection(client: Connection) {.async.} =
 
 
     try:
-        asyncCheck proccessClient()
+        asyncSpawn proccessClient()
     except:
         print getCurrentExceptionMsg()
 
@@ -281,7 +281,7 @@ proc poolFrame(create_count: uint = 0) =
 
 
                 context.free_peer_outbounds.add conn
-                asyncCheck processConnection(conn)
+                asyncSpawn processConnection(conn)
                 await conn.twriter.write(generateFinishHandShakeData())
 
             else:
@@ -310,7 +310,7 @@ proc poolFrame(create_count: uint = 0) =
 
     if count > 0: #yea yea yea yea but for testing, compiler knows what to do here :)
         for _ in 0..<count:
-            asyncCheck create()
+            asyncSpawn create()
 
 proc start*(){.async.} =
     echo &"Mode Foreign Server:  {globals.self_ip} <-> {globals.iran_addr} ({globals.final_target_domain} with ip {globals.final_target_ip})"

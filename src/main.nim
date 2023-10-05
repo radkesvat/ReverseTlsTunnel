@@ -44,13 +44,13 @@ when defined(linux) and not defined(android):
 
 
 #idle connection removal controller and general timer
-asyncCheck startController()
+asyncSpawn startController()
 
 
 if globals.mode == globals.RunMode.iran:
-    asyncCheck iran_server.start()
+    asyncSpawn iran_server.start()
 else:
-    asyncCheck foreign_server.start()
+    asyncSpawn foreign_server.start()
 
 
 runForever()
