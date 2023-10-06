@@ -106,13 +106,22 @@ wget  "https://raw.githubusercontent.com/radkesvat/ReverseTlsTunnel/master/insta
 
 # مشکلات و دیباگ
 ***
-دوستان اگه با پنل سنایی مصرف cpu هی میره بالا و میاد پایین ؛‌ تنها راه حلی که دوستان پیدا کردند انیه که به نسخه 1.6.1 پنل برگردین
-من این رو چک کنم و دیدم که مشکل cpu و رم که توسط xui گرفته میشد رو برطرف کرده و آروم شده همه چی
+دوستان اگه با پنل سنایی مصرف cpu هی میره بالا و میاد پایین و cpu زیادی مصرف میشه ؛  
 
 
 ```sh
-bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh) v1.6.1
+
+"log": {
+    "access": "./access.log",
+    "error": "./error.log",
+    "loglevel": "warning"
+  },
 ```
+حذف این قسمت از تنظیمات هسته مشکل رو حل میکنه
+
+البته اگه ایپی لیمیت با fail2ban تنظیم کرده باشین دیگه کار نمیکنه.
+
+
 
 ***
 
