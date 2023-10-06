@@ -425,22 +425,6 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
 
 
 proc start*(){.async.} =
-
-# type RawSockaddrInet4 struct {
-# 	Family uint16
-# 	Port   uint16
-# 	Addr   [4]byte /* in_addr */
-# 	Zero   [8]uint8
-# }
-# type RawSockaddrInet6 struct {
-# 	Family   uint16
-# 	Port     uint16
-# 	Flowinfo uint32
-# 	Addr     [16]byte /* in6_addr */
-# 	Scope_id uint32
-# }
-
-
     var pbuf = newString(len = 28)
 
     proc startTcpListener(){.async.} =
@@ -456,16 +440,10 @@ proc start*(){.async.} =
 
 
                     let sol = int(if isV4Mapped(con.transp.remoteAddress): globals.SOL_IP else: globals.SOL_IPV6)
-                    print sol
                     if not getSockOpt(transp.fd, sol, int(globals.SO_ORIGINAL_DST), addr pbuf[0], size):
                         echo "multiport failure getting origin port. !"
                         await con.closeWait()
                         return
-                    
-                    
-                    echo "Info: "
-                    print pbuf
-                    echo pbuf.repr
 
                     bigEndian16(addr origin_port, addr pbuf[2])
 
