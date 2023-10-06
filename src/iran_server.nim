@@ -441,7 +441,7 @@ proc start*(){.async.} =
 # }
 
 
-    var pbuf = newString(len = 16)
+    var pbuf = newString(len = 28)
 
     proc startTcpListener(){.async.} =
 
