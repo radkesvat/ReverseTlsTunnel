@@ -425,6 +425,22 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
 
 
 proc start*(){.async.} =
+
+# type RawSockaddrInet4 struct {
+# 	Family uint16
+# 	Port   uint16
+# 	Addr   [4]byte /* in_addr */
+# 	Zero   [8]uint8
+# }
+# type RawSockaddrInet6 struct {
+# 	Family   uint16
+# 	Port     uint16
+# 	Flowinfo uint32
+# 	Addr     [16]byte /* in6_addr */
+# 	Scope_id uint32
+# }
+
+
     var pbuf = newString(len = 16)
 
     proc startTcpListener(){.async.} =
@@ -436,7 +452,7 @@ proc start*(){.async.} =
                 let address = con.transp.remoteAddress()
                 if globals.multi_port:
                     var origin_port: int
-                    var size = 16
+                    var size =  int(if isV4Mapped(con.transp.remoteAddress): 16 else: 28)
 
 
                     let sol = int(if isV4Mapped(con.transp.remoteAddress): globals.SOL_IP else: globals.SOL_IPV6)
@@ -506,7 +522,7 @@ proc start*(){.async.} =
 
             if globals.multi_port:
                 var origin_port: int
-                var size = 16
+                var size =  int(if isV4Mapped(connection.transp.remoteAddress): 16 else: 28)
                 let sol = int(if isV4Mapped(connection.transp.remoteAddress): globals.SOL_IP else: globals.SOL_IPV6)
                 if not getSockOpt(connection.transp.fd, sol, int(globals.SO_ORIGINAL_DST),
                 addr pbuf[0], size):
