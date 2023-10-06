@@ -29,13 +29,13 @@ type
 
 proc encrypt(data: var string, start = 0) =
     var i: int = start
-    while i < min(data.len(),64):
+    while i < data.len():
         data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
         i += 1
 
 proc decrypt(data: var string) =
     var i: int = 0
-    while i < min(data.len(),64):
+    while i < data.len():
         data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
         i += 1
     
