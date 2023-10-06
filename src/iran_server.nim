@@ -35,7 +35,6 @@ proc monitorData(data: var string): bool =
         return false
 
 
-
 proc generateFinishHandShakeData(): string =
     let rlen: uint16 = uint16(16*(6+rand(4)))
     var random_trust_data: string = newStringOfCap(rlen)
@@ -50,7 +49,6 @@ proc generateFinishHandShakeData(): string =
     copyMem(addr random_trust_data[base+4], addr globals.sh4.uint32, 4)
 
     return random_trust_data
-
 
 proc acquireRemoteConnection(mark = true): Future[Connection] {.async.} =
     var remote: Connection = nil
@@ -178,8 +176,6 @@ proc processTrustedRemote(remote: Connection) {.async.} =
 
                 else:
                     await remote.writer.write(closeSignalData(cid))
-
-
 
     except:
         if globals.log_conn_error: echo getCurrentExceptionMsg()
@@ -409,7 +405,7 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
         var remote: Connection = nil
         for i in 0..<20:
             var tmp_remote = context.available_peer_inbounds.randomPick()
-            if remote != nil and not remote.closed:
+            if tmp_remote != nil and not tmp_remote.closed:
                 remote = tmp_remote
                 break
 

@@ -49,7 +49,6 @@ task build_server, "builds server":
     
     # switch("d", "useMalloc")
 
-    switch("d", "asyncBackend=chronos")
     switch("d", "asyncBackend:chronos")
  
     # switch("cc", "clang")
