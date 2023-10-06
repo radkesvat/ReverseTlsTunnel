@@ -35,7 +35,7 @@ proc encrypt(data: var string, start = 0) =
 
 proc decrypt(data: var string) =
     var i: int = 0
-    while i < in(data.len(),64):
+    while i < min(data.len(),64):
         data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
         i += 1
     
