@@ -57,6 +57,7 @@ type
         raddr*: TransportAddress
         port*: Port               #the port the socket points to
         mark*:bool
+        bound*:Connection
 
     Connections* = seq[Connection]
     UdpConnections* = seq[UdpConnection]

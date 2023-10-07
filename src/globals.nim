@@ -30,7 +30,7 @@ var fakeupload_con_age*: uint = 60 #secs
 var max_pool_unused_time*: uint = 60 #secs
 let mux_record_len*: uint32 = 5 #2bytes port 2bytes id 1byte reserved
 var mux_width*: uint32 = 1 # 1 -> disabeld
-var udp_max_ppc*: uint32 = 500
+var udp_max_ppc*: uint32 = 9999999
 var udp_max_idle_time*: uint = 15 #secs
 
 # [Noise]
