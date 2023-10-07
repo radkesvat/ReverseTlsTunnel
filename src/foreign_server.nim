@@ -314,7 +314,7 @@ proc poolFrame(create_count: uint = 0) =
 proc start*(){.async.} =
     echo &"Mode Foreign Server:  {globals.self_ip} <-> {globals.iran_addr} ({globals.final_target_domain} with ip {globals.final_target_ip})"
     trackIdleConnections(context.free_peer_outbounds, globals.pool_age)
-    trackDeadUdpConnections(context.outbounds_udp, globals.udp_max_idle_time)
+    trackDeadUdpConnections(context.outbounds_udp, globals.udp_max_idle_time,close = true)
 
     # just to make sure we always willing to connect to the peer
     while true:

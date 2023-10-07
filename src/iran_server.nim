@@ -361,7 +361,6 @@ proc processTcpConnection(client: Connection) {.async.} =
         printEx()
 
 proc processUdpPacket(client: UdpConnection) {.async.} =
-    client.hit()
 
     proc processClient(remote: Connection) {.async.} =
         try:
@@ -491,7 +490,6 @@ proc start*(){.async.} =
                 if not getSockOpt(connection.transp.fd, sol, int(globals.SO_ORIGINAL_DST),
                 addr pbuf[0], size):
                     echo "multiport failure getting origin port. !"
-                    await connection.closeWait()
                     return
                 bigEndian16(addr origin_port, addr pbuf[2])
 
@@ -530,7 +528,7 @@ proc start*(){.async.} =
 
     asyncSpawn startTcpListener()
     if globals.accept_udp:
-        trackDeadUdpConnections(context.user_inbounds_udp, globals.udp_max_idle_time)
+        trackDeadUdpConnections(context.user_inbounds_udp, globals.udp_max_idle_time,close = false)
         asyncSpawn startUdpListener()
 
 
