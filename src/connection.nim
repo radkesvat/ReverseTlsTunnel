@@ -338,17 +338,17 @@ template trackIdleConnections*(cons: var Connections, age: uint) =
                 checkAndRemove()
         asyncSpawn tracker()
 
-template trackDeadUdpConnections*(cons: var UdpConnections, age: uint,close :bool) =
+template trackDeadUdpConnections*(cons: var UdpConnections, age: uint,doclose :bool) =
     block:
         proc checkAndRemove() =
             cons.keepIf(proc(x: UdpConnection): bool =
                 if x.last_action != 0:
                     if et - x.last_action > age:
-                        if close:
+                        if doclose:
                             x.close()
                             if not isNil x.bound:
                                 x.bound.close()
-                                
+
                         if globals.log_conn_destory: echo "[Controller] closed a dead udp connection, ", et - x.last_action
                         return false
                 return true
