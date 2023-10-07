@@ -308,9 +308,8 @@ proc poolFrame(create_count: uint = 0) =
         elif i < globals.pool_size:
             count = 1
 
-    if count > 0: #yea yea yea yea but for testing, compiler knows what to do here :)
-        for _ in 0..<count:
-            asyncSpawn create()
+    for _ in 0..<count:
+        asyncSpawn create()
 
 proc start*(){.async.} =
     echo &"Mode Foreign Server:  {globals.self_ip} <-> {globals.iran_addr} ({globals.final_target_domain} with ip {globals.final_target_ip})"

@@ -360,9 +360,8 @@ proc processTcpConnection(client: Connection) {.async.} =
     except:
         printEx()
 
-
 proc processUdpPacket(client: UdpConnection) {.async.} =
-
+    client.hit()
 
     proc processClient(remote: Connection) {.async.} =
         try:
@@ -378,16 +377,13 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
 
                 #write
                 if remote.closed:
-                    remote = await acquireRemoteConnection()
-                    if remote == nil:
-                        if globals.log_conn_error: echo &"[Error] left without connection, closes forcefully."
-                        return
+                    if globals.log_conn_error: echo &"[Error] Tcp remote was just closed!"
+                    return
 
                 data.packForSend(client.id, client.port.uint16, flags = {DataFlags.udp})
                 await remote.writer.write(data)
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
 
-                client.hit()
                 inc remote.udp_packets; if remote.udp_packets > globals.udp_max_ppc: remote.close()
 
                 if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
@@ -399,15 +395,16 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
     #Initialize remote
     try:
         if globals.log_conn_create: echo "Real User connected (UDP) !"
-
-
         # var remote = await acquireRemoteConnection(not client.mark) #associate peer
         var remote: Connection = nil
         for i in 0..<20:
             var tmp_remote = context.available_peer_inbounds.randomPick()
-            if tmp_remote != nil and not tmp_remote.closed:
-                remote = tmp_remote
-                break
+            if tmp_remote != nil:
+                if tmp_remote.closed:
+                    context.available_peer_inbounds.remove tmp_remote
+                else:
+                    remote = tmp_remote
+                    break
 
         if remote != nil:
             if globals.log_conn_create: echo "Associated a peer connection"
