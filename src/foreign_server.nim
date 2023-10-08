@@ -204,9 +204,9 @@ proc processConnection(client: Connection) {.async.} =
                     continue
 
                 #write
-                echo "before dec:" ,data[0 .. 12].repr
+                echo "before dec:" ,data[0 .. 10].repr
                 unPackForRead(data)
-                echo "after dec:", data[0 .. 12].repr
+                echo "after dec:", data[0 .. 10].repr
 
 
                 if DataFlags.udp in cast[TransferFlags](flag):

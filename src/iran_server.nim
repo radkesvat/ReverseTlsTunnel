@@ -286,9 +286,9 @@ proc processTcpConnection(client: Connection) {.async.} =
                         await closeLine(client, remote); return
 
                 if remote.isTrusted:
-                    echo "before enc:", data[0 .. 12].repr
+                    echo "before enc:", data[10 .. 20].repr
                     data.packForSend(client.id, client.port.uint16)
-                    echo "after enc:", data[0 .. 12].repr
+                    echo "after enc:", data[10 .. 20].repr
 
                 await remote.writer.write(data)
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
