@@ -14,7 +14,7 @@ type
 
 # proc `+`(a:pointer,p:pointer): pointer =
 #   result = cast[pointer](cast[int](a) + 1 * sizeof(p))
-  
+
 # proc encrypt(data_pure: var string, start = 0) =
 #     let len = (data.len() - start) div 4
 #     var data = cast[seq[uint32]](data_pure)
@@ -29,15 +29,18 @@ type
 
 proc encrypt(data: var string, start = 0) =
     var i: int = start
-    while i < min(data.len(),start + globals.debug_enmax):
+    let loopmax = min(data.len(), start + globals.debug_enmax)
+    while i < loopmax:
         data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
         i += 1
 
-proc decrypt(data: var string, start = 5) =
-    var i: int = start
-    while i < min(data.len(),start + globals.debug_enmax):
+proc decrypt(data: var string) =
+    var i: int = 0
+    let loopmax = min(data.len(), globals.debug_enmax)
+    while i < loopmax:
         data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
         i += 1
+
 
 
 proc unPackForRead*(data: var string) =
