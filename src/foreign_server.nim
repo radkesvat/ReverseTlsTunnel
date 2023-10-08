@@ -204,7 +204,10 @@ proc processConnection(client: Connection) {.async.} =
                     continue
 
                 #write
+                echo data.repr
                 unPackForRead(data)
+                echo data.repr
+
 
                 if DataFlags.udp in cast[TransferFlags](flag):
                     proc handleDatagram(transp: DatagramTransport,
