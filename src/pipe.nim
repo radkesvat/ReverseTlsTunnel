@@ -29,7 +29,7 @@ type
 
 proc encrypt(data: var string, start = 0) =
     var i: int = start
-    while i < min(data.len(),globals.debug_enmax):
+    while i < min(data.len(),start + globals.debug_enmax):
         data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
         i += 1
 
@@ -96,17 +96,5 @@ proc closeSignalData*(cid: uint16): string =
     copyMem(addr data[0 + globals.full_tls_record_len.int+sizeof(e_cid)+sizeof(port)], addr flags, sizeof(uint8))
     return data
 
-
-#returns connection id
-# proc unPackForReadMux*(data: var string): tuple[cid: uint32, port: uint16] =
-#     decrypt data
-#     var (result_cid, port, result_data) = muxRead(data)
-#     data = result_data
-#     return (result_cid, port)
-
-# proc packForSendMux*(cid: uint32, port: uint16, data: var string) =
-#     var muxres = muxPack(cid, port, data)
-#     encrypt muxres
-#     data = muxres
 
 
