@@ -119,15 +119,17 @@ proc processConnection(client: Connection) {.async.} =
                     else:
                         discard await remote.reader.readOnce(addr data, 0)
                         continue
+                if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
+                
                 let width = globals.full_tls_record_len.int + globals.mux_record_len.int
                 data.setLen(data.len() + width)
                 await remote.reader.readExactly(addr data[0 + width], data.len - width)
-                if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
 
                 if client.closed:
                     client = await acquireClientConnection()
                     if client == nil: break
 
+                echo "before enc:  ", data[10 .. data.high].hash()
                 packForSend(data, remote.id, remote.port.uint16)
                 await client.twriter.write(data)
                 if globals.log_data_len: echo &"[processRemote] Sent {data.len()} bytes ->  client"
@@ -206,7 +208,7 @@ proc processConnection(client: Connection) {.async.} =
                 #write
                 # echo "before dec:" ,data[0 .. 10].repr
                 unPackForRead(data)
-                echo "after dec:", data.hash
+                # echo "after dec:", data.hash
 
 
                 if DataFlags.udp in cast[TransferFlags](flag):
