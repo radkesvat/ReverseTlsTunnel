@@ -46,7 +46,7 @@ proc unPackForRead*(data: var string) =
 
 
 proc flagForSend*(data: var string, flags: TransferFlags) =
-    let width = globals.full_tls_record_len.int+sizeof(uint16)+sizeof(uint16) + sizeof(flags)
+    let width = globals.full_tls_record_len.int+sizeof(uint16)+sizeof(uint16) + sizeof(uint8)
     if data.len < width: data.setLen(width)
 
     let size: uint16 = 0
@@ -56,7 +56,7 @@ proc flagForSend*(data: var string, flags: TransferFlags) =
     copyMem(addr data[0 + globals.full_tls_record_len.int+sizeof(uint16)+sizeof(uint16)], addr e_flags, sizeof(e_flags))
 
 proc packForSend*(data: var string, cid: uint16, port: uint16, flags: TransferFlags = {}) =
-    let width = globals.full_tls_record_len.int+sizeof(port)+sizeof(cid) + sizeof(flags)
+    let width = globals.full_tls_record_len.int+sizeof(port)+sizeof(cid) + sizeof(uint8)
     if data.len < width: data.setLen(width)
 
     let size: uint16 = data.len().uint16 - globals.full_tls_record_len.uint16
@@ -80,11 +80,11 @@ proc closeSignalData*(cid: uint16): string =
     let port: uint16 = rand(uint16.high.int).uint16
     let flags: uint8 = rand(uint8.high.int).uint8
 
-    let width = globals.full_tls_record_len.int+sizeof(port)+sizeof(cid) + sizeof(flags)
+    let width = globals.full_tls_record_len.int+sizeof(port)+sizeof(cid) + sizeof(uint8)
 
     var data = newString(len = width)
 
-    let size: uint16 = sizeof(port)+sizeof(cid) + sizeof(flags)
+    let size: uint16 = sizeof(port)+sizeof(cid) + sizeof(uint8)
     let e_cid: uint16 = cid xor size
 
     copyMem(addr data[0], addr globals.tls13_record_layer[0], globals.tls13_record_layer.len())
@@ -93,7 +93,7 @@ proc closeSignalData*(cid: uint16): string =
 
     copyMem(addr data[0 + globals.full_tls_record_len.int], addr e_cid, sizeof(e_cid))
     copyMem(addr data[0 + globals.full_tls_record_len.int+sizeof(e_cid)], addr port, sizeof(port))
-    copyMem(addr data[0 + globals.full_tls_record_len.int+sizeof(e_cid)+sizeof(port)], addr flags, sizeof(flags))
+    copyMem(addr data[0 + globals.full_tls_record_len.int+sizeof(e_cid)+sizeof(port)], addr flags, sizeof(uint8))
     return data
 
 
