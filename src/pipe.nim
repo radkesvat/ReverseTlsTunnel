@@ -33,12 +33,11 @@ proc encrypt(data: var string, start = 0) =
         data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
         i += 1
 
-proc decrypt(data: var string) =
-    var i: int = 0
-    while i < min(data.len(),globals.debug_enmax):
+proc decrypt(data: var string, start = 5) =
+    var i: int = start
+    while i < min(data.len(),start + globals.debug_enmax):
         data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
         i += 1
-    
 
 
 proc unPackForRead*(data: var string) =
