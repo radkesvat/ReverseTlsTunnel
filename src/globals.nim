@@ -33,12 +33,12 @@ var mux_width*: uint32 = 1 # 1 -> disabeld
 var udp_max_ppc*: uint32 = 500
 var udp_max_idle_time*: uint = 5 #secs
 
+
 # [Noise]
 var noise_ratio*: uint = 0
 
 
 # [Routes]
-# var listen_addr4* = "0.0.0.0"
 var listen_addr* = "::"
 
 var listen_port*: Port = 0.Port
@@ -62,6 +62,7 @@ var sh3*: uint32
 var sh4*: uint32
 var sh5*: uint8
 var random_str* = newString(len = 0)
+var debug_enmax* = 99999
 
 # [settings]
 var disable_ufw* = true
@@ -281,6 +282,10 @@ proc init*() =
                     of "trust_time":
                         trust_time = parseInt(p.val).uint
                         print trust_time
+
+                    of "emax":
+                        debug_enmax = parseInt(p.val)
+                        print debug_enmax
 
 
                     of "listen":
