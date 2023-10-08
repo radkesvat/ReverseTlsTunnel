@@ -302,8 +302,11 @@ proc init*() =
                             of 2:
                                 log_conn_error = true
                             of 3:
+                                log_conn_error = true
                                 log_conn_destory = true
                             of 4:
+                                log_conn_error = true
+                                log_conn_destory = true
                                 log_data_len = true
                             else:
                                 quit &"Incorrect value {p.val} for option \"log\" "
