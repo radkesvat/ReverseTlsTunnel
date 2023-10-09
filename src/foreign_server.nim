@@ -128,9 +128,9 @@ proc processConnection(client: Connection) {.async.} =
                     client = await acquireClientConnection()
                     if client == nil: break
 
-                echo "before enc:  ", data[10 .. data.high].hash()
+                echo "before enc:  ", data[10 .. data.high].hash(), "  len:",data.len
                 packForSend(data, remote.id, remote.port.uint16)
-                
+
                 await client.twriter.write(data)
                 if globals.log_data_len: echo &"[processRemote] Sent {data.len()} bytes ->  client"
 
