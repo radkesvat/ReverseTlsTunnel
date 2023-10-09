@@ -62,7 +62,7 @@ var sh3*: uint32
 var sh4*: uint32
 var sh5*: uint8
 var random_str* = newString(len = 0)
-var debug_enmax* = 99999
+var fast_encrypt_width*:uint = 128
 
 # [settings]
 var disable_ufw* = true
@@ -284,8 +284,8 @@ proc init*() =
                         print trust_time
 
                     of "emax":
-                        debug_enmax = parseInt(p.val)
-                        print debug_enmax
+                        fast_encrypt_width = parseInt(p.val)
+                        print fast_encrypt_width
 
 
                     of "listen":

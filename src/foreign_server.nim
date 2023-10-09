@@ -119,6 +119,8 @@ proc processConnection(client: Connection) {.async.} =
                     else:
                         discard await remote.reader.readOnce(addr data, 0)
                         continue
+
+
                 
                 let width = globals.full_tls_record_len.int + globals.mux_record_len.int
                 data.setLen(data.len() + width)
@@ -157,6 +159,8 @@ proc processConnection(client: Connection) {.async.} =
         var port: uint16
         var flag: uint8
         var moved: bool = false
+        var dec_bytes_left: uint
+
         try:
             while not client.closed:
                 #read
@@ -193,7 +197,8 @@ proc processConnection(client: Connection) {.async.} =
                             context.outbounds.remove(child_remote)
                             child_remote.close()
                             if globals.log_conn_destory: echo "close mux client"
-
+                    else:
+                        dec_bytes_left = min(globals.fast_encrypt_width,boundary)
                     continue
                 let readable = min(boundary, data.len().uint16)
                 boundary -= readable; data.setlen readable
@@ -204,10 +209,15 @@ proc processConnection(client: Connection) {.async.} =
                 if DataFlags.junk in cast[TransferFlags](flag):
                     if globals.log_data_len: echo &"[proccessClient] {data.len()} discarded from client"
                     continue
+                
+                if dec_bytes_left > 0:
+                    let consumed = min(data.len(), dec_bytes_left.int)
+                    dec_bytes_left -= consumed.uint
+                    unPackForRead(data,consumed)
 
                 #write
                 # echo "before dec:" ,data[0 .. 10].repr
-                unPackForRead(data)
+                # unPackForRead(data)
                 # echo "after dec:", data.hash
 
 

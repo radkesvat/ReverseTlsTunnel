@@ -1,6 +1,6 @@
 import std/[strformat, strutils, random, endians]
 import chronos, chronos/transports/[datagram, ipnet], chronos/osdefs
-import times, print, connection, pipe,hashes
+import times, print, connection, pipe, hashes
 from globals import nil
 
 type
@@ -11,7 +11,7 @@ type
         user_inbounds_udp: UdpConnections
         listener_udp: DatagramTransport
         available_peer_inbounds: Connections
-        peer_fupload_outbounds:Connections
+        peer_fupload_outbounds: Connections
         peer_ip: IpAddress
 
 var context = TunnelConnectionPoolContext()
@@ -77,26 +77,26 @@ proc connectTargetSNI(): Future[Connection] {.async.} =
 template fupload: bool = globals.noise_ratio != 0
 
 proc sendJunkData(len: int) {.async.} =
-    proc checkorRefill() = 
+    proc checkorRefill() =
         if context.peer_fupload_outbounds.len() < 8:
             if context.available_peer_inbounds.len != 0:
                 var tr = context.available_peer_inbounds[context.available_peer_inbounds.high]
-                if not tr.closed and not tr.counter > 0:#valid
+                if not tr.closed and not tr.counter > 0: #valid
                     context.available_peer_inbounds.remove(tr)
                     context.peer_fupload_outbounds.add tr
     checkorRefill()
-    var target:Connection = nil
+    var target: Connection = nil
     for i in 0..<8:
-        var tr:Connection = context.peer_fupload_outbounds.randomPick()
+        var tr: Connection = context.peer_fupload_outbounds.randomPick()
         if not tr.isNil() and not tr.closed():
-            target = tr;break
+            target = tr; break
 
     if target.isNil:
         if globals.log_data_len: echo "could not acquire a connection to send fake traffic."
         return
 
     let random_start = rand(1500)
-    let full_len = min((len+random_start) + `mod`((len+random_start),16) , globals.random_str.len())
+    let full_len = min((len+random_start) + `mod`((len+random_start), 16), globals.random_str.len())
     var data = globals.random_str[random_start ..< full_len]
     let size: uint16 = data.len().uint16 - globals.full_tls_record_len.uint16
     copyMem(addr data[0], addr globals.tls13_record_layer[0], globals.tls13_record_layer.len())
@@ -112,6 +112,7 @@ proc processTrustedRemote(remote: Connection) {.async.} =
     var cid: uint16
     var port: uint16
     var flag: uint8
+    var dec_bytes_left: uint
 
     try:
         while not remote.isNil and not remote.closed:
@@ -142,6 +143,9 @@ proc processTrustedRemote(remote: Connection) {.async.} =
                     context.user_inbounds.with(cid, child_client):
                         child_client.close()
                         context.user_inbounds.remove(child_client)
+                else:
+                    dec_bytes_left = min(globals.fast_encrypt_width,boundary)
+
                 continue
 
             let readable = min(boundary, data.len().uint16)
@@ -149,8 +153,12 @@ proc processTrustedRemote(remote: Connection) {.async.} =
             await remote.reader.readExactly(addr data[0], readable.int)
             if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
 
-            unPackForRead(data)
-            echo "after dec:", data.hash
+            if dec_bytes_left > 0:
+                let consumed = min(data.len(), dec_bytes_left.int)
+                dec_bytes_left -= consumed.uint
+                unPackForRead(data,consumed)
+
+            # echo "after dec:", data.hash
 
             # write
             if DataFlags.udp in cast[TransferFlags](flag):
@@ -168,7 +176,7 @@ proc processTrustedRemote(remote: Connection) {.async.} =
             else:
                 if context.user_inbounds.hasID(cid):
                     context.user_inbounds.with(cid, child_client):
-                        
+
                         if not child_client.closed:
                             await child_client.writer.write(data)
                             if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
@@ -295,7 +303,7 @@ proc processTcpConnection(client: Connection) {.async.} =
                 await remote.writer.write(data)
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
 
-                if fupload and remote.isTrusted : await sendJunkData(globals.noise_ratio.int * data.len())
+                if fupload and remote.isTrusted: await sendJunkData(globals.noise_ratio.int * data.len())
 
 
         except:
@@ -422,11 +430,11 @@ proc start*(){.async.} =
         proc serveStreamClient(server: StreamServer,
                         transp: StreamTransport) {.async.} =
             try:
-                let con = await Connection.new(transp,no_id = true)
+                let con = await Connection.new(transp, no_id = true)
                 let address = con.transp.remoteAddress()
                 if globals.multi_port:
                     var origin_port: int
-                    var size =  int(if isV4Mapped(con.transp.remoteAddress): 16 else: 28)
+                    var size = int(if isV4Mapped(con.transp.remoteAddress): 16 else: 28)
 
 
                     let sol = int(if isV4Mapped(con.transp.remoteAddress): globals.SOL_IP else: globals.SOL_IPV6)
@@ -490,7 +498,7 @@ proc start*(){.async.} =
 
             if globals.multi_port:
                 var origin_port: int
-                var size =  int(if isV4Mapped(connection.transp.remoteAddress): 16 else: 28)
+                var size = int(if isV4Mapped(connection.transp.remoteAddress): 16 else: 28)
                 let sol = int(if isV4Mapped(connection.transp.remoteAddress): globals.SOL_IP else: globals.SOL_IPV6)
                 if not getSockOpt(connection.transp.fd, sol, int(globals.SO_ORIGINAL_DST),
                 addr pbuf[0], size):
@@ -533,7 +541,7 @@ proc start*(){.async.} =
 
     asyncSpawn startTcpListener()
     if globals.accept_udp:
-        trackDeadUdpConnections(context.user_inbounds_udp, globals.udp_max_idle_time,false)
+        trackDeadUdpConnections(context.user_inbounds_udp, globals.udp_max_idle_time, false)
         asyncSpawn startUdpListener()
 
 

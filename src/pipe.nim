@@ -27,24 +27,25 @@ type
 #     for i in 0 ..< (data.len() div 4):
 #         (address+i.uint)[] = `xor`((address+i.uint)[], globals.sh4)
 
-proc encrypt(data: var string, start = 0) =
+proc encrypt(data: var string, start:int = 0, nbytes: int = data.len()) =
     var i: int = start
-    let loopmax = min(data.len(), start + globals.debug_enmax)
+    let loopmax = min(data.len(), start + nbytes)
     while i < loopmax:
         data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
         i += 1
 
-proc decrypt(data: var string) =
+proc decrypt(data: var string, nbytes: int = data.len()) =
+
     var i: int = 0
-    let loopmax = min(data.len(), globals.debug_enmax)
+    let loopmax = min(data.len(), nbytes)
     while i < loopmax:
         data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
         i += 1
 
 
 
-proc unPackForRead*(data: var string) =
-    decrypt data
+proc unPackForRead*(data: var string, bytes: int) =
+    decrypt data, bytes
 
 
 proc flagForSend*(data: var string, flags: TransferFlags) =
@@ -74,7 +75,7 @@ proc packForSend*(data: var string, cid: uint16, port: uint16, flags: TransferFl
     copyMem(addr data[0 + globals.full_tls_record_len.int+sizeof(e_cid)], addr e_port, sizeof(e_port))
     copyMem(addr data[0 + globals.full_tls_record_len.int+sizeof(e_cid)+sizeof(e_port)], addr e_flags, sizeof(e_flags))
 
-    encrypt(data, width)
+    encrypt(data, width, globals.fast_encrypt_width.int)
 
 
 
