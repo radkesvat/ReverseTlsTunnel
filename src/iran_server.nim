@@ -424,7 +424,10 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
 
 proc start*(){.async.} =
     var pbuf = newString(len = 28)
-
+    context.user_inbounds.new() 
+    context.user_inbounds_udp.new() 
+    context.available_peer_inbounds.new() 
+    context.peer_fupload_outbounds.new() 
     proc startTcpListener(){.async.} =
 
         proc serveStreamClient(server: StreamServer,
