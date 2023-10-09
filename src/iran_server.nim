@@ -149,8 +149,8 @@ proc processTrustedRemote(remote: Connection) {.async.} =
             await remote.reader.readExactly(addr data[0], readable.int)
             if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
 
-            echo "before dec:", data.hash
             unPackForRead(data)
+            echo "after dec:", data.hash
 
             # write
             if DataFlags.udp in cast[TransferFlags](flag):
