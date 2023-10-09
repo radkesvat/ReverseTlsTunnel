@@ -1,5 +1,15 @@
 #!/bin/bash
 
+#colors
+red='\033[0;31m'
+green='\033[0;32m'
+yellow='\033[0;33m'
+blue='\033[0;34m'
+purple='\033[0;35m'
+cyan='\033[0;36m'
+white='\033[0;37m'
+rest='\033[0m'
+
 root_access() {
     # Check if the script is running as root
     if [ "$EUID" -ne 0 ]; then
@@ -279,7 +289,7 @@ lb_uninstall() {
     sudo rm /etc/systemd/system/lbtunnel.service
     sudo systemctl reset-failed
     sudo rm RTT
-    sudo rm install.sh 2>/dev/nul
+    sudo rm install.sh 2>/dev/null
 
     echo "Uninstallation completed successfully."
 }
@@ -300,7 +310,7 @@ uninstall() {
     sudo rm /etc/systemd/system/tunnel.service
     sudo systemctl reset-failed
     sudo rm RTT
-    sudo rm install.sh 2>/dev/nul
+    sudo rm install.sh 2>/dev/null
 
     echo "Uninstallation completed successfully."
 }
@@ -432,9 +442,9 @@ stop_tunnel() {
 check_tunnel_status() {
     # Check the status of the tunnel service
     if sudo systemctl is-active --quiet tunnel.service; then
-        echo "Multiport is:[running ✔]"
+        echo -e "${yellow}Multiport is: ${green}    [running ✔]${rest}"
     else
-        echo "Multiport is:[Not running ✗ ]"
+        echo -e "${yellow}Multiport is:${red}    [Not running ✗ ]${rest}"
     fi
 }
 
@@ -475,12 +485,111 @@ stop_lb_tunnel() {
 check_lb_tunnel_status() {
     # Check the status of the load balancer tunnel service
     if sudo systemctl is-active --quiet lbtunnel.service; then
-        echo "Load balancer is:[running ✔]"
+        echo -e "${yellow}Load balancer is: ${green}[running ✔]${rest}"
     else
-        echo "Load balancer is:[Not running ✗ ]"
+        echo -e "${yellow}Load balancer is:${red}[Not running ✗ ]${rest}"
     fi
 }
 
+check_c_installed() {
+    if [ -f "/etc/systemd/system/custom_tunnel.service" ]; then
+        echo "The Custom Tunnel is already installed."
+        exit 1
+    fi
+}
+
+# Function to start the custom tunnel service
+start_c_tunnel() {
+    # Check if the service is installed
+    if sudo systemctl is-enabled --quiet custom_tunnel.service; then
+    
+        sudo systemctl start custom_tunnel.service > /dev/null 2>&1
+
+        if sudo systemctl is-active --quiet custom_tunnel.service; then
+            echo "Custom Tunnel started."
+        else
+            echo "Custom Tunnel failed to start."
+        fi
+    else
+        echo "Custom Tunnel is not installed."
+    fi
+}
+
+check_c_tunnel_status() {
+    # Check the status of the load balancer tunnel service
+    if sudo systemctl is-active --quiet custom_tunnel.service; then
+        echo -e "${yellow}Custom Tunnel is: ${green}[running ✔]${rest}"
+    else
+        echo -e "${yellow}Custom Tunnel is:${red}[Not running ✗ ]${rest}"
+    fi
+}
+
+
+stop_c_tunnel() {
+    # Check if the service is installed
+    if sudo systemctl is-enabled --quiet custom_tunnel.service; then
+    
+        sudo systemctl stop custom_tunnel.service > /dev/null 2>&1
+
+        if sudo systemctl is-active --quiet custom_tunnel.service; then
+            echo "Custom Tunnel failed to stop."
+        else
+            echo "Custom Tunnel stopped."
+        fi
+    else
+        echo "Custom Tunnel is not installed."
+    fi
+}
+
+install_custom() {
+    root_access
+    check_dependencies
+    check_c_installed
+    install_selected_version
+    cd /etc/systemd/system
+    read -p "Enter RTT arguments (Example: RTT --iran --lport:443 --sni:splus.ir --password:123): " arguments
+    
+    # Create the custom_tunnel.service file with user input
+    cat <<EOL > custom_tunnel.service
+[Unit]
+Description=my custom tunnel service
+
+[Service]
+Type=idle
+User=root
+WorkingDirectory=/root
+ExecStart=/root/$arguments
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOL
+
+    # Reload systemctl daemon and start the service
+    sudo systemctl daemon-reload
+    sudo systemctl start custom_tunnel.service
+    sudo systemctl enable custom_tunnel.service
+}
+
+c_uninstall() {
+    # Check if the service is installed
+    if [ ! -f "/etc/systemd/system/custom_tunnel.service" ]; then
+        echo "The Custom Tunnel is not installed."
+        return
+    fi
+
+    # Stop and disable the service
+    sudo systemctl stop custom_tunnel.service
+    sudo systemctl disable custom_tunnel.service
+
+    # Remove service file
+    sudo rm /etc/systemd/system/custom_tunnel.service
+    sudo systemctl reset-failed
+    sudo rm RTT
+    sudo rm install.sh 2>/dev/null
+
+    echo "Uninstallation completed successfully."
+}
 
 #ip  & version
 myip=$(hostname -I | awk '{print $1}')
@@ -488,29 +597,36 @@ version=$(./RTT -v 2>&1 | grep -o 'version="[0-9.]*"')
 
 # Main menu
 clear
-echo "By --> Peyman * Github.com/Ptechgithub * "
-echo "Your IP is: ($myip) "
-echo "**********************"
+echo -e "${cyan}By --> Peyman * Github.com/Ptechgithub * ${rest}"
+echo -e "Your IP is: ${cyan}($myip)${rest} "
+echo -e "${yellow}******************************${rest}"
 check_tunnel_status
 check_lb_tunnel_status
-echo "**********************"
-echo " --------#- Reverse Tls Tunnel -#--------"
-echo "1) Install (Multiport)"
-echo "2) Uninstall (Multiport)"
+check_c_tunnel_status
+echo -e "${yellow}******************************${rest}"
+echo -e " ${purple}--------#- Reverse Tls Tunnel -#--------${rest}"
+echo -e "${green}1) Install (Multiport)${rest}"
+echo -e "${red}2) Uninstall (Multiport)${rest}"
 echo "3) Start Multiport"
 echo "4) Stop Multiport"
 echo "5) Check Status"
-echo " ----------------------------"
-echo "6) Install Load-balancer"
-echo "7) Uninstall Load-balancer"
+echo -e "${yellow} ----------------------------${rest}"
+echo -e "${green}6) Install Load-balancer${rest}"
+echo -e "${red}7) Uninstall Load-balancer${rest}"
 echo "8) Start Load Balancer"
 echo "9) Stop Load Balancer"
 echo "10) Check status"
-echo " ----------------------------"
-echo "11) Update RTT"
-echo "12) Compile RTT"
+echo -e "${yellow} ----------------------------${rest}"
+echo -e "${green}11) Install Custom${rest}"
+echo -e "${red}12) Uninstall Custom${rest}"
+echo "13) Start Custom"
+echo "14) Stop Custom"
+echo "15) Check status"
+echo -e "${yellow} ----------------------------${rest}"
+echo -e "${cyan}16) Update RTT${rest}"
+echo -e "${cyan}17 Compile RTT${rest}"
 echo "0) Exit"
-echo " --------------$version--------------"
+echo -e "${purple} --------------${cyan}$version${purple}--------------${rest}"
 read -p "Please choose: " choice
 
 case $choice in
@@ -544,10 +660,25 @@ case $choice in
     10)
         check_lb_tunnel_status
         ;;
-    11) 
-        update_services
+    11)
+        install_custom
         ;;
     12)
+        c_uninstall
+        ;;
+    13)
+        start_c_tunnel
+        ;;
+    14) 
+        stop_c_tunnel
+        ;;
+    15) 
+        check_c_tunnel_status
+        ;;
+    16) 
+        update_services
+        ;;
+    17)
         compile
         ;;
     0)   
