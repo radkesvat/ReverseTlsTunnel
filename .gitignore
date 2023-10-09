@@ -8,6 +8,7 @@ node_modules
 .env.local
 .env.*.local
 package-lock.json
+main_linkerArgs.txt
 
 # Log files
 npm-debug.log*

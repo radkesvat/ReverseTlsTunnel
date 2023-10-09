@@ -1,6 +1,6 @@
 import std/[strformat,macros,strutils,ospaths]
 
-const Release = true
+const Release = false
 
 
 const libs_dir = "libs"
@@ -49,7 +49,6 @@ task build_server, "builds server":
     
     # switch("d", "useMalloc")
 
-    switch("d", "asyncBackend=chronos")
     switch("d", "asyncBackend:chronos")
  
     # switch("cc", "clang")

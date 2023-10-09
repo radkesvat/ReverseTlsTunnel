@@ -57,6 +57,7 @@ type
         raddr*: TransportAddress
         port*: Port               #the port the socket points to
         mark*:bool
+        bound*:Connection
 
     Connections* = seq[Connection]
     UdpConnections* = seq[UdpConnection]
@@ -70,7 +71,7 @@ proc new_uid: uint16 =
     result = lgid
     inc lgid
 
-
+template assignId*(con: Connection or UdpConnection) = con.id = new_uid()
 
 
 
@@ -130,8 +131,9 @@ proc remove*(cons: var (Connections or UdpConnections), con: Connection or  UdpC
     var index = -1
     when con is Connection or con is UdpConnection:
         for i, el in cons:
-            if el.id == con.id:
+            if el == con:
                 index = i
+                
     when con is uint16:
         for i, el in cons:
             if el.id == con:
@@ -222,9 +224,9 @@ proc closeWait*(conn: Connection) {.async.} =
         conn.state = SocketState.Closed
 
 
-proc new*(ctype: typedesc[UdpConnection], transp: DatagramTransport, raddr: TransportAddress): UdpConnection =
+proc new*(ctype: typedesc[UdpConnection], transp: DatagramTransport, raddr: TransportAddress,no_id = false): UdpConnection =
     result = UdpConnection(
-        id: new_uid(),
+        id: if no_id: 0 else: new_uid(),
         creation_time: et,
         last_action: et,
         transp: transp,
@@ -232,7 +234,8 @@ proc new*(ctype: typedesc[UdpConnection], transp: DatagramTransport, raddr: Tran
     )
 
 
-proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketScheme = SocketScheme.NonSecure, hostname: string = ""): Future[
+proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketScheme = SocketScheme.NonSecure,
+ hostname: string = "",no_id = false): Future[
         Connection] {.async.} =
     if scheme == SocketScheme.Secure:
         assert not hostname.isEmptyOrWhitespace(), "hostname was empty for secure socket!"
@@ -242,7 +245,7 @@ proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketSc
                 case scheme
                 of SocketScheme.NonSecure:
                     let res = Connection(
-                    id: new_uid(),
+                    id:  if no_id: 0 else: new_uid(),
                     kind: SocketScheme.NonSecure,
                     transp: transp,
                     reader: newAsyncStreamReader(transp),
@@ -260,7 +263,7 @@ proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketSc
 
                     let tls = newTLSClientAsyncStream(treader, twriter, hostname, flags = flags)
                     let res = Connection(
-                    id: new_uid(),
+                    id: if no_id: 0 else: new_uid(),
                     kind: SocketScheme.Secure,
                     transp: transp,
                     treader: treader,
@@ -300,7 +303,7 @@ proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketSc
     return conn
 
 proc connect*(address: TransportAddress, scheme: SocketScheme = SocketScheme.NonSecure,
-    hostname: string = ""): Future[Connection] {.async.} =
+    hostname: string = "",no_id = false): Future[Connection] {.async.} =
     let transp =
         try:
             var flags = {SocketFlags.TcpNoDelay, SocketFlags.ReuseAddr}
@@ -312,7 +315,7 @@ proc connect*(address: TransportAddress, scheme: SocketScheme = SocketScheme.Non
         except CatchableError as exc:
             raise exc
 
-    let con = await Connection.new(transp, scheme, hostname)
+    let con = await Connection.new(transp, scheme, hostname,no_id)
     con.port = address.port
     return con
 
@@ -333,15 +336,19 @@ template trackIdleConnections*(cons: var Connections, age: uint) =
             while true:
                 await sleepAsync(timer.seconds(age.int))
                 checkAndRemove()
-        asyncCheck tracker()
+        asyncSpawn tracker()
 
-template trackDeadUdpConnections*(cons: var UdpConnections, age: uint) =
+template trackDeadUdpConnections*(cons: var UdpConnections, age: uint,doclose :bool) =
     block:
         proc checkAndRemove() =
             cons.keepIf(proc(x: UdpConnection): bool =
                 if x.last_action != 0:
                     if et - x.last_action > age:
-                        x.close()
+                        if doclose:
+                            x.close()
+                            if not isNil x.bound:
+                                x.bound.close()
+
                         if globals.log_conn_destory: echo "[Controller] closed a dead udp connection, ", et - x.last_action
                         return false
                 return true
@@ -350,7 +357,7 @@ template trackDeadUdpConnections*(cons: var UdpConnections, age: uint) =
             while true:
                 await sleepAsync(timer.seconds(age.int))
                 checkAndRemove()
-        asyncCheck tracker()
+        asyncSpawn tracker()
 
 proc startController*() {.async.} =
     while true:

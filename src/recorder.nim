@@ -11,7 +11,6 @@ type
 let allrecords* = newSeq[Record](len = globals.tls_records)
 
 
-
 proc recrdSends(rec: Record, sent: string) =
     let index = rec.sent.high
     rec.sent[index].add sent
@@ -23,8 +22,6 @@ proc recrdRecvs(rec: Record, received: string) =
     rec.received[index].add received
 
 proc finishRecord(rec: Record)=rec.handshaked = true
-    
-
 
 proc find(sent:string)=
     for rec in allrecords:

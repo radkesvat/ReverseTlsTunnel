@@ -1,20 +1,22 @@
 import std/[strformat, strutils, random, endians]
-import chronos , chronos/transports/[datagram,ipnet] , chronos/osdefs
-import times, print, connection, pipe
+import chronos, chronos/transports/[datagram, ipnet], chronos/osdefs
+import times, print, connection, pipe, hashes
 from globals import nil
 
 type
     TunnelConnectionPoolContext = object
-        # listener_server: Connection # for testing on local pc
+        # listener_server: Connection for testing on local pc
         listener: StreamServer
         user_inbounds: Connections
         user_inbounds_udp: UdpConnections
         listener_udp: DatagramTransport
         available_peer_inbounds: Connections
+        peer_fupload_outbounds: Connections
         peer_ip: IpAddress
 
-
 var context = TunnelConnectionPoolContext()
+
+
 
 proc monitorData(data: var string): bool =
     let base = 5 + 7 + `mod`(globals.sh5, 7.uint8)
@@ -33,7 +35,6 @@ proc monitorData(data: var string): bool =
         return false
 
 
-
 proc generateFinishHandShakeData(): string =
     let rlen: uint16 = uint16(16*(6+rand(4)))
     var random_trust_data: string = newStringOfCap(rlen)
@@ -49,7 +50,6 @@ proc generateFinishHandShakeData(): string =
 
     return random_trust_data
 
-
 proc acquireRemoteConnection(mark = true): Future[Connection] {.async.} =
     var remote: Connection = nil
     for i in 0..<200:
@@ -59,7 +59,7 @@ proc acquireRemoteConnection(mark = true): Future[Connection] {.async.} =
                 if remote.closed or remote.exhausted:
                     context.available_peer_inbounds.remove(remote)
                     continue
-                
+
                 if mark:
                     inc remote.counter
                     remote.exhausted = remote.counter >= globals.mux_width
@@ -69,10 +69,42 @@ proc acquireRemoteConnection(mark = true): Future[Connection] {.async.} =
 
 proc connectTargetSNI(): Future[Connection] {.async.} =
     let address = initTAddress(globals.final_target_ip, globals.final_target_port)
-    var new_remote: Connection = await connection.connect(address)
+    var new_remote: Connection = await connection.connect(address, no_id = true)
     new_remote.trusted = TrustStatus.no
     if globals.log_conn_create: echo "connected to ", globals.final_target_domain, ":", $globals.final_target_port
     return new_remote
+
+template fupload: bool = globals.noise_ratio != 0
+
+proc sendJunkData(len: int) {.async.} =
+    proc checkorRefill() =
+        if context.peer_fupload_outbounds.len() < 8:
+            if context.available_peer_inbounds.len != 0:
+                var tr = context.available_peer_inbounds[context.available_peer_inbounds.high]
+                if not tr.closed and not tr.counter > 0: #valid
+                    context.available_peer_inbounds.remove(tr)
+                    context.peer_fupload_outbounds.add tr
+    checkorRefill()
+    var target: Connection = nil
+    for i in 0..<8:
+        var tr: Connection = context.peer_fupload_outbounds.randomPick()
+        if not tr.isNil() and not tr.closed():
+            target = tr; break
+
+    if target.isNil:
+        if globals.log_data_len: echo "could not acquire a connection to send fake traffic."
+        return
+
+    let random_start = rand(1500)
+    let full_len = min((len+random_start) + `mod`((len+random_start), 16), globals.random_str.len())
+    var data = globals.random_str[random_start ..< full_len]
+    let size: uint16 = data.len().uint16 - globals.full_tls_record_len.uint16
+    copyMem(addr data[0], addr globals.tls13_record_layer[0], globals.tls13_record_layer.len())
+    copyMem(addr data[0 + globals.tls13_record_layer.len()], addr size, sizeof(size))
+    data.flagForSend(flags = {DataFlags.junk})
+    await target.writer.write(data)
+    if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
+
 
 proc processTrustedRemote(remote: Connection) {.async.} =
     var data = newStringOfCap(4200)
@@ -80,6 +112,7 @@ proc processTrustedRemote(remote: Connection) {.async.} =
     var cid: uint16
     var port: uint16
     var flag: uint8
+    var dec_bytes_left: uint
 
     try:
         while not remote.isNil and not remote.closed:
@@ -110,6 +143,9 @@ proc processTrustedRemote(remote: Connection) {.async.} =
                     context.user_inbounds.with(cid, child_client):
                         child_client.close()
                         context.user_inbounds.remove(child_client)
+                else:
+                    dec_bytes_left = min(globals.fast_encrypt_width,boundary)
+
                 continue
 
             let readable = min(boundary, data.len().uint16)
@@ -117,35 +153,39 @@ proc processTrustedRemote(remote: Connection) {.async.} =
             await remote.reader.readExactly(addr data[0], readable.int)
             if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
 
+            if dec_bytes_left > 0:
+                let consumed = min(data.len(), dec_bytes_left.int)
+                dec_bytes_left -= consumed.uint
+                unPackForRead(data,consumed)
+
+            # echo "after dec:", data.hash
 
             # write
             if DataFlags.udp in cast[TransferFlags](flag):
                 context.user_inbounds_udp.with(cid, child_client):
-                    unPackForRead(data)
+                    # unPackForRead(data)
                     child_client.hit()
-                    
+
                     await child_client.transp.sendTo(child_client.raddr, data)
                     if globals.log_data_len: echo &"[processRemote] {data.len()} bytes -> client"
 
+                    if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
+
                     inc remote.udp_packets; if remote.udp_packets > globals.udp_max_ppc: remote.close()
-                    
+
             else:
                 if context.user_inbounds.hasID(cid):
                     context.user_inbounds.with(cid, child_client):
-                        unPackForRead(data)
+
                         if not child_client.closed:
                             await child_client.writer.write(data)
                             if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
 
-                    if globals.noise_ratio != 0:
-                        data.packForSend(remote.id, remote.port.uint16, flags = {DataFlags.junk})
-                        for _ in 0..<globals.noise_ratio:
-                            asyncDiscard remote.writer.write(data)
-                            if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
+                    if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
+
+
                 else:
                     await remote.writer.write(closeSignalData(cid))
-
-           
 
     except:
         if globals.log_conn_error: echo getCurrentExceptionMsg()
@@ -225,27 +265,26 @@ proc processTcpConnection(client: Connection) {.async.} =
                         context.available_peer_inbounds.register(client)
                         context.peer_ip = client.transp.remoteAddress.address
                         remote.close() # close untrusted remote
-                        asyncCheck processTrustedRemote(client)
+                        asyncSpawn processTrustedRemote(client)
 
                         return
                     else:
                         if first_packet:
                             if not data.contains(globals.final_target_domain):
-                                if globals.trusted_foreign_peers.len != 0 or  context.peer_ip != IpAddress():
+                                if globals.trusted_foreign_peers.len != 0 or context.peer_ip != IpAddress():
                                     #user wants to use panel via iran ip
                                     client.trusted = TrustStatus.pending
                                 else:
                                     echo "[Error] user connection but no peer connected yet."
                                     await closeLine(client, remote)
                                     return
-                        if not (globals.trusted_foreign_peers.len != 0 or  context.peer_ip != IpAddress()):
+                        if not (globals.trusted_foreign_peers.len != 0 or context.peer_ip != IpAddress()):
                             if (epochTime().uint - client.creation_time) > globals.trust_time:
                                 #user connection but no peer connected yet
                                 #peer connection but couldnt finish handshake in time
                                 client.trusted = TrustStatus.no
                                 await closeLine(client, remote)
                                 return
-
                     first_packet = false
 
                 #write
@@ -257,10 +296,14 @@ proc processTcpConnection(client: Connection) {.async.} =
                         await closeLine(client, remote); return
 
                 if remote.isTrusted:
+                    # echo "before enc:  ", data[10 .. data.high].hash()
                     data.packForSend(client.id, client.port.uint16)
-                await remote.writer.write(data)
+                    # echo "after enc:", data[10 .. 20].repr
 
+                await remote.writer.write(data)
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
+
+                if fupload and remote.isTrusted: await sendJunkData(globals.noise_ratio.int * data.len())
 
 
         except:
@@ -271,11 +314,11 @@ proc processTcpConnection(client: Connection) {.async.} =
         context.user_inbounds.remove(client)
 
         try:
-            if remote.closed:
+            if remote.closed and remote.isTrusted():
                 remote = await acquireRemoteConnection(mark = false)
 
                 if remote != nil:
-                    await remote.writer.write(closeSignalData(client.id))     
+                    await remote.writer.write(closeSignalData(client.id))
             else:
                 await remote.writer.write(closeSignalData(client.id))
                 remote.counter.dec
@@ -284,7 +327,7 @@ proc processTcpConnection(client: Connection) {.async.} =
                     remote.close()
                     if globals.log_conn_destory: echo "Closed a exhausted mux connection"
 
-            
+
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
@@ -292,28 +335,29 @@ proc processTcpConnection(client: Connection) {.async.} =
     #Initialize remote
     try:
         var remote: Connection = nil
-        if globals.trusted_foreign_peers.len != 0 :
+        if globals.trusted_foreign_peers.len != 0:
 
-                if isV4Mapped(client.transp.remoteAddress):
-                    let ipv4 = toIPv4(client.transp.remoteAddress).address
-                    if ipv4 in globals.trusted_foreign_peers:
-                        #load balancer connection
-                        remote = await connectTargetSNI()
-                        asyncCheck processUntrustedRemote(remote)
-                else:
-                    if client.transp.remoteAddress.address in globals.trusted_foreign_peers:
-                        #load balancer connection
-                        remote = await connectTargetSNI()
-                        asyncCheck processUntrustedRemote(remote)
+            if isV4Mapped(client.transp.remoteAddress):
+                let ipv4 = toIPv4(client.transp.remoteAddress).address
+                if ipv4 in globals.trusted_foreign_peers:
+                    #load balancer connection
+                    remote = await connectTargetSNI()
+                    asyncSpawn processUntrustedRemote(remote)
+            else:
+                if client.transp.remoteAddress.address in globals.trusted_foreign_peers:
+                    #load balancer connection
+                    remote = await connectTargetSNI()
+                    asyncSpawn processUntrustedRemote(remote)
 
         if remote == nil:
             if context.peer_ip != IpAddress() and
                 context.peer_ip != client.transp.remoteAddress.address:
                 if globals.log_conn_create: echo "Real User connected !"
                 client.trusted = TrustStatus.no
+                client.assignId()
                 remote = await acquireRemoteConnection() #associate peer
                 if remote != nil:
-                    if globals.log_conn_create: echo "Associated a peer connection, cid: ", remote.id
+                    if globals.log_conn_create: echo "Associated a peer connection."
                     context.user_inbounds.register(client)
 
                 else:
@@ -322,16 +366,14 @@ proc processTcpConnection(client: Connection) {.async.} =
                     return
             else:
                 remote = await connectTargetSNI()
-                asyncCheck processUntrustedRemote(remote)
+                asyncSpawn processUntrustedRemote(remote)
 
-        asyncCheck processClient(remote)
+        asyncSpawn processClient(remote)
 
     except:
         printEx()
 
-
-proc processUdpPacket(client:UdpConnection) {.async.} =
-    
+proc processUdpPacket(client: UdpConnection) {.async.} =
 
     proc processClient(remote: Connection) {.async.} =
         try:
@@ -347,68 +389,60 @@ proc processUdpPacket(client:UdpConnection) {.async.} =
 
                 #write
                 if remote.closed:
-                    remote = await acquireRemoteConnection()
-                    if remote == nil:
-                        if globals.log_conn_error: echo &"[Error] left without connection, closes forcefully."
-                        return
+                    if globals.log_conn_error: echo &"[Error] Tcp remote was just closed!"
+                    return
 
-                data.packForSend(client.id, client.port.uint16,flags = {DataFlags.udp})
+                data.packForSend(client.id, client.port.uint16, flags = {DataFlags.udp})
                 await remote.writer.write(data)
-
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
-          
 
-                client.hit()
                 inc remote.udp_packets; if remote.udp_packets > globals.udp_max_ppc: remote.close()
-   
+
+                if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
 
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
-   
+
     #Initialize remote
     try:
         if globals.log_conn_create: echo "Real User connected (UDP) !"
-
-
         # var remote = await acquireRemoteConnection(not client.mark) #associate peer
-        var remote:Connection = nil
-        for i in 0..<20:
-            var tmp_remote = context.available_peer_inbounds.randomPick() 
-            if remote != nil and not remote.closed:
-                remote = tmp_remote
-                break
+        if client.bound == nil or client.bound.closed:
+            client.bound = await acquireRemoteConnection()
 
-        if remote != nil:
-            if globals.log_conn_create: echo "Associated a peer connection, cid: ", remote.id
+        if client.bound != nil:
+            if globals.log_conn_create: echo "Associated a peer connection"
         else:
             echo &"[AssociatedCon][Error] left without connection, closes forcefully."
             return
-        await processClient(remote)
+        await processClient(client.bound)
 
     except:
         printEx()
 
 
-
 proc start*(){.async.} =
-    var pbuf = newString(len = 16)
+    var pbuf = newString(len = 28)
 
     proc startTcpListener(){.async.} =
 
         proc serveStreamClient(server: StreamServer,
                         transp: StreamTransport) {.async.} =
             try:
-                let con = await Connection.new(transp)
+                let con = await Connection.new(transp, no_id = true)
                 let address = con.transp.remoteAddress()
                 if globals.multi_port:
                     var origin_port: int
-                    var size = 16
-                    if not getSockOpt(transp.fd, int(globals.SOL_IP), int(globals.SO_ORIGINAL_DST),
-                    addr pbuf[0], size):
+                    var size = int(if isV4Mapped(con.transp.remoteAddress): 16 else: 28)
+
+
+                    let sol = int(if isV4Mapped(con.transp.remoteAddress): globals.SOL_IP else: globals.SOL_IPV6)
+                    if not getSockOpt(transp.fd, sol, int(globals.SO_ORIGINAL_DST), addr pbuf[0], size):
                         echo "multiport failure getting origin port. !"
                         await con.closeWait()
                         return
+
                     bigEndian16(addr origin_port, addr pbuf[2])
 
                     con.port = origin_port.Port
@@ -418,7 +452,7 @@ proc start*(){.async.} =
                     con.port = server.local.port.Port
                     if globals.log_conn_create: print "Connected client: ", address
 
-                asyncCheck processTcpConnection(con)
+                asyncSpawn processTcpConnection(con)
             except:
                 echo "handle client connection error:"
                 echo getCurrentExceptionMsg()
@@ -436,7 +470,7 @@ proc start*(){.async.} =
                 raise exc
             except CatchableError as exc:
                 raise exc
-        
+
         context.listener = server
 
         if globals.multi_port:
@@ -454,49 +488,49 @@ proc start*(){.async.} =
         proc handleDatagram(transp: DatagramTransport,
                     raddr: TransportAddress): Future[void] {.async.} =
 
-                var (found,connection) = findUdp(context.user_inbounds_udp,raddr)
-                if not found: 
-                    connection = UdpConnection.new(transp,raddr)
-                    context.user_inbounds_udp.register connection
+            var (found, connection) = findUdp(context.user_inbounds_udp, raddr)
+            if not found:
+                connection = UdpConnection.new(transp, raddr)
+                context.user_inbounds_udp.register connection
 
-                let address = raddr
+            let address = raddr
+            if globals.log_conn_create: print "Connected client: ", address
+
+            if globals.multi_port:
+                var origin_port: int
+                var size = int(if isV4Mapped(connection.transp.remoteAddress): 16 else: 28)
+                let sol = int(if isV4Mapped(connection.transp.remoteAddress): globals.SOL_IP else: globals.SOL_IPV6)
+                if not getSockOpt(connection.transp.fd, sol, int(globals.SO_ORIGINAL_DST),
+                addr pbuf[0], size):
+                    echo "multiport failure getting origin port. !"
+                    return
+                bigEndian16(addr origin_port, addr pbuf[2])
+
+                connection.port = origin_port.Port
+
+                if globals.log_conn_create: print "Connected client: ", address, connection.port
+            else:
+                # connection.port = transp.localAddress.port.Port
+                connection.port = globals.listen_port
                 if globals.log_conn_create: print "Connected client: ", address
 
-                if globals.multi_port:
-                    var origin_port: int
-                    var size = 16
-                    if not getSockOpt(connection.transp.fd, int(globals.SOL_IP), int(globals.SO_ORIGINAL_DST),
-                    addr pbuf[0], size):
-                        echo "multiport failure getting origin port. !"
-                        await connection.closeWait()
-                        return
-                    bigEndian16(addr origin_port, addr pbuf[2])
 
-                    connection.port = origin_port.Port
-
-                    if globals.log_conn_create: print "Connected client: ", address, connection.port
-                else:
-                    # connection.port = transp.localAddress.port.Port
-                    connection.port = globals.listen_port
-                    if globals.log_conn_create: print "Connected client: ", address
-
-
-                asyncCheck processUdpPacket(connection)
+            asyncSpawn processUdpPacket(connection)
 
         # var address4 = initTAddress(globals.listen_addr4, globals.listen_port.Port)
         var address = initTAddress(globals.listen_addr, globals.listen_port.Port)
 
         # var dgramServer4 = newDatagramTransport(handleDatagram, local = address4,flags = {ReuseAddr})
         # echo &"Started udp server  {globals.listen_addr4}:{globals.listen_port}"
-    
-        context.listener_udp = newDatagramTransport6(handleDatagram, local = address,flags = {ServerFlags.ReuseAddr})
-            
+
+        context.listener_udp = newDatagramTransport6(handleDatagram, local = address, flags = {ServerFlags.ReuseAddr})
+
         echo &"Started udp server  {globals.listen_addr}:{globals.listen_port}"
 
         await context.listener_udp.join()
         echo "Udp server ended."
 
-    # trackIdleConnections(context.available_peer_inbounds, globals.pool_age)
+    trackIdleConnections(context.peer_fupload_outbounds, globals.fakeupload_con_age)
 
     await sleepAsync(200)
     if globals.accept_udp:
@@ -504,14 +538,16 @@ proc start*(){.async.} =
     else:
         echo &"Mode Iran: {globals.self_ip}  handshake: {globals.final_target_domain}"
 
-    
-    asyncCheck startTcpListener()
+
+    asyncSpawn startTcpListener()
     if globals.accept_udp:
-        trackDeadUdpConnections(context.user_inbounds_udp,globals.udp_max_idle_time)
-        asyncCheck startUdpListener()
+        trackDeadUdpConnections(context.user_inbounds_udp, globals.udp_max_idle_time, false)
+        asyncSpawn startUdpListener()
 
 
-    # asyncCheck start_server_listener()
+
+
+    # asyncSpawn start_server_listener()
 
 
 

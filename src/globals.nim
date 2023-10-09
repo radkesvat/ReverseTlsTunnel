@@ -3,7 +3,7 @@ import dns_resolve, hashes, print, parseopt, strutils, random, net, osproc, strf
 import checksums/sha1
 
 
-const version = "5.2"
+const version = "5.5"
 
 type RunMode*{.pure.} = enum
     unspecified, iran, kharej
@@ -26,18 +26,19 @@ let full_tls_record_len*: uint = tls13_record_layer.len().uint + tls13_record_la
 var trust_time*: uint = 3 #secs
 var pool_size*: uint = 24
 var pool_age*: uint = 15
+var fakeupload_con_age*: uint = 60 #secs
 var max_pool_unused_time*: uint = 60 #secs
 let mux_record_len*: uint32 = 5 #2bytes port 2bytes id 1byte reserved
 var mux_width*: uint32 = 1 # 1 -> disabeld
 var udp_max_ppc*: uint32 = 500
-var udp_max_idle_time*: uint = 15 #secs
+var udp_max_idle_time*: uint = 5 #secs
+
 
 # [Noise]
 var noise_ratio*: uint = 0
 
 
 # [Routes]
-# var listen_addr4* = "0.0.0.0"
 var listen_addr* = "::"
 
 var listen_port*: Port = 0.Port
@@ -60,7 +61,8 @@ var sh2*: uint32
 var sh3*: uint32
 var sh4*: uint32
 var sh5*: uint8
-var random_str* = newString(len = 2000)
+var random_str* = newString(len = 0)
+var fast_encrypt_width*:uint = 128
 
 # [settings]
 var disable_ufw* = true
@@ -78,7 +80,11 @@ var multi_port_additions: seq[Port]
 
 # [posix constants]
 const SO_ORIGINAL_DST* = 80
+const IP6T_SO_ORIGINAL_DST* =  80
+
 const SOL_IP* = 0
+const SOL_IPV6* = 41
+
 
 proc isPortFree*(port: Port): bool =
     execCmdEx(&"""lsof -i:{port}""").output.len < 3
@@ -97,6 +103,9 @@ proc chooseRandomLPort(): Port =
 proc iptablesInstalled(): bool {.used.} =
     execCmdEx("""dpkg-query -W --showformat='${Status}\n' iptables|grep "install ok install"""").output != ""
 
+proc ip6tablesInstalled(): bool {.used.} =
+    execCmdEx("""dpkg-query -W --showformat='${Status}\n' ip6tables|grep "install ok install"""").output != ""
+
 proc lsofInstalled(): bool {.used.} =
     execCmdEx("""dpkg-query -W --showformat='${Status}\n' lsof|grep "install ok install"""").output != ""
 
@@ -104,18 +113,22 @@ proc resetIptables*() =
     echo "reseting iptable nat"
     assert 0 == execCmdEx("iptables -t nat -F").exitCode
     assert 0 == execCmdEx("iptables -t nat -X").exitCode
-
+    if ip6tablesInstalled():
+        assert 0 == execCmdEx("ip6tables -t nat -F").exitCode
+        assert 0 == execCmdEx("ip6tables -t nat -X").exitCode
 
 template FWProtocol(): string = (if accept_udp: "all" else: "tcp")
 
-
+#ip6tables -t nat -A PREROUTING -p tcp --dport 443:2083 -j REDIRECT --to-port 
 proc createIptablesForwardRules*() =
     if reset_iptable: resetIptables()
     if not (multi_port_min == 0.Port or multi_port_max == 0.Port):
         assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p {FWProtocol} --dport {multi_port_min}:{multi_port_max} -j REDIRECT --to-port {listen_port}""").exitCode
+        assert 0 == execCmdEx(&"""ip6tables -t nat -A PREROUTING -p {FWProtocol} --dport {multi_port_min}:{multi_port_max} -j REDIRECT --to-port {listen_port}""").exitCode
 
     for port in multi_port_additions:
         assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p {FWProtocol} --dport {port} -j REDIRECT --to-port {listen_port}""").exitCode
+        assert 0 == execCmdEx(&"""ip6tables -t nat -A PREROUTING -p {FWProtocol} --dport {port} -j REDIRECT --to-port {listen_port}""").exitCode
 
 proc multiportSupported(): bool =
     when defined(windows) or defined(android):
@@ -123,16 +136,21 @@ proc multiportSupported(): bool =
         return false
     else:
         if not iptablesInstalled():
-            echo "multi listen port requires iptables to be installed."
+            echo "multi listen port requires iptables to be installed.  \"apt-get install iptables\""
             return false
+        if not ip6tablesInstalled():
+            echo "multi listen port requires ip6tables to be installed. (ip6tables not iptables !)  \"apt-get install ip6tables\""
+            return false
+        
+        if not lsofInstalled():
+            echo "multi listen port requires lsof to be installed.  install with \"apt-get install lsof\""
+            return false
+        
         return true
 
 
 proc init*() =
     print version
-
-    for i in 0..<random_str.len():
-        random_str[i] = rand(char.low .. char.high).char
 
     var p = initOptParser(longNoVal = @["kharej", "iran", "multiport", "keep-ufw", "keep-iptables", "keep-os-limit", "accept-udp", "debug"])
     while true:
@@ -265,6 +283,10 @@ proc init*() =
                         trust_time = parseInt(p.val).uint
                         print trust_time
 
+                    of "emax":
+                        fast_encrypt_width = parseInt(p.val).uint
+                        print fast_encrypt_width
+
 
                     of "listen":
                         listen_addr = (p.val)
@@ -280,8 +302,11 @@ proc init*() =
                             of 2:
                                 log_conn_error = true
                             of 3:
+                                log_conn_error = true
                                 log_conn_destory = true
                             of 4:
+                                log_conn_error = true
+                                log_conn_destory = true
                                 log_data_len = true
                             else:
                                 quit &"Incorrect value {p.val} for option \"log\" "
@@ -347,6 +372,10 @@ proc init*() =
             quit(0)
         )
 
+    let rs_capacity =  4200 + (noise_ratio * 4200)
+    random_str = newStringOfCap(rs_capacity); random_str.setLen(rs_capacity)
+    for i in 0..<random_str.len():
+        random_str[i] = rand(char.low .. char.high).char
 
     final_target_ip = resolveIPv4(final_target_domain)
     print "\n"
