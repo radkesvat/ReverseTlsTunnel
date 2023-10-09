@@ -284,7 +284,7 @@ proc init*() =
                         print trust_time
 
                     of "emax":
-                        fast_encrypt_width = parseInt(p.val)
+                        fast_encrypt_width = parseInt(p.val).uint
                         print fast_encrypt_width
 
 
