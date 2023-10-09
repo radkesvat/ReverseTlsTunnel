@@ -2,7 +2,7 @@ import chronos
 import chronos/streams/[tlsstream], chronos/transports/datagram
 import std/[strformat, net, openssl, random]
 import overrides/[asyncnet]
-import print, connection, pipe,hashes
+import print, connection, pipe
 from globals import nil
 
 type
@@ -130,7 +130,7 @@ proc processConnection(client: Connection) {.async.} =
                     client = await acquireClientConnection()
                     if client == nil: break
 
-                echo "before enc:  ", data[10 .. data.high].hash(), "  len:",data.len
+                # echo "before enc:  ", data[10 .. data.high].hash(), "  len:",data.len
                 packForSend(data, remote.id, remote.port.uint16)
 
                 await client.twriter.write(data)

@@ -1,7 +1,7 @@
 # import overrides/[asyncnet]
 import chronos, chronos/asyncsync, chronos/transports/datagram
 import chronos/streams/[asyncstream, tlsstream, boundstream]
-import std/[tables, sequtils, times, strutils, net, random,hashes]
+import std/[tables, sequtils, times, strutils, net, random, hashes]
 import globals
 export asyncsync
 
@@ -51,17 +51,22 @@ type
 
     UdpConnection* = ref object
         creation_time*: uint #creation epochtime
-        last_action*:uint    #last action epochtime
-        id*: uint16   
+        last_action*: uint   #last action epochtime
+        id*: uint16
         transp*: DatagramTransport
         raddr*: TransportAddress
-        port*: Port               #the port the socket points to
-        mark*:bool
-        bound*:Connection
+        port*: Port          #the port the socket points to
+        mark*: bool
+        bound*: Connection
 
-    Connections* = seq[Connection]
-    UdpConnections* = seq[UdpConnection]
 
+    Connections* = ref object
+        round: uint
+        connections: seq[Connection]
+
+    UdpConnections* = ref object
+        round: uint
+        connections: seq[UdpConnection]
 
 
 var et: uint = 0 #last epoch time
@@ -72,25 +77,39 @@ proc new_uid: uint16 =
     inc lgid
 
 template assignId*(con: Connection or UdpConnection) = con.id = new_uid()
+template add*(conns: Connections or UdpConnections, con = Connection or UdpConnection) = conns.connections.add con
+template del*(conns: Connections or UdpConnections, i: int) = conns.connections.del i
+template delete*(conns: Connections or UdpConnections,i: int) = conns.connections.delete i
+template len*(conns: Connections or UdpConnections): int = conns.connections.len
+template high*(conns: Connections or UdpConnections): int = conns.connections.high
+template `[]`*(conns: Connections or UdpConnections, i: int): Connection or UdpConnection = conns.connections[i]
+template keepIf*(conns: Connections or UdpConnections, p: untyped) = conns.connections.keepIf(p)
+template roundGet(conns: Connections or UdpConnections): Connection or UdpConnection =
+    block:
+        if cons.len == 0:nil
+        else:
+            conns.round = if conns.round <= conns.connections.high: conns.round else: 0
+            let result = conns.connections[conns.round]; conns.round.inc; result
+
+template isTrusted*(con: Connection): bool = con.trusted == TrustStatus.yes
 
 
+template hit*(conn: UdpConnection) = conn.last_action = et
 
-template hit*(conn: UdpConnection)= conn.last_action = et
-
-proc findUdp*(conns:UdpConnections, raddr: TransportAddress): tuple[result: bool, connection: UdpConnection] =
-    for el in conns:
+proc findUdp*(conns: UdpConnections, raddr: TransportAddress): tuple[result: bool, connection: UdpConnection] =
+    for el in conns.connections:
         if el.raddr == raddr:
             el.hit()
-            return (true,el)
-    return (false,nil)
+            return (true, el)
+    return (false, nil)
 
 
-proc findUdp*(conns:UdpConnections, filedesc: AsyncFD): tuple[result: bool, connection: UdpConnection] =
-    for el in conns:
+proc findUdp*(conns: UdpConnections, filedesc: AsyncFD): tuple[result: bool, connection: UdpConnection] =
+    for el in conns.connections:
         if el.transp.fd == filedesc:
             el.hit()
-            return (true,el)
-    return (false,nil)
+            return (true, el)
+    return (false, nil)
 
 
 
@@ -106,72 +125,72 @@ proc findUdp*(conns:UdpConnections, filedesc: AsyncFD): tuple[result: bool, conn
 #             h = h !& hash(x.raddr.address_un)
 #         of AddressFamily.None:
 #             h = h !& hash("None")
-        
+
 #     h = h !& hash(x.raddr.port)
 #     result = int(!$h)
 
 
-proc isTrusted*(con: Connection): bool = con.trusted == TrustStatus.yes
 
-proc hasID*(cons: Connections or UdpConnections, cid: uint16): bool =
-    for el in cons:
+proc hasID*(conns: Connections or UdpConnections, cid: uint16): bool =
+    for el in conns.connections:
         if cid == el.id:
             return true
     return false
 
-template with*(cons: Connections or UdpConnections, cid: uint16, name: untyped, action: untyped) =
+template with*(conns: Connections or UdpConnections, cid: uint16, name: untyped, action: untyped) =
     block withconnection:
-        for el in cons:
+        for el in conns.connections:
             var `name` {.inject.} = el
             if `name`.id == cid:
                 action
                 break withconnection
 
-proc remove*(cons: var (Connections or UdpConnections), con: Connection or  UdpConnection or uint16) =
+proc remove*(conns: var (Connections or UdpConnections), con: Connection or UdpConnection or uint16) =
     var index = -1
     when con is Connection or con is UdpConnection:
-        for i, el in cons:
+        for i, el in conns.connections:
             if el == con:
                 index = i
-                
+
     when con is uint16:
-        for i, el in cons:
+        for i, el in conns.connections:
             if el.id == con:
                 index = i
-    
+
     if index != -1:
-        cons.delete(index)
+        conns.delete(index)
 
-# proc remove*(cons: var seq[uint32], id: uint16) =
-#     let i = cons.find(id)
+# proc remove*(conns: var seq[uint32], id: uint16) =
+#     let i = conns.find(id)
 #     if i != -1:
-#         cons.del(i)
+#         conns.del(i)
 
 
-proc grab*(cons: var Connections ): Connection =
-    if cons.len() == 0: return nil
-    result = cons[0]
-    cons.del(0)
+template grab*(conns: Connections): Connection =
+    if conns.len() == 0: return nil
+    let result = conns[0]
+    conns.del(0)
+    result
     # result.register_start_time = 0
 
-proc randomPick*(cons: var Connections): Connection =
-    if cons.len() == 0: return nil
-    let index = rand(cons.high)
-    result = cons[index]
+template randomPick*(conns: Connections): Connection =
+    if conns.len() == 0: return nil
+    let index = rand(conns.high)
+    conns[index]
 
-    # cons.del(index)
+    # conns.del(index)
     # result.register_start_time = 0
 
 
-proc register*(cons: var (Connections or UdpConnections), con: Connection or var UdpConnection) =
+proc register*(conns: var (Connections or UdpConnections), con: Connection or var UdpConnection) =
     # con.register_start_time = et
-    cons.add con
+    conns.add con
 
 
 
-template close*(conn: UdpConnection)= conn.transp.close()
-template closeWait*(conn: UdpConnection):untyped = conn.transp.closeWait()
-template join*(conn: UdpConnection)= conn.transp.join()
+template close*(conn: UdpConnection) = conn.transp.close()
+template closeWait*(conn: UdpConnection): untyped = conn.transp.closeWait()
+template join*(conn: UdpConnection) = conn.transp.join()
 template closed*(conn: UdpConnection): bool = conn.transp.closed()
 
 proc closed*(conn: Connection): bool =
@@ -224,7 +243,7 @@ proc closeWait*(conn: Connection) {.async.} =
         conn.state = SocketState.Closed
 
 
-proc new*(ctype: typedesc[UdpConnection], transp: DatagramTransport, raddr: TransportAddress,no_id = false): UdpConnection =
+proc new*(ctype: typedesc[UdpConnection], transp: DatagramTransport, raddr: TransportAddress, no_id = false): UdpConnection =
     result = UdpConnection(
         id: if no_id: 0 else: new_uid(),
         creation_time: et,
@@ -235,7 +254,7 @@ proc new*(ctype: typedesc[UdpConnection], transp: DatagramTransport, raddr: Tran
 
 
 proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketScheme = SocketScheme.NonSecure,
- hostname: string = "",no_id = false): Future[
+ hostname: string = "", no_id = false): Future[
         Connection] {.async.} =
     if scheme == SocketScheme.Secure:
         assert not hostname.isEmptyOrWhitespace(), "hostname was empty for secure socket!"
@@ -245,7 +264,7 @@ proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketSc
                 case scheme
                 of SocketScheme.NonSecure:
                     let res = Connection(
-                    id:  if no_id: 0 else: new_uid(),
+                    id: if no_id: 0 else: new_uid(),
                     kind: SocketScheme.NonSecure,
                     transp: transp,
                     reader: newAsyncStreamReader(transp),
@@ -303,7 +322,7 @@ proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketSc
     return conn
 
 proc connect*(address: TransportAddress, scheme: SocketScheme = SocketScheme.NonSecure,
-    hostname: string = "",no_id = false): Future[Connection] {.async.} =
+    hostname: string = "", no_id = false): Future[Connection] {.async.} =
     let transp =
         try:
             var flags = {SocketFlags.TcpNoDelay, SocketFlags.ReuseAddr}
@@ -315,16 +334,16 @@ proc connect*(address: TransportAddress, scheme: SocketScheme = SocketScheme.Non
         except CatchableError as exc:
             raise exc
 
-    let con = await Connection.new(transp, scheme, hostname,no_id)
+    let con = await Connection.new(transp, scheme, hostname, no_id)
     con.port = address.port
     return con
 
 
 
-template trackIdleConnections*(cons: var Connections, age: uint) =
+template trackIdleConnections*(conns: var Connections, age: uint) =
     block:
         proc checkAndRemove() =
-            cons.keepIf(proc(x: Connection): bool =
+            conns.keepIf(proc(x: Connection): bool =
                 if x.creation_time != 0:
                     if et - x.creation_time > age:
                         x.close()
@@ -338,10 +357,10 @@ template trackIdleConnections*(cons: var Connections, age: uint) =
                 checkAndRemove()
         asyncSpawn tracker()
 
-template trackDeadUdpConnections*(cons: var UdpConnections, age: uint,doclose :bool) =
+template trackDeadUdpConnections*(conns: var UdpConnections, age: uint, doclose: bool) =
     block:
         proc checkAndRemove() =
-            cons.keepIf(proc(x: UdpConnection): bool =
+            conns.keepIf(proc(x: UdpConnection): bool =
                 if x.last_action != 0:
                     if et - x.last_action > age:
                         if doclose:

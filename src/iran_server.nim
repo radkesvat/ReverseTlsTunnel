@@ -1,6 +1,6 @@
 import std/[strformat, strutils, random, endians]
 import chronos, chronos/transports/[datagram, ipnet], chronos/osdefs
-import times, print, connection, pipe, hashes
+import times, print, connection, pipe
 from globals import nil
 
 type
