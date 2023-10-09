@@ -119,7 +119,6 @@ proc processConnection(client: Connection) {.async.} =
                     else:
                         discard await remote.reader.readOnce(addr data, 0)
                         continue
-                if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
                 
                 let width = globals.full_tls_record_len.int + globals.mux_record_len.int
                 data.setLen(data.len() + width)
@@ -129,7 +128,7 @@ proc processConnection(client: Connection) {.async.} =
                     client = await acquireClientConnection()
                     if client == nil: break
 
-                echo "before enc:  ", data[10 .. 20].repr
+                echo "before enc:  ", data[10 .. data.high].hash()
                 packForSend(data, remote.id, remote.port.uint16)
                 await client.twriter.write(data)
                 if globals.log_data_len: echo &"[processRemote] Sent {data.len()} bytes ->  client"

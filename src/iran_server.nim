@@ -149,11 +149,13 @@ proc processTrustedRemote(remote: Connection) {.async.} =
             await remote.reader.readExactly(addr data[0], readable.int)
             if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
 
+            unPackForRead(data)
+            echo "after dec:", data.hash
 
             # write
             if DataFlags.udp in cast[TransferFlags](flag):
                 context.user_inbounds_udp.with(cid, child_client):
-                    unPackForRead(data)
+                    # unPackForRead(data)
                     child_client.hit()
 
                     await child_client.transp.sendTo(child_client.raddr, data)
@@ -166,8 +168,7 @@ proc processTrustedRemote(remote: Connection) {.async.} =
             else:
                 if context.user_inbounds.hasID(cid):
                     context.user_inbounds.with(cid, child_client):
-                        unPackForRead(data)
-                        echo "after dec:", data[0 .. 10].repr
+                        
                         if not child_client.closed:
                             await child_client.writer.write(data)
                             if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
