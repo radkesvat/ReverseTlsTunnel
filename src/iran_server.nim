@@ -167,7 +167,7 @@ proc processTrustedRemote(remote: Connection) {.async.} =
                 if context.user_inbounds.hasID(cid):
                     context.user_inbounds.with(cid, child_client):
                         unPackForRead(data)
-                        echo "after dec:", data.hash
+                        echo "after dec:", data[0 .. 10].repr
                         if not child_client.closed:
                             await child_client.writer.write(data)
                             if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
