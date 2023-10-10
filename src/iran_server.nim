@@ -7,32 +7,38 @@ type
     TunnelConnectionPoolContext = object
         # listener_server: Connection for testing on local pc
         listener: StreamServer
+        listener_udp: DatagramTransport
         user_inbounds: Connections
         user_inbounds_udp: UdpConnections
-        listener_udp: DatagramTransport
+
+        up_bounds: Connections
+        dw_bounds: Connections
         available_peer_inbounds: Connections
-        peer_fupload_outbounds: Connections
         peer_ip: IpAddress
 
 var context = TunnelConnectionPoolContext()
 
 
 
-proc monitorData(data: var string): bool =
+proc monitorData(data: var string): tuple[trust: bool, upload: bool] =
     let base = 5 + 7 + `mod`(globals.sh5, 7.uint8)
-    if data.high.uint8 < base + 4: return false
+    if data.high.uint8 < base + 1: return (false, false)
     var sh1_c: uint32
     var sh2_c: uint32
+    var up_c: uint8
 
     copyMem(addr sh1_c, addr data[base+0], 4)
     copyMem(addr sh2_c, addr data[base+4], 4)
+    copyMem(addr up_c, addr data[base+8], 1)
+
     let chk1 = sh1_c == globals.sh1
     let chk2 = sh2_c == globals.sh2
+    let up = (up_c xor globals.sh5) == 0x0
 
     if (chk1 and chk2):
-        return true
+        return (true, up)
     else:
-        return false
+        return (false, up)
 
 
 proc generateFinishHandShakeData(): string =
@@ -50,21 +56,22 @@ proc generateFinishHandShakeData(): string =
 
     return random_trust_data
 
-proc acquireRemoteConnection(mark = true): Future[Connection] {.async.} =
+proc acquireRemoteConnection(upload: bool, mark = true): Future[Connection] {.async.} =
     var remote: Connection = nil
-    for i in 0..<200:
-        if context.available_peer_inbounds.len != 0:
-            remote = context.available_peer_inbounds[0]
+    var source: Connections = if upload: context.up_bounds else: context.dw_bounds
+    for i in 0..<100:
+        if source.len != 0:
+            remote = source.roundPick()
             if remote != nil:
-                if remote.closed or remote.exhausted:
-                    context.available_peer_inbounds.remove(remote)
+                if remote.closed:
+                    source.remove(remote)
                     continue
 
                 if mark:
                     inc remote.counter
-                    remote.exhausted = remote.counter >= globals.mux_width
+
                 return remote
-        await sleepAsync(10)
+        await sleepAsync(20)
     return nil
 
 proc connectTargetSNI(): Future[Connection] {.async.} =
@@ -77,19 +84,7 @@ proc connectTargetSNI(): Future[Connection] {.async.} =
 template fupload: bool = globals.noise_ratio != 0
 
 proc sendJunkData(len: int) {.async.} =
-    proc checkorRefill() =
-        if context.peer_fupload_outbounds.len() < 8:
-            if context.available_peer_inbounds.len != 0:
-                var tr = context.available_peer_inbounds[context.available_peer_inbounds.high]
-                if not tr.closed and not tr.counter > 0: #valid
-                    context.available_peer_inbounds.remove(tr)
-                    context.peer_fupload_outbounds.add tr
-    checkorRefill()
-    var target: Connection = nil
-    for i in 0..<8:
-        var tr: Connection = context.peer_fupload_outbounds.randomPick()
-        if not tr.isNil() and not tr.closed():
-            target = tr; break
+    var target: Connection = await acquireRemoteConnection(upload = true)
 
     if target.isNil:
         if globals.log_data_len: echo "could not acquire a connection to send fake traffic."
@@ -106,7 +101,7 @@ proc sendJunkData(len: int) {.async.} =
     if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
 
 
-proc processTrustedRemote(remote: Connection) {.async.} =
+proc processDownBoundRemote(remote: Connection) {.async.} =
     var data = newStringOfCap(4200)
     var boundary: uint16 = 0
     var cid: uint16
@@ -144,7 +139,7 @@ proc processTrustedRemote(remote: Connection) {.async.} =
                         child_client.close()
                         context.user_inbounds.remove(child_client)
                 else:
-                    dec_bytes_left = min(globals.fast_encrypt_width,boundary)
+                    dec_bytes_left = min(globals.fast_encrypt_width, boundary)
 
                 continue
 
@@ -156,44 +151,59 @@ proc processTrustedRemote(remote: Connection) {.async.} =
             if dec_bytes_left > 0:
                 let consumed = min(data.len(), dec_bytes_left.int)
                 dec_bytes_left -= consumed.uint
-                unPackForRead(data,consumed)
+                unPackForRead(data, consumed)
 
             # echo "after dec:", data.hash
-
-            # write
             if DataFlags.udp in cast[TransferFlags](flag):
-                context.user_inbounds_udp.with(cid, child_client):
-                    # unPackForRead(data)
-                    child_client.hit()
-
-                    await child_client.transp.sendTo(child_client.raddr, data)
-                    if globals.log_data_len: echo &"[processRemote] {data.len()} bytes -> client"
-
-                    if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
-
-                    inc remote.udp_packets; if remote.udp_packets > globals.udp_max_ppc: remote.close()
+                context.user_inbounds_udp.with(cid, udp_up_bound):
+                    await udp_up_bound.transp.sendTo(udp_up_bound.raddr, data)
+                    if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
 
             else:
-                if context.user_inbounds.hasID(cid):
-                    context.user_inbounds.with(cid, child_client):
-
-                        if not child_client.closed:
-                            await child_client.writer.write(data)
-                            if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
-
+                if remote.up_bound == nil or remote.up_bound.id != cid:
+                    remote.up_bound = context.user_inbounds.find(cid)
+                if remote.up_bound != nil and not remote.up_bound.closed:
+                    await remote.up_bound.writer.write(data)
+                    if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
                     if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
-
-
                 else:
                     await remote.writer.write(closeSignalData(cid))
+
+            # # write
+            # if DataFlags.udp in cast[TransferFlags](flag):
+            #     context.user_inbounds_udp.with(cid, child_client):
+            #         # unPackForRead(data)
+            #         child_client.hit()
+
+            #         await child_client.transp.sendTo(child_client.raddr, data)
+            #         if globals.log_data_len: echo &"[processRemote] {data.len()} bytes -> client"
+
+            #         if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
+
+            #         inc remote.udp_packets; if remote.udp_packets > globals.udp_max_ppc: remote.close()
+
+            # else:
+            #     if context.user_inbounds.hasID(cid):
+            #         context.user_inbounds.with(cid, child_client):
+
+            #             if not child_client.closed:
+            #                 await child_client.writer.write(data)
+            #                 if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
+
+            #         if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
+
+
+            #     else:
+            #         await remote.writer.write(closeSignalData(cid))
 
     except:
         if globals.log_conn_error: echo getCurrentExceptionMsg()
     #close
-    context.available_peer_inbounds.remove(remote)
+    context.dw_bounds.remove(remote)
     await remote.closeWait()
 
 proc processTcpConnection(client: Connection) {.async.} =
+
     proc closeLine(remote, client: Connection) {.async.} =
         if globals.log_conn_destory: echo "closed client & remote"
         if remote != nil:
@@ -201,22 +211,22 @@ proc processTcpConnection(client: Connection) {.async.} =
         else:
             await client.closeWait()
 
-    proc processUntrustedRemote(remote: Connection) {.async.} =
+    proc processSNIRemote() {.async.} =
         var data = newStringOfCap(4200)
         try:
-            while not remote.isNil and not remote.closed:
+            while not client.up_bound.isNil and not client.up_bound.closed:
                 #read
-                data.setlen remote.reader.tsource.offset
+                data.setlen client.up_bound.reader.tsource.offset
                 if data.len() == 0:
-                    if remote.reader.atEof():
-                        await closeLine(client, remote)
+                    if client.up_bound.reader.atEof():
+                        await closeLine(client, client.up_bound)
                         return
                     else:
-                        discard await remote.reader.readOnce(addr data, 0)
+                        discard await client.up_bound.reader.readOnce(addr data, 0)
                         continue
 
-                await remote.reader.readExactly(addr data[0], data.len)
-                if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote "
+                await client.up_bound.reader.readExactly(addr data[0], data.len)
+                if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from target Sni"
 
                 # write
                 if not client.closed:
@@ -225,13 +235,12 @@ proc processTcpConnection(client: Connection) {.async.} =
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
         #close
-        await remote.closeWait()
+        # await client.up_bound.closeWait()
         if not client.isTrusted():
             await client.closeWait()
 
 
-    proc processClient(remote: Connection) {.async.} =
-        var remote = remote
+    proc processClient() {.async.} =
         var data = newStringOfCap(4200)
         var first_packet = true
         try:
@@ -256,54 +265,56 @@ proc processTcpConnection(client: Connection) {.async.} =
                 #trust based route
                 if client.trusted == TrustStatus.pending:
 
-                    var trust = monitorData(data)
+                    var (trust, up) = monitorData(data)
                     if trust:
                         #peer connection
                         client.trusted = TrustStatus.yes
+                        client.up_bound.close() # close SNI remote
+                        client.up_bound = nil
                         let address = client.transp.remoteAddress()
-                        print "Peer Fake Handshake Complete ! ", address
-                        context.available_peer_inbounds.register(client)
+                        print "Peer Fake Handshake Complete !", address
+                        # context.available_peer_inbounds.register(client)
                         context.peer_ip = client.transp.remoteAddress.address
-                        remote.close() # close untrusted remote
-                        asyncSpawn processTrustedRemote(client)
+                        if up:
+                            context.up_bounds.register(client)
+                        else:
+                            context.dw_bounds.register(client)
+                            asyncSpawn processDownBoundRemote(client)
 
-                        return
+                        return # no need to close this client
                     else:
                         if first_packet:
                             if not data.contains(globals.final_target_domain):
-                                if globals.trusted_foreign_peers.len != 0 or context.peer_ip != IpAddress():
+                                if context.peer_ip != IpAddress():
                                     #user wants to use panel via iran ip
                                     client.trusted = TrustStatus.pending
                                 else:
                                     echo "[Error] user connection but no peer connected yet."
-                                    await closeLine(client, remote)
+                                    await closeLine(client, client.up_bound)
                                     return
                         if not (globals.trusted_foreign_peers.len != 0 or context.peer_ip != IpAddress()):
                             if (epochTime().uint - client.creation_time) > globals.trust_time:
                                 #user connection but no peer connected yet
                                 #peer connection but couldnt finish handshake in time
                                 client.trusted = TrustStatus.no
-                                await closeLine(client, remote)
+                                await closeLine(client, client.up_bound)
                                 return
                     first_packet = false
 
                 #write
-                if remote.closed:
-                    remote.close()
-                    remote = await acquireRemoteConnection()
-                    if remote == nil:
+                if client.up_bound.closed:
+                    client.up_bound = await acquireRemoteConnection(upload = true)
+                    if client.up_bound == nil:
                         if globals.log_conn_error: echo &"[Error] left without connection, closes forcefully."
-                        await closeLine(client, remote); return
+                        await closeLine(client, client.up_bound); return
 
-                if remote.isTrusted:
-                    # echo "before enc:  ", data[10 .. data.high].hash()
+                if client.up_bound.isTrusted:
                     data.packForSend(client.id, client.port.uint16)
-                    # echo "after enc:", data[10 .. 20].repr
 
-                await remote.writer.write(data)
+                await client.up_bound.writer.write(data)
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
 
-                if fupload and remote.isTrusted: await sendJunkData(globals.noise_ratio.int * data.len())
+                if fupload and client.up_bound.isTrusted: await sendJunkData(globals.noise_ratio.int * data.len())
 
 
         except:
@@ -314,18 +325,18 @@ proc processTcpConnection(client: Connection) {.async.} =
         context.user_inbounds.remove(client)
 
         try:
-            if remote.closed and remote.isTrusted():
-                remote = await acquireRemoteConnection(mark = false)
+            if client.up_bound.closed and client.up_bound.isTrusted():
+                client.up_bound = await acquireRemoteConnection(upload = true, mark = false)
 
-                if remote != nil:
-                    await remote.writer.write(closeSignalData(client.id))
+                if client.up_bound != nil:
+                    await client.up_bound.writer.write(closeSignalData(client.id))
             else:
-                await remote.writer.write(closeSignalData(client.id))
-                remote.counter.dec
-                if remote.exhausted and remote.counter == 0:
-                    context.available_peer_inbounds.remove(remote)
-                    remote.close()
-                    if globals.log_conn_destory: echo "Closed a exhausted mux connection"
+                await client.up_bound.writer.write(closeSignalData(client.id))
+                client.up_bound.counter.dec
+                # if remote.exhausted and remote.counter == 0:
+                #     context.available_peer_inbounds.remove(remote)
+                #     remote.close()
+                #     if globals.log_conn_destory: echo "Closed a exhausted mux connection"
 
 
         except:
@@ -334,29 +345,29 @@ proc processTcpConnection(client: Connection) {.async.} =
 
     #Initialize remote
     try:
-        var remote: Connection = nil
         if globals.trusted_foreign_peers.len != 0:
 
             if isV4Mapped(client.transp.remoteAddress):
                 let ipv4 = toIPv4(client.transp.remoteAddress).address
                 if ipv4 in globals.trusted_foreign_peers:
                     #load balancer connection
-                    remote = await connectTargetSNI()
-                    asyncSpawn processUntrustedRemote(remote)
+                    client.up_bound = await connectTargetSNI()
+                    asyncSpawn processSNIRemote()
             else:
                 if client.transp.remoteAddress.address in globals.trusted_foreign_peers:
                     #load balancer connection
-                    remote = await connectTargetSNI()
-                    asyncSpawn processUntrustedRemote(remote)
+                    client.up_bound = await connectTargetSNI()
+                    asyncSpawn processSNIRemote()
 
-        if remote == nil:
+        if client.up_bound == nil:
             if context.peer_ip != IpAddress() and
                 context.peer_ip != client.transp.remoteAddress.address:
                 if globals.log_conn_create: echo "Real User connected !"
                 client.trusted = TrustStatus.no
                 client.assignId()
-                remote = await acquireRemoteConnection() #associate peer
-                if remote != nil:
+                client.up_bound = await acquireRemoteConnection(upload = true) #associate peer
+
+                if client.up_bound != nil:
                     if globals.log_conn_create: echo "Associated a peer connection."
                     context.user_inbounds.register(client)
 
@@ -365,10 +376,10 @@ proc processTcpConnection(client: Connection) {.async.} =
                     await client.closeWait()
                     return
             else:
-                remote = await connectTargetSNI()
-                asyncSpawn processUntrustedRemote(remote)
+                client.up_bound = await connectTargetSNI()
+                asyncSpawn processSNIRemote()
 
-        asyncSpawn processClient(remote)
+        asyncSpawn processClient()
 
     except:
         printEx()
@@ -409,7 +420,7 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
         if globals.log_conn_create: echo "Real User connected (UDP) !"
         # var remote = await acquireRemoteConnection(not client.mark) #associate peer
         if client.bound == nil or client.bound.closed:
-            client.bound = await acquireRemoteConnection()
+            client.bound = await acquireRemoteConnection(upload = true)
 
         if client.bound != nil:
             if globals.log_conn_create: echo "Associated a peer connection"
@@ -424,10 +435,11 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
 
 proc start*(){.async.} =
     var pbuf = newString(len = 28)
-    context.user_inbounds.new() 
-    context.user_inbounds_udp.new() 
-    context.available_peer_inbounds.new() 
-    context.peer_fupload_outbounds.new() 
+    context.user_inbounds.new()
+    context.user_inbounds_udp.new()
+    context.available_peer_inbounds.new()
+    context.up_bounds.new()
+    context.dw_bounds.new()
     proc startTcpListener(){.async.} =
 
         proc serveStreamClient(server: StreamServer,
@@ -533,7 +545,8 @@ proc start*(){.async.} =
         await context.listener_udp.join()
         echo "Udp server ended."
 
-    trackIdleConnections(context.peer_fupload_outbounds, globals.fakeupload_con_age)
+    trackOldConnections(context.up_bounds, globals.connection_age)
+    trackOldConnections(context.dw_bounds, globals.connection_age)
 
     await sleepAsync(200)
     if globals.accept_udp:
