@@ -29,11 +29,14 @@ proc generateFinishHandShakeData(upload: bool): string =
     copyMem(addr random_trust_data[3], addr rlen, 2) #tls len
 
     let base = 5 + 7 + `mod`(globals.sh5, 7.uint8)
-    copyMem(unsafeAddr random_trust_data[base+0], unsafeAddr globals.sh1.uint32, 4)
-    copyMem(unsafeAddr random_trust_data[base+4], unsafeAddr globals.sh2.uint32, 4)
-    var up: uint8 = uint8(if upload: 1+rand(uint8.high.int-1) else: (0x0 xor globals.sh5.int))
+    copyMem(unsafeAddr random_trust_data[base+0], unsafeAddr globals.sh1, 4)
+    copyMem(unsafeAddr random_trust_data[base+4], unsafeAddr globals.sh2, 4)
+    var up: uint8 = (if upload: 1+rand(uint8.high.int-1) else: 0x0).uint8
 
-    copyMem(unsafeAddr random_trust_data[base+4], unsafeAddr globals.sh2.uint32, 4)
+    up = up xor globals.sh5
+
+
+    copyMem(unsafeAddr random_trust_data[base+8], unsafeAddr up, 1)
 
     return random_trust_data
 

@@ -41,21 +41,6 @@ proc monitorData(data: var string): tuple[trust: bool, upload: bool] =
         return (false, up)
 
 
-proc generateFinishHandShakeData(): string =
-    let rlen: uint16 = uint16(16*(6+rand(4)))
-    var random_trust_data: string = newStringOfCap(rlen)
-    random_trust_data.setLen(rlen)
-
-    copyMem(addr random_trust_data[0], addr(globals.random_str[rand(250)]), rlen)
-    copyMem(addr random_trust_data[0], addr globals.tls13_record_layer[0], 3) #tls header
-    copyMem(addr random_trust_data[3], addr rlen, 2) #tls len
-
-    let base = 5 + 7 + `mod`(globals.sh5, 7.uint8)
-    copyMem(addr random_trust_data[base+0], addr globals.sh3.uint32, 4)
-    copyMem(addr random_trust_data[base+4], addr globals.sh4.uint32, 4)
-
-    return random_trust_data
-
 proc acquireRemoteConnection(upload: bool, mark = true): Future[Connection] {.async.} =
     var remote: Connection = nil
     var source: Connections = if upload: context.up_bounds else: context.dw_bounds
