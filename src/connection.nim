@@ -30,6 +30,7 @@ type
     Connection* = ref object
         creation_time*: uint      #creation epochtime
         id*: uint16               #global incremental id
+        up_bound*: Connection
         case kind*: SocketScheme
         of SocketScheme.NonSecure:
             discard
@@ -40,13 +41,12 @@ type
         transp*: StreamTransport
         reader*: AsyncStreamReader
         writer*: AsyncStreamWriter
-        remoteHostname*: string   # sni
         state*: SocketState
         trusted*: TrustStatus     #when fake handshake perfromed
         estabilished*: AsyncEvent #connection has started
         port*: Port               #the port the socket points to
         counter*: uint
-        exhausted*: bool
+        # exhausted*: bool
         udp_packets*: uint32
 
     UdpConnection* = ref object
@@ -79,19 +79,25 @@ proc new_uid: uint16 =
 template assignId*(con: Connection or UdpConnection) = con.id = new_uid()
 template add*(conns: Connections or UdpConnections, con = Connection or UdpConnection) = conns.connections.add con
 template del*(conns: Connections or UdpConnections, i: int) = conns.connections.del i
-template delete*(conns: Connections or UdpConnections,i: int) = conns.connections.delete i
+template delete*(conns: Connections or UdpConnections, i: int) = conns.connections.delete i
 template len*(conns: Connections or UdpConnections): int = conns.connections.len
 template high*(conns: Connections or UdpConnections): int = conns.connections.high
 template `[]`*(conns: Connections or UdpConnections, i: int): Connection or UdpConnection = conns.connections[i]
 template keepIf*(conns: Connections or UdpConnections, p: untyped) = conns.connections.keepIf(p)
-template roundGet(conns: Connections or UdpConnections): Connection or UdpConnection =
+template roundPick*(conns: Connections or UdpConnections): Connection or UdpConnection =
     block:
-        if cons.len == 0:nil
+        if conns.len == 0: nil
         else:
-            conns.round = if conns.round <= conns.connections.high: conns.round else: 0
+            conns.round = if conns.round <= conns.connections.high.uint: conns.round else: 0
             let result = conns.connections[conns.round]; conns.round.inc; result
 
 template isTrusted*(con: Connection): bool = con.trusted == TrustStatus.yes
+
+proc find*(conns: Connections or UdpConnections, cid: uint16): Connection =
+    for el in conns.connections:
+        if el.id == cid:
+            return el
+
 
 
 template hit*(conn: UdpConnection) = conn.last_action = et
@@ -270,7 +276,6 @@ proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketSc
                     reader: newAsyncStreamReader(transp),
                     writer: newAsyncStreamWriter(transp),
                     state: SocketState.Connecting,
-                    remoteHostname: hostname,
                     estabilished: newAsyncEvent()
                     )
                     res
@@ -291,7 +296,6 @@ proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketSc
                     writer: tls.writer,
                     tls: tls,
                     state: SocketState.Connecting,
-                    remoteHostname: hostname,
                     estabilished: newAsyncEvent()
 
                     )
@@ -340,7 +344,7 @@ proc connect*(address: TransportAddress, scheme: SocketScheme = SocketScheme.Non
 
 
 
-template trackIdleConnections*(conns: var Connections, age: uint) =
+template trackOldConnections*(conns: var Connections, age: uint) =
     block:
         proc checkAndRemove() =
             conns.keepIf(proc(x: Connection): bool =
