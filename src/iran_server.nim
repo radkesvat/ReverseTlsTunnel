@@ -154,32 +154,7 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
                 else:
                     await remote.writer.write(closeSignalData(cid))
 
-            # # write
-            # if DataFlags.udp in cast[TransferFlags](flag):
-            #     context.user_inbounds_udp.with(cid, child_client):
-            #         # unPackForRead(data)
-            #         child_client.hit()
-
-            #         await child_client.transp.sendTo(child_client.raddr, data)
-            #         if globals.log_data_len: echo &"[processRemote] {data.len()} bytes -> client"
-
-            #         if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
-
-            #         inc remote.udp_packets; if remote.udp_packets > globals.udp_max_ppc: remote.close()
-
-            # else:
-            #     if context.user_inbounds.hasID(cid):
-            #         context.user_inbounds.with(cid, child_client):
-
-            #             if not child_client.closed:
-            #                 await child_client.writer.write(data)
-            #                 if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
-
-            #         if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
-
-
-            #     else:
-            #         await remote.writer.write(closeSignalData(cid))
+    
 
     except:
         if globals.log_conn_error: echo getCurrentExceptionMsg()

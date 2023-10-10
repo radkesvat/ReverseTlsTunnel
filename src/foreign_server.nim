@@ -339,7 +339,7 @@ proc poolConttroller() {.async.} =
 
 
     proc watch(): Future[bool] {.async.} =
-        if context.up_bounds.len().uint < 2 or context.up_bounds.len().uint < 2:
+        if context.up_bounds.len().uint < 2 or context.dw_bounds.len().uint < 2:
             await context.log_lock.acquire()
             stdout.write "[Warn] few connections exist!, retry to connect in 3 seconds."; stdout.flushFile()
             for i in 0..<3:
