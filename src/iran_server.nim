@@ -272,7 +272,7 @@ proc processTcpConnection(client: Connection) {.async.} =
                         client.up_bound.close() # close SNI remote
                         client.up_bound = nil
                         let address = client.transp.remoteAddress()
-                        print "Peer Fake Handshake Complete !", address
+                        print "Peer Fake Handshake Complete !", up
                         # context.available_peer_inbounds.register(client)
                         context.peer_ip = client.transp.remoteAddress.address
                         if up:
