@@ -7,19 +7,20 @@ from globals import nil
 
 type
     ServerConnectionPoolContext = object
-        free_peer_outbounds: Connections
+        listeners_udp: UdpConnections
         pending_free_outbounds: int
-        used_peer_outbounds: Connections
+
+        up_bounds: Connections
+        dw_bounds: Connections
+
         outbounds: Connections
-        outbounds_udp: UdpConnections
+
 
 var context = ServerConnectionPoolContext()
 
-# [FWD]
-proc poolFrame(create_count: uint = 0)
 
 
-proc generateFinishHandShakeData(): string =
+proc generateFinishHandShakeData(upload: bool): string =
     #AES default chunk size is 16 so use a multple of 16
     let rlen: uint16 = uint16(globals.full_tls_record_len.int + 16*(6+rand(4)))
     var random_trust_data: string = newStringOfCap(rlen)
@@ -31,6 +32,9 @@ proc generateFinishHandShakeData(): string =
 
     let base = 5 + 7 + `mod`(globals.sh5, 7.uint8)
     copyMem(unsafeAddr random_trust_data[base+0], unsafeAddr globals.sh1.uint32, 4)
+    copyMem(unsafeAddr random_trust_data[base+4], unsafeAddr globals.sh2.uint32, 4)
+    var up: uint8 = uint8(if upload: 1+rand(uint8.high.int-1) else: (0x0 xor globals.sh5.int))
+
     copyMem(unsafeAddr random_trust_data[base+4], unsafeAddr globals.sh2.uint32, 4)
 
     return random_trust_data
@@ -54,15 +58,17 @@ proc remoteTrusted(port: Port): Future[Connection] {.async.} =
     con.trusted = TrustStatus.yes
     return con
 
-proc acquireClientConnection(): Future[Connection] {.async.} =
+proc acquireClientConnection(upload:bool): Future[Connection] {.async.} =
     var found: Connection = nil
+    var source: Connections = if upload: context.up_bounds else: context.dw_bounds
+
     for i in 0..<50:
-        found = context.used_peer_outbounds.randomPick()
+        found = source.roundPick()
         if found != nil:
             if not found.closed:
                 return found
             else:
-                context.used_peer_outbounds.remove(found)
+                source.remove(found)
 
     return nil
 
@@ -78,7 +84,7 @@ proc processConnection(client: Connection) {.async.} =
 
 
     proc processUdpRemote(remote: UdpConnection) {.async.} =
-        var client = client
+        var client = await acquireClientConnection(true)
 
         let width = globals.full_tls_record_len.int + globals.mux_record_len.int
 
@@ -93,9 +99,9 @@ proc processConnection(client: Connection) {.async.} =
 
                 #write
                 if client.closed:
-                    client = await acquireClientConnection()
+                    client = await acquireClientConnection(true)
                     if client == nil:
-                        echo "[Error] no client for udp !"
+                        if globals.log_conn_error: echo "[Error] no client for udp !"
                         return
 
                 packForSend(data, remote.id, remote.port.uint16, flags = {DataFlags.udp})
@@ -107,7 +113,7 @@ proc processConnection(client: Connection) {.async.} =
 
 
     proc processRemote(remote: Connection) {.async.} =
-        var client = client
+        var client = await acquireClientConnection(true)
         var data = newStringOfCap(4200)
         try:
             while not remote.closed:
@@ -120,15 +126,15 @@ proc processConnection(client: Connection) {.async.} =
                         discard await remote.reader.readOnce(addr data, 0)
                         continue
 
-
-                
                 let width = globals.full_tls_record_len.int + globals.mux_record_len.int
                 data.setLen(data.len() + width)
                 await remote.reader.readExactly(addr data[0 + width], data.len - width)
 
                 if client.closed:
-                    client = await acquireClientConnection()
-                    if client == nil: break
+                    client = await acquireClientConnection(true)
+                    if client == nil: 
+                        if globals.log_conn_error: echo "[Error] no client for tcp !"
+                        break
 
                 # echo "before enc:  ", data[10 .. data.high].hash(), "  len:",data.len
                 packForSend(data, remote.id, remote.port.uint16)
@@ -142,7 +148,7 @@ proc processConnection(client: Connection) {.async.} =
         #close
         try:
             if client == nil or client.closed:
-                client = await acquireClientConnection()
+                client = await acquireClientConnection(true)
             if client != nil:
                 await client.twriter.write(closeSignalData(remote.id))
         except:
@@ -152,13 +158,11 @@ proc processConnection(client: Connection) {.async.} =
         remote.close()
 
     proc proccessClient() {.async.} =
-
         var data = newStringOfCap(4200)
         var boundary: uint16 = 0
         var cid: uint16
         var port: uint16
         var flag: uint8
-        var moved: bool = false
         var dec_bytes_left: uint
 
         try:
@@ -170,13 +174,6 @@ proc processConnection(client: Connection) {.async.} =
                         break
                     else:
                         discard await client.treader.readOnce(addr data, 0); continue
-
-
-                if not moved and context.free_peer_outbounds.hasID(client.id):
-                    moved = true
-                    context.free_peer_outbounds.remove(client)
-                    context.used_peer_outbounds.register(client)
-                    poolFrame()
 
 
                 if boundary == 0:
@@ -198,7 +195,7 @@ proc processConnection(client: Connection) {.async.} =
                             child_remote.close()
                             if globals.log_conn_destory: echo "close mux client"
                     else:
-                        dec_bytes_left = min(globals.fast_encrypt_width,boundary)
+                        dec_bytes_left = min(globals.fast_encrypt_width, boundary)
                     continue
                 let readable = min(boundary, data.len().uint16)
                 boundary -= readable; data.setlen readable
@@ -209,11 +206,11 @@ proc processConnection(client: Connection) {.async.} =
                 if DataFlags.junk in cast[TransferFlags](flag):
                     if globals.log_data_len: echo &"[proccessClient] {data.len()} discarded from client"
                     continue
-                
+
                 if dec_bytes_left > 0:
                     let consumed = min(data.len(), dec_bytes_left.int)
                     dec_bytes_left -= consumed.uint
-                    unPackForRead(data,consumed)
+                    unPackForRead(data, consumed)
 
                 #write
                 # echo "before dec:" ,data[0 .. 10].repr
@@ -224,12 +221,12 @@ proc processConnection(client: Connection) {.async.} =
                 if DataFlags.udp in cast[TransferFlags](flag):
                     proc handleDatagram(transp: DatagramTransport,
                         raddr: TransportAddress): Future[void] {.async.} =
-                        var (found, connection) = findUdp(context.outbounds_udp, transp.fd)
+                        var (found, connection) = findUdp(context.listeners_udp, transp.fd)
                         if found:
                             await processUdpRemote(connection)
 
-                    if context.outbounds_udp.hasID(cid):
-                        context.outbounds_udp.with(cid, udp_remote):
+                    if context.listeners_udp.hasID(cid):
+                        context.listeners_udp.with(cid, udp_remote):
                             udp_remote.hit()
                             await udp_remote.transp.send(data)
                             if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote (presist udp)"
@@ -241,7 +238,7 @@ proc processConnection(client: Connection) {.async.} =
                         var connection = UdpConnection.new(transp, ta)
 
                         connection.id = cid
-                        context.outbounds_udp.register connection
+                        context.listeners_udp.register connection
                         await connection.transp.send(data)
                         if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote (udp)"
                         asyncSpawn connection.transp.join()
@@ -265,9 +262,8 @@ proc processConnection(client: Connection) {.async.} =
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
         #close
-        context.used_peer_outbounds.remove(client)
-        context.free_peer_outbounds.remove(client)
-        poolFrame()
+        context.dw_bounds.remove(client)
+        # poolFrame()
 
         await client.closeWait()
 
@@ -280,12 +276,64 @@ proc processConnection(client: Connection) {.async.} =
     except:
         print getCurrentExceptionMsg()
 
-proc poolFrame(create_count: uint = 0) =
-    var count = create_count
+# proc poolFrame(create_count: uint = 0) =
+#     var count = create_count
 
-    proc create() {.async.} =
+#     proc create(upload: bool) {.async.} =
+#         inc context.pending_free_outbounds
+
+#         try:
+#             var con_fut = connect(initTAddress(globals.iran_addr, globals.iran_port), SocketScheme.Secure, globals.final_target_domain)
+#             var notimeout = await withTimeout(con_fut, 3.secs)
+#             if notimeout:
+#                 var conn = con_fut.read()
+#                 if globals.log_conn_create: echo "TlsHandsahke complete."
+#                 conn.trusted = TrustStatus.yes
+
+
+#                 context.free_peer_outbounds.add conn
+#                 asyncSpawn processConnection(conn)
+#                 await conn.twriter.write(generateFinishHandShakeData(upload))
+
+#             else:
+#                 if globals.log_conn_create: echo "Connecting to iran Timed-out!"
+
+
+#         except TLSStreamProtocolError as exc:
+#             if globals.log_conn_create: echo "Tls error, handshake failed because:"
+#             echo exc.msg
+
+#         except CatchableError as exc:
+#             if globals.log_conn_create: echo "Connection failed because:"
+#             echo exc.name, ": ", exc.msg
+
+#         dec context.pending_free_outbounds
+
+
+#     if count == 0:
+#         var i = uint(context.free_peer_outbounds.len() + context.pending_free_outbounds)
+
+#         if i < globals.pool_size div 2:
+#             count = 2
+#         elif i < globals.pool_size:
+#             count = 1
+
+#     for _ in 0..<count:
+#         asyncSpawn create()
+
+
+proc poolConttroller() {.async.} =
+    proc handleUpClient(client:Connection){.async.}=
+        try:
+            let bytes =  await client.treader.consume()
+            if globals.log_data_len: echo "discarded ",bytes , " bytes form up-bound."
+        except:
+            if globals.log_conn_error: echo getCurrentExceptionMsg()
+        context.up_bounds.remove(client)
+
+
+    proc connect(upload: bool) {.async.} =
         inc context.pending_free_outbounds
-
         try:
             var con_fut = connect(initTAddress(globals.iran_addr, globals.iran_port), SocketScheme.Secure, globals.final_target_domain)
             var notimeout = await withTimeout(con_fut, 3.secs)
@@ -294,15 +342,17 @@ proc poolFrame(create_count: uint = 0) =
                 if globals.log_conn_create: echo "TlsHandsahke complete."
                 conn.trusted = TrustStatus.yes
 
+                await conn.twriter.write(generateFinishHandShakeData(upload))
 
-                context.free_peer_outbounds.add conn
-                asyncSpawn processConnection(conn)
-                await conn.twriter.write(generateFinishHandShakeData())
+                if upload:
+                    context.up_bounds.add conn
+                    asyncSpawn handleUpClient( conn)
+                else:
+                    context.dw_bounds.add conn
+                    asyncSpawn processConnection(conn)
 
             else:
                 if globals.log_conn_create: echo "Connecting to iran Timed-out!"
-
-
 
         except TLSStreamProtocolError as exc:
             if globals.log_conn_create: echo "Tls error, handshake failed because:"
@@ -314,34 +364,44 @@ proc poolFrame(create_count: uint = 0) =
 
         dec context.pending_free_outbounds
 
+    proc reCreate() {.async.} =
+        var u_futs: seq[Future[void]]
+        var d_futs: seq[Future[void]]
+        if context.up_bounds.len().uint <= globals.upload_cons:
+            for i in 0..<globals.upload_cons:
+                u_futs.add connect(true)
+        await all u_futs
+        if context.up_bounds.len().uint <= globals.download_cons:
+            for i in 0..<globals.download_cons:
+                d_futs.add connect(false)
+        await all d_futs
 
-    if count == 0:
-        var i = uint(context.free_peer_outbounds.len() + context.pending_free_outbounds)
+    while true:
+        asyncSpawn reCreate()
+        await sleepAsync ((globals.connection_age - globals.connection_rewind).int).seconds
 
-        if i < globals.pool_size div 2:
-            count = 2
-        elif i < globals.pool_size:
-            count = 1
-
-    for _ in 0..<count:
-        asyncSpawn create()
 
 proc start*(){.async.} =
     echo &"Mode Foreign Server:  {globals.self_ip} <-> {globals.iran_addr} ({globals.final_target_domain} with ip {globals.final_target_ip})"
-    context.free_peer_outbounds.new()
-    context.used_peer_outbounds.new()
+    context.listeners_udp.new()
     context.outbounds.new()
-    context.outbounds_udp.new()
+    context.up_bounds.new()
+    context.dw_bounds.new()
     
-    trackIdleConnections(context.free_peer_outbounds, globals.pool_age)
-    trackDeadUdpConnections(context.outbounds_udp, globals.udp_max_idle_time,true)
 
-    # just to make sure we always willing to connect to the peer
+    trackOldConnections(context.up_bounds, globals.connection_age + globals.connection_rewind)
+    trackOldConnections(context.dw_bounds, globals.connection_age + globals.connection_rewind)
+
+
+    trackDeadUdpConnections(context.listeners_udp, globals.udp_max_idle_time, true)
+
+    asyncSpawn poolConttroller()
     while true:
-        poolFrame()
         await sleepAsync(5.secs)
-        echo "free: ", context.free_peer_outbounds.len,
-             "  iran: ", context.used_peer_outbounds.len, " core: ", context.outbounds.len
+        echo "prallel upload: ", context.up_bounds.len,"   ",
+             "parallel download: ",context.dw_bounds.len,"   ",
+             "outbounds: ",context.outbounds.len
+
 
 
 
