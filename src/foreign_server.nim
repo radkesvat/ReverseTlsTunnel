@@ -12,7 +12,7 @@ type
         up_bounds: Connections
         dw_bounds: Connections
         outbounds: Connections
-        log_lock: AsyncLock 
+        log_lock: AsyncLock
 
 var context = ServerConnectionPoolContext()
 
@@ -56,7 +56,7 @@ proc remoteTrusted(port: Port): Future[Connection] {.async.} =
     con.trusted = TrustStatus.yes
     return con
 
-proc acquireClientConnection(upload:bool): Future[Connection] {.async.} =
+proc acquireClientConnection(upload: bool): Future[Connection] {.async.} =
     var found: Connection = nil
     var source: Connections = if upload: context.up_bounds else: context.dw_bounds
 
@@ -130,7 +130,7 @@ proc processConnection(client: Connection) {.async.} =
 
                 if client.closed:
                     client = await acquireClientConnection(true)
-                    if client == nil: 
+                    if client == nil:
                         if globals.log_conn_error: echo "[Error] no client for tcp !"
                         break
 
@@ -278,10 +278,10 @@ proc processConnection(client: Connection) {.async.} =
 
 
 proc poolConttroller() {.async.} =
-    proc handleUpClient(client:Connection){.async.}=
+    proc handleUpClient(client: Connection){.async.} =
         try:
-            let bytes =  await client.treader.consume()
-            if globals.log_data_len: echo "discarded ",bytes , " bytes form up-bound."
+            let bytes = await client.treader.consume()
+            if globals.log_data_len: echo "discarded ", bytes, " bytes form up-bound."
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
         context.up_bounds.remove(client)
@@ -301,7 +301,7 @@ proc poolConttroller() {.async.} =
 
                 if upload:
                     context.up_bounds.add conn
-                    asyncSpawn handleUpClient( conn)
+                    asyncSpawn handleUpClient(conn)
                 else:
                     context.dw_bounds.add conn
                     asyncSpawn processConnection(conn)
@@ -331,16 +331,35 @@ proc poolConttroller() {.async.} =
                 d_futs.add connect(false)
         await all d_futs
 
-    while true:
-        await reCreate()
-        if  context.up_bounds.len().uint < 2 or context.up_bounds.len().uint < 2:
+
+    proc watch(): Future[bool] {.async.} =
+        if context.up_bounds.len().uint < 2 or context.up_bounds.len().uint < 2:
             await context.log_lock.acquire()
             stdout.write "[Warn] few connections exist!, retry to connect in 3 seconds."; stdout.flushFile()
             for i in 0..<3:
-                stdout.write "."; await sleepAsync (1).seconds; stdout.flushFile(); 
+                stdout.write "."; await sleepAsync 1.seconds; stdout.flushFile();
             stdout.write '\n'; context.log_lock.release()
+            return true
         else:
-            await sleepAsync ((globals.connection_age - globals.connection_rewind).int).seconds
+            return false
+
+
+    while true:
+        await reCreate()
+        var secs_left = (globals.connection_age - globals.connection_rewind).int
+        while true:
+            await sleepAsync 1.seconds; dec secs_left
+            if await watch():
+                break
+            if secs_left <= 0: break
+        # if  context.up_bounds.len().uint < 2 or context.up_bounds.len().uint < 2:
+        #     await context.log_lock.acquire()
+        #     stdout.write "[Warn] few connections exist!, retry to connect in 3 seconds."; stdout.flushFile()
+        #     for i in 0..<3:
+        #         stdout.write "."; await sleepAsync (1).seconds; stdout.flushFile();
+        #     stdout.write '\n'; context.log_lock.release()
+        # else:
+        #     await sleepAsync ((globals.connection_age - globals.connection_rewind).int).seconds
 
 
 proc start*(){.async.} =
@@ -360,10 +379,10 @@ proc start*(){.async.} =
     asyncSpawn poolConttroller()
     while true:
         await sleepAsync(5.secs)
-        await context.log_lock.acquire()    
-        echo "prallel upload: ", context.up_bounds.len,"   ",
-             "parallel download: ",context.dw_bounds.len,"   ",
-             "outbounds: ",context.outbounds.len
+        await context.log_lock.acquire()
+        echo "prallel upload: ", context.up_bounds.len, "   ",
+             "parallel download: ", context.dw_bounds.len, "   ",
+             "outbounds: ", context.outbounds.len
         context.log_lock.release()
 
 
