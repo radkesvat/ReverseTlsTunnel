@@ -24,6 +24,11 @@ let full_tls_record_len*: uint = tls13_record_layer.len().uint + tls13_record_la
 
 # [Connection]
 var trust_time*: uint = 3 #secs
+var upload_cons*: uint = 8
+var download_cons*: uint = 8
+var connection_age*: uint = 60 # secs
+var connection_rewind*: uint = 5 # secs
+
 var pool_size*: uint = 24
 var pool_age*: uint = 15
 var fakeupload_con_age*: uint = 60 #secs
@@ -31,8 +36,7 @@ var max_pool_unused_time*: uint = 60 #secs
 let mux_record_len*: uint32 = 5 #2bytes port 2bytes id 1byte reserved
 
 var mux_width*: uint32 = 1 # 1 -> disabeld
-var connection_age*:uint = 15 # secs
-var connection_rewind*:uint = 2 # secs
+
 
 var udp_max_ppc*: uint32 = 500
 var udp_max_idle_time*: uint = 5 #secs
@@ -66,7 +70,7 @@ var sh3*: uint32
 var sh4*: uint32
 var sh5*: uint8
 var random_str* = newString(len = 0)
-var fast_encrypt_width*:uint = 128
+var fast_encrypt_width*: uint = 128
 
 # [settings]
 var disable_ufw* = true
@@ -84,7 +88,7 @@ var multi_port_additions: seq[Port]
 
 # [posix constants]
 const SO_ORIGINAL_DST* = 80
-const IP6T_SO_ORIGINAL_DST* =  80
+const IP6T_SO_ORIGINAL_DST* = 80
 
 const SOL_IP* = 0
 const SOL_IPV6* = 41
@@ -123,7 +127,7 @@ proc resetIptables*() =
 
 template FWProtocol(): string = (if accept_udp: "all" else: "tcp")
 
-#ip6tables -t nat -A PREROUTING -p tcp --dport 443:2083 -j REDIRECT --to-port 
+#ip6tables -t nat -A PREROUTING -p tcp --dport 443:2083 -j REDIRECT --to-port
 proc createIptablesForwardRules*() =
     if reset_iptable: resetIptables()
     if not (multi_port_min == 0.Port or multi_port_max == 0.Port):
@@ -145,11 +149,11 @@ proc multiportSupported(): bool =
         if not ip6tablesInstalled():
             echo "multi listen port requires ip6tables to be installed. (ip6tables not iptables !)  \"apt-get install ip6tables\""
             return false
-        
+
         if not lsofInstalled():
             echo "multi listen port requires lsof to be installed.  install with \"apt-get install lsof\""
             return false
-        
+
         return true
 
 
@@ -376,7 +380,7 @@ proc init*() =
             quit(0)
         )
 
-    let rs_capacity =  4200 + (noise_ratio * 4200)
+    let rs_capacity = 4200 + (noise_ratio * 4200)
     random_str = newStringOfCap(rs_capacity); random_str.setLen(rs_capacity)
     for i in 0..<random_str.len():
         random_str[i] = rand(char.low .. char.high).char
