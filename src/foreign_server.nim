@@ -381,7 +381,7 @@ proc poolConttroller() {.async.} =
         if  context.up_bounds.len().uint < 2 or context.up_bounds.len().uint < 2:
             stdout.write "[Warn] few connections exist!, retry to connect in 3 seconds."; stdout.flushFile()
             for i in 0..<3:
-                stdout.write "."; await sleepAsync (1).seconds; stdout.flushFile()
+                stdout.write "."; await sleepAsync (1).seconds; stdout.flushFile(); stdout.write '\n'
         else:
             await sleepAsync ((globals.connection_age - globals.connection_rewind).int).seconds
 
