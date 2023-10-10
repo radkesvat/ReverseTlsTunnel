@@ -12,7 +12,7 @@ type
         up_bounds: Connections
         dw_bounds: Connections
         outbounds: Connections
-        log_lock: AsyncLock
+        log_lock: AsyncLock 
 
 var context = ServerConnectionPoolContext()
 
@@ -349,7 +349,7 @@ proc start*(){.async.} =
     context.outbounds.new()
     context.up_bounds.new()
     context.dw_bounds.new()
-    
+    context.log_lock = newAsyncLock()
 
     trackOldConnections(context.up_bounds, globals.connection_age + globals.connection_rewind)
     trackOldConnections(context.dw_bounds, globals.connection_age + globals.connection_rewind)
