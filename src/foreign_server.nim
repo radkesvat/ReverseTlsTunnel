@@ -9,12 +9,10 @@ type
     ServerConnectionPoolContext = object
         listeners_udp: UdpConnections
         pending_free_outbounds: int
-
         up_bounds: Connections
         dw_bounds: Connections
-
         outbounds: Connections
-
+        log_lock: AsyncLock
 
 var context = ServerConnectionPoolContext()
 
@@ -276,50 +274,7 @@ proc processConnection(client: Connection) {.async.} =
     except:
         print getCurrentExceptionMsg()
 
-# proc poolFrame(create_count: uint = 0) =
-#     var count = create_count
 
-#     proc create(upload: bool) {.async.} =
-#         inc context.pending_free_outbounds
-
-#         try:
-#             var con_fut = connect(initTAddress(globals.iran_addr, globals.iran_port), SocketScheme.Secure, globals.final_target_domain)
-#             var notimeout = await withTimeout(con_fut, 3.secs)
-#             if notimeout:
-#                 var conn = con_fut.read()
-#                 if globals.log_conn_create: echo "TlsHandsahke complete."
-#                 conn.trusted = TrustStatus.yes
-
-
-#                 context.free_peer_outbounds.add conn
-#                 asyncSpawn processConnection(conn)
-#                 await conn.twriter.write(generateFinishHandShakeData(upload))
-
-#             else:
-#                 if globals.log_conn_create: echo "Connecting to iran Timed-out!"
-
-
-#         except TLSStreamProtocolError as exc:
-#             if globals.log_conn_create: echo "Tls error, handshake failed because:"
-#             echo exc.msg
-
-#         except CatchableError as exc:
-#             if globals.log_conn_create: echo "Connection failed because:"
-#             echo exc.name, ": ", exc.msg
-
-#         dec context.pending_free_outbounds
-
-
-#     if count == 0:
-#         var i = uint(context.free_peer_outbounds.len() + context.pending_free_outbounds)
-
-#         if i < globals.pool_size div 2:
-#             count = 2
-#         elif i < globals.pool_size:
-#             count = 1
-
-#     for _ in 0..<count:
-#         asyncSpawn create()
 
 
 proc poolConttroller() {.async.} =
@@ -379,10 +334,11 @@ proc poolConttroller() {.async.} =
     while true:
         await reCreate()
         if  context.up_bounds.len().uint < 2 or context.up_bounds.len().uint < 2:
+            await context.log_lock.acquire()
             stdout.write "[Warn] few connections exist!, retry to connect in 3 seconds."; stdout.flushFile()
             for i in 0..<3:
                 stdout.write "."; await sleepAsync (1).seconds; stdout.flushFile(); 
-            stdout.write '\n'
+            stdout.write '\n'; context.log_lock.release()
         else:
             await sleepAsync ((globals.connection_age - globals.connection_rewind).int).seconds
 
@@ -404,10 +360,11 @@ proc start*(){.async.} =
     asyncSpawn poolConttroller()
     while true:
         await sleepAsync(5.secs)
+        await context.log_lock.acquire()    
         echo "prallel upload: ", context.up_bounds.len,"   ",
              "parallel download: ",context.dw_bounds.len,"   ",
              "outbounds: ",context.outbounds.len
-
+        context.log_lock.release()
 
 
 
