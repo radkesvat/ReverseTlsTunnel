@@ -27,12 +27,27 @@ type
 #     for i in 0 ..< (data.len() div 4):
 #         (address+i.uint)[] = `xor`((address+i.uint)[], globals.sh4)
 
+# proc encrypt(data: var string, start:int = 0, nbytes: int = data.len()) =
+#     var i: int = start
+#     let loopmax = min(data.len(), start + nbytes)
+#     while i < loopmax:
+#         data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
+#         i += 1
+
+# proc decrypt(data: var string, nbytes: int = data.len()) =
+
+#     var i: int = 0
+#     let loopmax = min(data.len(), nbytes)
+#     while i < loopmax:
+#         data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
+#         i += 1
+
 proc encrypt(data: var string, start:int = 0, nbytes: int = data.len()) =
     var i: int = start
     let loopmax = min(data.len(), start + nbytes)
     while i < loopmax:
         data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
-        i += 1
+        i += 2
 
 proc decrypt(data: var string, nbytes: int = data.len()) =
 
@@ -40,7 +55,7 @@ proc decrypt(data: var string, nbytes: int = data.len()) =
     let loopmax = min(data.len(), nbytes)
     while i < loopmax:
         data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
-        i += 1
+        i += 2
 
 
 
