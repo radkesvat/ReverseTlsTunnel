@@ -347,9 +347,8 @@ proc connect*(address: TransportAddress, scheme: SocketScheme = SocketScheme.Non
 
 proc safeClose(con:Connection){.async.}=
     con.flag_is_closing = true
-    await sleepAsync(timer.seconds(1))
-
     await con.writer.finish()
+    await sleepAsync(timer.seconds(1))
     con.close()
 
 template trackOldConnections*(conns: var Connections, age: uint) =
