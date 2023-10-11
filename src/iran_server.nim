@@ -161,6 +161,7 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
     except:
         if globals.log_conn_error: echo getCurrentExceptionMsg()
     #close
+    echo "H!"
     context.dw_bounds.remove(remote)
     await remote.closeWait()
 
@@ -287,6 +288,7 @@ proc processTcpConnection(client: Connection) {.async.} =
         context.user_inbounds.remove(client)
 
         try:
+
             if client.up_bound.closed and client.up_bound.isTrusted():
                 client.up_bound = await acquireRemoteConnection(upload = true, mark = false)
 
