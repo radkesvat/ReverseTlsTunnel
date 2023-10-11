@@ -85,6 +85,19 @@ proc sendJunkData(len: int) {.async.} =
     await target.writer.write(data)
     if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
 
+proc handleUpRemote(remote: Connection){.async.} =
+    try:
+        let bytes = await remote.treader.consume()
+        when not defined release:
+            echo "discarded ", bytes, " bytes form up-bound."
+    except:
+        if globals.log_conn_error: echo getCurrentExceptionMsg()
+    when not defined release:
+        echo "closed a up-bound"
+    context.up_bounds.remove(remote)
+    remote.close
+
+
 
 proc processDownBoundRemote(remote: Connection) {.async.} =
     var data = newStringOfCap(4200)
@@ -240,6 +253,8 @@ proc processTcpConnection(client: Connection) {.async.} =
                         context.peer_ip = client.transp.remoteAddress.address
                         if up:
                             context.up_bounds.register(client)
+                            asyncSpawn handleUpRemote(client)
+
                         else:
                             context.dw_bounds.register(client)
                             asyncSpawn processDownBoundRemote(client)
@@ -248,20 +263,18 @@ proc processTcpConnection(client: Connection) {.async.} =
                     else:
                         if first_packet:
                             if not data.contains(globals.final_target_domain):
-                                if context.peer_ip != IpAddress():
-                                    #user wants to use panel via iran ip
-                                    client.trusted = TrustStatus.pending
-                                else:
-                                    echo "[Error] user connection but no peer connected yet."
-                                    await closeLine(client, client.up_bound)
-                                    return
-                        if not (globals.trusted_foreign_peers.len != 0 or context.peer_ip != IpAddress()):
-                            if (epochTime().uint - client.creation_time) > globals.trust_time:
                                 #user connection but no peer connected yet
-                                #peer connection but couldnt finish handshake in time
                                 client.trusted = TrustStatus.no
+                                echo "[Error] user connection but no peer connected yet."
                                 await closeLine(client, client.up_bound)
                                 return
+                        if (epochTime().uint - client.creation_time) > globals.trust_time:
+                            #user connection but no peer connected yet
+                            #peer connection but couldnt finish handshake in time
+                            client.trusted = TrustStatus.no
+                            await closeLine(client, client.up_bound)
+                            return
+
                     first_packet = false
 
                 #write
