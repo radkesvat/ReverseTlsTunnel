@@ -344,13 +344,16 @@ proc connect*(address: TransportAddress, scheme: SocketScheme = SocketScheme.Non
 
 
 
+proc safeClose(con:Connection){.async.}=
+    await con.writer.finish()
+    con.close()
 template trackOldConnections*(conns: var Connections, age: uint) =
     block:
         proc checkAndRemove() =
             conns.keepIf(proc(x: Connection): bool =
                 if x.creation_time != 0:
                     if et - x.creation_time > age:
-                        x.close()
+                        asyncSpawn safeClose(x)
                         if globals.log_conn_destory: echo "[Controller] closed a idle connection, ", et - x.creation_time
                         return false
                 return true
