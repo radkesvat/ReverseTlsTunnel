@@ -151,7 +151,7 @@ proc processConnection(client: Connection) {.async.} =
         except:
             if globals.log_conn_error: echo "[Error] [processRemote] [loopEx]: ", getCurrentExceptionMsg()
 
-        if globals.log_conn_destory:echo "closed core remote"
+        if globals.log_conn_destory:echo "[Closed] [processRemote] [end]: closed core remote"
         context.outbounds.remove(remote)
         remote.close()
 
@@ -204,6 +204,7 @@ proc processConnection(client: Connection) {.async.} =
                     boundary -= globals.mux_record_len.uint16 + fake_bytes
                     if boundary == 0:
                         context.outbounds.with(cid, child_remote):
+                            echo "close-sig: ", cid
                             child_remote.flag_no_close_signal = true
                             context.outbounds.remove(child_remote)
                             child_remote.close()
