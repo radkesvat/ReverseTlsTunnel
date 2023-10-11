@@ -302,7 +302,7 @@ proc poolConttroller() {.async.} =
                 echo "discarded ", bytes, " bytes form up-bound."
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
-        if globals.log_conn_close: echo "closed a up-bound"
+        if globals.log_conn_destory: echo "closed a up-bound"
         context.up_bounds.remove(client)
         client.close
 
