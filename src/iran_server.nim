@@ -87,7 +87,7 @@ proc sendJunkData(len: int) {.async.} =
 
 proc handleUpRemote(remote: Connection){.async.} =
     try:
-        let bytes = await remote.readre.consume()
+        let bytes = await remote.reader.consume()
         when not defined release:
             echo "discarded ", bytes, " bytes form up-bound."
     except:
