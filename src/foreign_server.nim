@@ -139,7 +139,7 @@ proc processConnection(client: Connection) {.async.} =
                 if client.closed or client.isClosing:
                     client = await acquireClientConnection(true)
                     if client == nil:
-                        if globals.log_conn_error: echo "[Error] no client for tcp !"
+                        if globals.log_conn_error: echo "[Error] [processRemote] [loop]: ", "no client for tcp !"
                         break
 
                 # echo "before enc:  ", data[10 .. data.high].hash(), "  len:",data.len
@@ -149,7 +149,7 @@ proc processConnection(client: Connection) {.async.} =
                 if globals.log_data_len: echo &"[processRemote] Sent {data.len()} bytes ->  client"
 
         except:
-            if globals.log_conn_error: echo getCurrentExceptionMsg()
+            if globals.log_conn_error: echo "[Error] [processRemote] [loopEx]: ", getCurrentExceptionMsg()
 
         if globals.log_conn_destory:echo "closed core remote"
         context.outbounds.remove(remote)
@@ -158,12 +158,12 @@ proc processConnection(client: Connection) {.async.} =
         #close
         if not remote.flag_no_close_signal:
             try:
-                if client == nil or client.closed:
+                if client == nil or client.closed or client.isClosing:
                     client = await acquireClientConnection(true)
                 if client != nil:
                     await client.twriter.write(closeSignalData(remote.id))
             except:
-                if globals.log_conn_error: echo getCurrentExceptionMsg()
+                if globals.log_conn_error:echo "[Error] [processRemote] [closeSig]: " , getCurrentExceptionMsg()
 
 
     proc proccessClient() {.async.} =
@@ -268,8 +268,11 @@ proc processConnection(client: Connection) {.async.} =
                             if not child_remote.closed():
                                 try:
                                     await child_remote.writer.write(data)
+                                    if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
+
                                 except:
-                                    if globals.log_conn_error: echo getCurrentExceptionMsg()
+                                    if globals.log_conn_error: echo "[Error] [proccessClient] [writeCoreP]: ", getCurrentExceptionMsg()
+                                
                     else:
                         var remote = await remoteTrusted(if globals.multi_port: port.Port else: globals.next_route_port)
                         remote.id = cid
@@ -277,9 +280,9 @@ proc processConnection(client: Connection) {.async.} =
                         asyncSpawn processRemote(remote)
                         try:
                             await remote.writer.write(data)
+                            if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
                         except:
-                            if globals.log_conn_error: echo getCurrentExceptionMsg()
-                        if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
+                            if globals.log_conn_error: echo "[Error] [proccessClient] [writeCoreF]: ", getCurrentExceptionMsg()
 
         except:
             echo getCurrentExceptionMsg()
@@ -302,15 +305,15 @@ proc processConnection(client: Connection) {.async.} =
 
 
 
-proc poolConttroller() {.async.} =
+proc poolController() {.async.} =
     proc handleUpClient(client: Connection){.async.} =
         try:
             let bytes = await client.treader.consume()
             when not defined release:
                 echo "discarded ", bytes, " bytes form up-bound."
         except:
-            if globals.log_conn_error: echo getCurrentExceptionMsg()
-        if globals.log_conn_destory: echo "closed a up-bound"
+            if globals.log_conn_error: echo "[Error] [poolController] [loopEx]: ", getCurrentExceptionMsg()
+        if globals.log_conn_destory: echo "[Closed] [poolController] [End]:","a up-bound"
         context.up_bounds.remove(client)
         client.close
 
@@ -404,7 +407,7 @@ proc start*(){.async.} =
 
     trackDeadUdpConnections(context.listeners_udp, globals.udp_max_idle_time, true)
 
-    asyncSpawn poolConttroller()
+    asyncSpawn poolController()
     while true:
         await sleepAsync(5.secs)
         await context.log_lock.acquire()

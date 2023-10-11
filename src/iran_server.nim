@@ -91,9 +91,9 @@ proc handleUpRemote(remote: Connection){.async.} =
         when not defined release:
             echo "discarded ", bytes, " bytes form up-bound."
     except:
-        if globals.log_conn_destory: echo getCurrentExceptionMsg()
+        if globals.log_conn_error: echo "[Error] [handleUpRemote] [loopEx]: ", getCurrentExceptionMsg()
 
-    if globals.log_conn_error: echo "closed a up-bound"
+    if globals.log_conn_destory: echo "[Closed] [poolController] [End]:","a up-bound"
     context.up_bounds.remove(remote)
     remote.close
 
@@ -155,7 +155,6 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
                 dec_bytes_left -= consumed.uint
                 unPackForRead(data, consumed)
 
-            # echo "after dec:", data.hash
             if DataFlags.udp in cast[TransferFlags](flag):
                 context.user_inbounds_udp.with(cid, udp_up_bound):
                     await udp_up_bound.transp.sendTo(udp_up_bound.raddr, data)
@@ -174,12 +173,11 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
                         if temp_up_bound != nil:
                             await temp_up_bound.writer.write(closeSignalData(cid))
                 except:
-                    echo "x"
-                    echo getCurrentExceptionMsg()
+                    if globals.log_conn_error: echo "[Error] [processDownBoundRemote] [writeCl]: ",getCurrentExceptionMsg()
 
 
     except:
-        echo getCurrentExceptionMsg()
+        if globals.log_conn_error: echo "[Error] [processDownBoundRemote] [loopEx]: ",getCurrentExceptionMsg()
     #close
     context.dw_bounds.remove(remote)
     await remote.closeWait()
@@ -215,7 +213,7 @@ proc processTcpConnection(client: Connection) {.async.} =
                     await client.writer.write(data)
                     if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client "
         except:
-            if globals.log_conn_error: echo getCurrentExceptionMsg()
+            if globals.log_conn_error: echo "[Error] [processSNIRemote] [loopEx]: ",getCurrentExceptionMsg()
         #close
         # await client.up_bound.closeWait()
         if not client.isTrusted():
@@ -287,7 +285,7 @@ proc processTcpConnection(client: Connection) {.async.} =
                 if client.up_bound.closed or client.up_bound.isClosing:
                     client.up_bound = await acquireRemoteConnection(upload = true)
                     if client.up_bound == nil:
-                        if globals.log_conn_error: echo &"[Error] left without connection, closes forcefully."
+                        if globals.log_conn_error: echo "[Error] [processClient] [loop]: ","left without connection, closes forcefully."
                         await closeLine(client, client.up_bound); return
 
                 if client.up_bound.isTrusted:
@@ -300,7 +298,7 @@ proc processTcpConnection(client: Connection) {.async.} =
 
 
         except:
-            if globals.log_conn_error: echo getCurrentExceptionMsg()
+            if globals.log_conn_error: echo "[Error] [processClient] [loopEx]: ", getCurrentExceptionMsg()
 
         #close
         client.close()
@@ -323,7 +321,7 @@ proc processTcpConnection(client: Connection) {.async.} =
 
 
         except:
-            if globals.log_conn_error: echo getCurrentExceptionMsg()
+            if globals.log_conn_error: echo  "[Error] [processClient] [closeSig]: ",getCurrentExceptionMsg()
 
 
     #Initialize remote
@@ -383,7 +381,7 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
 
                 #write
                 if remote.closed:
-                    if globals.log_conn_error: echo &"[Error] Tcp remote was just closed!"
+                    if globals.log_conn_error: echo  "[Error] [UDP-processClient] [loop]: "," Tcp remote was just closed!"
                     return
 
                 data.packForSend(client.id, client.port.uint16, flags = {DataFlags.udp})
@@ -395,7 +393,7 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
                 if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
 
         except:
-            if globals.log_conn_error: echo getCurrentExceptionMsg()
+            if globals.log_conn_error: echo "[Error] [UDP-processClient] [loopEx]: ",getCurrentExceptionMsg()
 
 
     #Initialize remote

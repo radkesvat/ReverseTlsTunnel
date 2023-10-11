@@ -98,7 +98,7 @@ proc find*(conns: Connections or UdpConnections, cid: uint16): Connection =
     for el in conns.connections:
         if el.id == cid:
             return el
-
+    return nil
 
 
 template hit*(conn: UdpConnection) = conn.last_action = et
