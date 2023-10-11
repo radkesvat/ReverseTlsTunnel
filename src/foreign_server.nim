@@ -287,10 +287,14 @@ proc poolConttroller() {.async.} =
     proc handleUpClient(client: Connection){.async.} =
         try:
             let bytes = await client.treader.consume()
-            if globals.log_data_len: echo "discarded ", bytes, " bytes form up-bound."
+            when not defined release:
+                echo "discarded ", bytes, " bytes form up-bound."
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
+        when not defined release:
+            echo "closed a up-bound"
         context.up_bounds.remove(client)
+        client.close
 
 
     proc connect(upload: bool) {.async.} =
@@ -332,7 +336,7 @@ proc poolConttroller() {.async.} =
             for i in 0..<globals.upload_cons:
                 u_futs.add connect(true)
         await all u_futs
-        if context.up_bounds.len().uint <= globals.download_cons:
+        if context.dw_bounds.len().uint <= globals.download_cons:
             for i in 0..<globals.download_cons:
                 d_futs.add connect(false)
         await all d_futs
