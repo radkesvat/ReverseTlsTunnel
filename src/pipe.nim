@@ -69,7 +69,7 @@ proc flagForSend*(data: var string, flags: TransferFlags) =
 
     var size: uint16 = data.len.uint16 - globals.full_tls_record_len.uint16
     
-    let dif:uint8 = (size mod 0xF).uint8
+    let dif:uint8 = (size mod 16).uint8
     data.setLen data.len + dif.int
     size += dif
 
@@ -87,7 +87,7 @@ proc packForSend*(data: var string, cid: uint16, port: uint16, flags: TransferFl
     var size: uint16 = data.len().uint16 - globals.full_tls_record_len.uint16
 
 
-    let dif:uint8 = (size mod 0xF).uint8
+    let dif:uint8 = (size mod 16).uint8
     data.setLen data.len + dif.int
     size += dif
 
@@ -121,7 +121,7 @@ proc closeSignalData*(cid: uint16): string =
 
     var size: uint16 = data.len().uint16 - globals.full_tls_record_len.uint16
 
-    let dif:uint8 = (size mod 0xF).uint8
+    let dif:uint8 = (size mod 16).uint8
     data.setLen data.len + dif.int
     size += dif
 
