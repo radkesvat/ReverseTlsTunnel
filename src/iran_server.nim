@@ -91,9 +91,9 @@ proc handleUpRemote(remote: Connection){.async.} =
         when not defined release:
             echo "discarded ", bytes, " bytes form up-bound."
     except:
-        echo getCurrentExceptionMsg()
-    when not defined release:
-        echo "closed a up-bound"
+        if globals.log_conn_destory:echo getCurrentExceptionMsg()
+    
+    if globals.log_conn_error:echo "closed a up-bound"
     context.up_bounds.remove(remote)
     remote.close
 
@@ -174,7 +174,6 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
     except:
         if globals.log_conn_error: echo getCurrentExceptionMsg()
     #close
-    echo "H!"
     context.dw_bounds.remove(remote)
     await remote.closeWait()
 

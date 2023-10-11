@@ -151,7 +151,7 @@ proc processConnection(client: Connection) {.async.} =
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
-        echo "closed core remote"
+        if globals.log_conn_destory:echo "closed core remote"
         context.outbounds.remove(remote)
         remote.close()
 
@@ -259,20 +259,18 @@ proc processConnection(client: Connection) {.async.} =
                             if not isSet(child_remote.estabilished): await child_remote.estabilished.wait()
                             if not child_remote.closed():
                                 try:
-                                    await child_remote.writer.write(data) 
-                                except :
-                                    echo "X1"
-                                    echo getCurrentExceptionMsg()
+                                    await child_remote.writer.write(data)
+                                except:
+                                    if globals.log_conn_error: echo getCurrentExceptionMsg()
                     else:
                         var remote = await remoteTrusted(if globals.multi_port: port.Port else: globals.next_route_port)
                         remote.id = cid
                         context.outbounds.register(remote)
                         asyncSpawn processRemote(remote)
                         try:
-                            await remote.writer.write(data) 
-                        except :
-                            echo "X2"
-                            echo getCurrentExceptionMsg()
+                            await remote.writer.write(data)
+                        except:
+                            if globals.log_conn_error: echo getCurrentExceptionMsg()
                         if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
 
         except:
@@ -304,8 +302,7 @@ proc poolConttroller() {.async.} =
                 echo "discarded ", bytes, " bytes form up-bound."
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
-        when not defined release:
-            echo "closed a up-bound"
+        if globals.log_conn_close: echo "closed a up-bound"
         context.up_bounds.remove(client)
         client.close
 
