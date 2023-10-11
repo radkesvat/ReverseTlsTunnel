@@ -107,6 +107,7 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
     var flag: uint8
     var dec_bytes_left: uint
     var fake_bytes: uint8 = 0
+    var client:Connection = nil
     try:
         while not remote.isNil and not remote.closed:
             #read
@@ -162,10 +163,10 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
 
             else:
                 try:
-                    if remote.up_bound == nil or remote.up_bound.id != cid:
-                        remote.up_bound = context.user_inbounds.find(cid)
-                    if remote.up_bound != nil and not remote.up_bound.closed:
-                        await remote.up_bound.writer.write(data)
+                    if client == nil or client.id != cid:
+                        client = context.user_inbounds.find(cid)
+                    if client != nil and not client.closed:
+                        await client.writer.write(data)
                         if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
                         if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
                     else:
@@ -191,21 +192,21 @@ proc processTcpConnection(client: Connection) {.async.} =
         else:
             await client.closeWait()
 
-    proc processSNIRemote() {.async.} =
+    proc processSNIRemote(remote:Connection) {.async.} =
         var data = newStringOfCap(4200)
         try:
-            while not client.up_bound.isNil and not client.up_bound.closed:
+            while not remote.isNil and not remote.closed:
                 #read
-                data.setlen client.up_bound.reader.tsource.offset
+                data.setlen remote.reader.tsource.offset
                 if data.len() == 0:
-                    if client.up_bound.reader.atEof():
-                        await closeLine(client, client.up_bound)
+                    if remote.reader.atEof():
+                        await closeLine(client, remote)
                         return
                     else:
-                        discard await client.up_bound.reader.readOnce(addr data, 0)
+                        discard await remote.reader.readOnce(addr data, 0)
                         continue
 
-                await client.up_bound.reader.readExactly(addr data[0], data.len)
+                await remote.reader.readExactly(addr data[0], data.len)
                 if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from target Sni"
 
                 # write
@@ -215,12 +216,13 @@ proc processTcpConnection(client: Connection) {.async.} =
         except:
             if globals.log_conn_error: echo "[Error] [processSNIRemote] [loopEx]: ",getCurrentExceptionMsg()
         #close
-        # await client.up_bound.closeWait()
+        # await remote.closeWait()
         if not client.isTrusted():
             await client.closeWait()
 
 
-    proc processClient() {.async.} =
+    proc processClient(ub:Connection) {.async.} =
+        var up_bound = ub
         var data = newStringOfCap(4200)
         var first_packet = true
         try:
@@ -249,8 +251,8 @@ proc processTcpConnection(client: Connection) {.async.} =
                     if trust:
                         #peer connection
                         client.trusted = TrustStatus.yes
-                        client.up_bound.close() # close SNI remote
-                        client.up_bound = nil
+                        up_bound.close() # close SNI remote
+                        up_bound = nil
                         let address = client.transp.remoteAddress()
                         print "Peer Fake Handshake Complete !", up
                         # context.available_peer_inbounds.register(client)
@@ -270,31 +272,31 @@ proc processTcpConnection(client: Connection) {.async.} =
                                 #user connection but no peer connected yet
                                 client.trusted = TrustStatus.no
                                 echo "[Error] user connection but no peer connected yet."
-                                await closeLine(client, client.up_bound)
+                                await closeLine(client, up_bound)
                                 return
                         if (epochTime().uint - client.creation_time) > globals.trust_time:
                             #user connection but no peer connected yet
                             #peer connection but couldnt finish handshake in time
                             client.trusted = TrustStatus.no
-                            await closeLine(client, client.up_bound)
+                            await closeLine(client, up_bound)
                             return
 
                     first_packet = false
 
                 #write
-                if client.up_bound.closed or client.up_bound.isClosing:
-                    client.up_bound = await acquireRemoteConnection(upload = true)
-                    if client.up_bound == nil:
+                if up_bound.closed or up_bound.isClosing:
+                    up_bound = await acquireRemoteConnection(upload = true)
+                    if up_bound == nil:
                         if globals.log_conn_error: echo "[Error] [processClient] [loop]: ","left without connection, closes forcefully."
-                        await closeLine(client, client.up_bound); return
+                        await closeLine(client, up_bound); return
 
-                if client.up_bound.isTrusted:
+                if up_bound.isTrusted:
                     data.packForSend(client.id, client.port.uint16)
 
-                await client.up_bound.writer.write(data)
+                await up_bound.writer.write(data)
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
 
-                if fupload and client.up_bound.isTrusted: await sendJunkData(globals.noise_ratio.int * data.len())
+                if fupload and up_bound.isTrusted: await sendJunkData(globals.noise_ratio.int * data.len())
 
 
         except:
@@ -305,26 +307,15 @@ proc processTcpConnection(client: Connection) {.async.} =
         context.user_inbounds.remove(client)
 
         try:
-
-            if client.up_bound.closed and client.up_bound.isTrusted():
-                client.up_bound = await acquireRemoteConnection(upload = true, mark = false)
-
-                if client.up_bound != nil:
-                    await client.up_bound.writer.write(closeSignalData(client.id))
-            else:
-                await client.up_bound.writer.write(closeSignalData(client.id))
-                client.up_bound.counter.dec
-                # if remote.exhausted and remote.counter == 0:
-                #     context.available_peer_inbounds.remove(remote)
-                #     remote.close()
-                #     if globals.log_conn_destory: echo "Closed a exhausted mux connection"
-
-
+            let temp_up_bound = await acquireRemoteConnection(true)
+            if temp_up_bound != nil:
+                await temp_up_bound.writer.write(closeSignalData(client.id))
         except:
             if globals.log_conn_error: echo  "[Error] [processClient] [closeSig]: ",getCurrentExceptionMsg()
 
 
     #Initialize remote
+    var client_up_bound:Connection = nil
     try:
         if globals.trusted_foreign_peers.len != 0:
 
@@ -332,23 +323,23 @@ proc processTcpConnection(client: Connection) {.async.} =
                 let ipv4 = toIPv4(client.transp.remoteAddress).address
                 if ipv4 in globals.trusted_foreign_peers:
                     #load balancer connection
-                    client.up_bound = await connectTargetSNI()
-                    asyncSpawn processSNIRemote()
+                    client_up_bound = await connectTargetSNI()
+                    asyncSpawn processSNIRemote(client_up_bound)
             else:
                 if client.transp.remoteAddress.address in globals.trusted_foreign_peers:
                     #load balancer connection
-                    client.up_bound = await connectTargetSNI()
-                    asyncSpawn processSNIRemote()
+                    client_up_bound = await connectTargetSNI()
+                    asyncSpawn processSNIRemote(client_up_bound)
 
-        if client.up_bound == nil:
+        if client_up_bound == nil:
             if context.peer_ip != IpAddress() and
                 context.peer_ip != client.transp.remoteAddress.address:
                 if globals.log_conn_create: echo "Real User connected !"
                 client.trusted = TrustStatus.no
                 client.assignId()
-                client.up_bound = await acquireRemoteConnection(upload = true) #associate peer
+                client_up_bound = await acquireRemoteConnection(upload = true) #associate peer
 
-                if client.up_bound != nil:
+                if client_up_bound != nil:
                     if globals.log_conn_create: echo "Associated a peer connection."
                     context.user_inbounds.register(client)
 
@@ -357,10 +348,10 @@ proc processTcpConnection(client: Connection) {.async.} =
                     await client.closeWait()
                     return
             else:
-                client.up_bound = await connectTargetSNI()
-                asyncSpawn processSNIRemote()
+                client_up_bound = await connectTargetSNI()
+                asyncSpawn processSNIRemote(client_up_bound)
 
-        asyncSpawn processClient()
+        asyncSpawn processClient(client_up_bound)
 
     except:
         printEx()

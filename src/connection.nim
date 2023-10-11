@@ -30,7 +30,6 @@ type
     Connection* = ref object
         creation_time*: uint      #creation epochtime
         id*: uint16               #global incremental id
-        up_bound*: Connection
         case kind*: SocketScheme
         of SocketScheme.NonSecure:
             discard
