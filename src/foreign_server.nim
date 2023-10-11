@@ -282,7 +282,7 @@ proc processConnection(client: Connection) {.async.} =
                         if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
 
         except:
-            if globals.log_conn_error: echo getCurrentExceptionMsg()
+            echo getCurrentExceptionMsg()
 
         #close
         context.dw_bounds.remove(client)

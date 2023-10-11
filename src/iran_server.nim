@@ -162,21 +162,24 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
                     if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
 
             else:
-                if remote.up_bound == nil or remote.up_bound.id != cid:
-                    remote.up_bound = context.user_inbounds.find(cid)
-                if remote.up_bound != nil and not remote.up_bound.closed:
-                    await remote.up_bound.writer.write(data)
-                    if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
-                    if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
-                else:
-                    let temp_up_bound = await acquireRemoteConnection(true)
-                    if temp_up_bound != nil:
-                        await temp_up_bound.writer.write(closeSignalData(cid))
-
+                try:
+                    if remote.up_bound == nil or remote.up_bound.id != cid:
+                        remote.up_bound = context.user_inbounds.find(cid)
+                    if remote.up_bound != nil and not remote.up_bound.closed:
+                        await remote.up_bound.writer.write(data)
+                        if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
+                        if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
+                    else:
+                        let temp_up_bound = await acquireRemoteConnection(true)
+                        if temp_up_bound != nil:
+                            await temp_up_bound.writer.write(closeSignalData(cid))
+                except:
+                    echo "x"
+                    echo getCurrentExceptionMsg()
 
 
     except:
-        if globals.log_conn_error: echo getCurrentExceptionMsg()
+        echo getCurrentExceptionMsg()
     #close
     context.dw_bounds.remove(remote)
     await remote.closeWait()
