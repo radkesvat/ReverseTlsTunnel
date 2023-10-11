@@ -49,6 +49,7 @@ type
         # exhausted*: bool
         udp_packets*: uint32
         flag_no_close_signal*:bool
+        flag_is_closing:bool
 
     UdpConnection* = ref object
         creation_time*: uint #creation epochtime
@@ -90,7 +91,7 @@ template roundPick*(conns: Connections or UdpConnections): Connection or UdpConn
         else:
             conns.round = if conns.round <= conns.connections.high.uint: conns.round else: 0
             let result = conns.connections[conns.round]; conns.round.inc; result
-
+template isClosing*(con: Connection): bool = con.flag_is_closing
 template isTrusted*(con: Connection): bool = con.trusted == TrustStatus.yes
 
 proc find*(conns: Connections or UdpConnections, cid: uint16): Connection =
@@ -345,8 +346,10 @@ proc connect*(address: TransportAddress, scheme: SocketScheme = SocketScheme.Non
 
 
 proc safeClose(con:Connection){.async.}=
+    con.flag_is_closing = true
     await con.writer.finish()
     con.close()
+    
 template trackOldConnections*(conns: var Connections, age: uint) =
     block:
         proc checkAndRemove() =

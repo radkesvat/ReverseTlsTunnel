@@ -48,7 +48,7 @@ proc acquireRemoteConnection(upload: bool, mark = true): Future[Connection] {.as
         if source.len != 0:
             remote = source.roundPick()
             if remote != nil:
-                if remote.closed:
+                if remote.closed or remote.isClosing:
                     source.remove(remote)
                     continue
 
@@ -265,7 +265,7 @@ proc processTcpConnection(client: Connection) {.async.} =
                     first_packet = false
 
                 #write
-                if client.up_bound.closed:
+                if client.up_bound.closed or client.up_bound.isClosing:
                     client.up_bound = await acquireRemoteConnection(upload = true)
                     if client.up_bound == nil:
                         if globals.log_conn_error: echo &"[Error] left without connection, closes forcefully."

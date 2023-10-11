@@ -66,10 +66,12 @@ proc acquireClientConnection(upload: bool): Future[Connection] {.async.} =
     for i in 0..<50:
         found = source.roundPick()
         if found != nil:
-            if not found.closed:
-                return found
-            else:
+            if found.closed or found.isClosing:
                 source.remove(found)
+                continue
+
+            return found
+
 
     return nil
 
@@ -134,7 +136,7 @@ proc processConnection(client: Connection) {.async.} =
                 data.setLen(data.len() + width)
                 await remote.reader.readExactly(addr data[0 + width], data.len - width)
 
-                if client.closed:
+                if client.closed or client.isClosing:
                     client = await acquireClientConnection(true)
                     if client == nil:
                         if globals.log_conn_error: echo "[Error] no client for tcp !"
