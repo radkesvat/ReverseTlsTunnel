@@ -256,14 +256,21 @@ proc processConnection(client: Connection) {.async.} =
                         context.outbounds.with(cid, child_remote):
                             if not isSet(child_remote.estabilished): await child_remote.estabilished.wait()
                             if not child_remote.closed():
-                                await child_remote.writer.write(data)
-                                if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
+                                try:
+                                    await child_remote.writer.write(data) 
+                                except :
+                                    echo "X1"
+                                    echo getCurrentExceptionMsg()
                     else:
                         var remote = await remoteTrusted(if globals.multi_port: port.Port else: globals.next_route_port)
                         remote.id = cid
                         context.outbounds.register(remote)
                         asyncSpawn processRemote(remote)
-                        await remote.writer.write(data)
+                        try:
+                            await remote.writer.write(data) 
+                        except :
+                            echo "X2"
+                            echo getCurrentExceptionMsg()
                         if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
 
         except:
