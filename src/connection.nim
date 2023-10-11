@@ -48,6 +48,7 @@ type
         counter*: uint
         # exhausted*: bool
         udp_packets*: uint32
+        flag_no_close_signal*:bool
 
     UdpConnection* = ref object
         creation_time*: uint #creation epochtime
@@ -58,7 +59,6 @@ type
         port*: Port          #the port the socket points to
         mark*: bool
         bound*: Connection
-
 
     Connections* = ref object
         round: uint

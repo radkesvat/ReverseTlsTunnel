@@ -150,13 +150,14 @@ proc processConnection(client: Connection) {.async.} =
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
         #close
-        try:
-            if client == nil or client.closed:
-                client = await acquireClientConnection(true)
-            if client != nil:
-                await client.twriter.write(closeSignalData(remote.id))
-        except:
-            if globals.log_conn_error: echo getCurrentExceptionMsg()
+        if not remote.flag_no_close_signal:
+            try:
+                if client == nil or client.closed:
+                    client = await acquireClientConnection(true)
+                if client != nil:
+                    await client.twriter.write(closeSignalData(remote.id))
+            except:
+                if globals.log_conn_error: echo getCurrentExceptionMsg()
 
         context.outbounds.remove(remote)
         remote.close()
@@ -195,6 +196,7 @@ proc processConnection(client: Connection) {.async.} =
                     boundary -= globals.mux_record_len.uint16
                     if boundary == 0:
                         context.outbounds.with(cid, child_remote):
+                            child_remote.flag_no_close_signal = true
                             context.outbounds.remove(child_remote)
                             child_remote.close()
                             if globals.log_conn_destory: echo "close mux client"

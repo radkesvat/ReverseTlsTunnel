@@ -152,7 +152,9 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
                     if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
                     if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
                 else:
-                    await remote.writer.write(closeSignalData(cid))
+                    let temp_up_bound = await acquireRemoteConnection(true)
+                    if temp_up_bound != nil:
+                        await temp_up_bound.writer.write(closeSignalData(cid))
 
     
 
