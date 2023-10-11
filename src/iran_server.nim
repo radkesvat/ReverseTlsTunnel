@@ -139,7 +139,9 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
                     context.user_inbounds.with(cid, child_client):
                         child_client.close()
                         context.user_inbounds.remove(child_client)
-                    if fake_bytes > 0: discard await remote.reader.consume(fake_bytes.int)
+                    if fake_bytes > 0: 
+                        print fake_bytes
+                        discard await remote.reader.consume(fake_bytes.int)
                 else:
                     dec_bytes_left = min(globals.fast_encrypt_width, boundary)
 
