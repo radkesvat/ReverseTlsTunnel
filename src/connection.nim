@@ -357,7 +357,7 @@ template trackOldConnections*(conns: var Connections, age: uint) =
             )
         proc tracker(){.async.} =
             while true:
-                await sleepAsync(timer.seconds(age.int))
+                await sleepAsync(timer.seconds(1))
                 checkAndRemove()
         asyncSpawn tracker()
 
@@ -378,7 +378,7 @@ template trackDeadUdpConnections*(conns: var UdpConnections, age: uint, doclose:
             )
         proc tracker() {.async.} =
             while true:
-                await sleepAsync(timer.seconds(age.int))
+                await sleepAsync(timer.seconds(1))
                 checkAndRemove()
         asyncSpawn tracker()
 
