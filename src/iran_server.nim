@@ -1,6 +1,6 @@
 import std/[strformat, strutils, random, endians]
 import chronos, chronos/transports/[datagram, ipnet], chronos/osdefs
-import times, print, connection, pipe
+import times, print, connection, pipe, bitops
 from globals import nil
 
 type
@@ -91,9 +91,9 @@ proc handleUpRemote(remote: Connection){.async.} =
         when not defined release:
             echo "discarded ", bytes, " bytes form up-bound."
     except:
-        if globals.log_conn_destory:echo getCurrentExceptionMsg()
-    
-    if globals.log_conn_error:echo "closed a up-bound"
+        if globals.log_conn_destory: echo getCurrentExceptionMsg()
+
+    if globals.log_conn_error: echo "closed a up-bound"
     context.up_bounds.remove(remote)
     remote.close
 
@@ -106,7 +106,7 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
     var port: uint16
     var flag: uint8
     var dec_bytes_left: uint
-
+    var fake_bytes: uint8 = 0
     try:
         while not remote.isNil and not remote.closed:
             #read
@@ -129,13 +129,16 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
                 copyMem(addr flag, addr data[globals.full_tls_record_len.int + sizeof(cid) + sizeof(port)], sizeof(flag))
 
                 cid = cid xor boundary
-                flag = flag xor boundary.uint8
+                flag = (flag xor boundary.uint8)
+                fake_bytes = bitand((flag shr 4), 0xF)
+                flag = bitand(flag, 0xF)
 
-                boundary -= globals.mux_record_len.uint16
+                boundary -= globals.mux_record_len.uint16 + fake_bytes
                 if boundary == 0:
                     context.user_inbounds.with(cid, child_client):
                         child_client.close()
                         context.user_inbounds.remove(child_client)
+                    if fake_bytes > 0: discard await remote.reader.consume(fake_bytes.int)
                 else:
                     dec_bytes_left = min(globals.fast_encrypt_width, boundary)
 
@@ -144,6 +147,7 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
             let readable = min(boundary, data.len().uint16)
             boundary -= readable; data.setlen readable
             await remote.reader.readExactly(addr data[0], readable.int)
+            if boundary == 0 and fake_bytes > 0: discard await remote.reader.consume(fake_bytes.int)
             if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
 
             if dec_bytes_left > 0:
@@ -169,7 +173,7 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
                     if temp_up_bound != nil:
                         await temp_up_bound.writer.write(closeSignalData(cid))
 
-    
+
 
     except:
         if globals.log_conn_error: echo getCurrentExceptionMsg()

@@ -2,7 +2,7 @@ import chronos
 import chronos/streams/[tlsstream], chronos/transports/datagram
 import std/[strformat, net, openssl, random]
 import overrides/[asyncnet]
-import print, connection, pipe
+import print, connection, pipe,bitops
 from globals import nil
 
 type
@@ -173,6 +173,7 @@ proc processConnection(client: Connection) {.async.} =
         var port: uint16
         var flag: uint8
         var dec_bytes_left: uint
+        var fake_bytes: uint8 = 0
 
         try:
             while not client.closed:
@@ -196,20 +197,27 @@ proc processConnection(client: Connection) {.async.} =
                     copyMem(addr flag, addr data[globals.full_tls_record_len.int + sizeof(cid) + sizeof(port)], sizeof(flag))
                     cid = cid xor boundary
                     port = port xor boundary
-                    flag = flag xor boundary.uint8
-                    boundary -= globals.mux_record_len.uint16
+                    flag = (flag xor boundary.uint8)
+                    fake_bytes = bitand((flag shr 4), 0xF)
+                    flag = bitand(flag, 0xF)
+
+                    boundary -= globals.mux_record_len.uint16 + fake_bytes
                     if boundary == 0:
                         context.outbounds.with(cid, child_remote):
                             child_remote.flag_no_close_signal = true
                             context.outbounds.remove(child_remote)
                             child_remote.close()
-                            if globals.log_conn_destory: echo "close mux client"
+                            
+                        if fake_bytes > 0: discard await client.treader.consume(fake_bytes.int)
+                        
                     else:
                         dec_bytes_left = min(globals.fast_encrypt_width, boundary)
                     continue
                 let readable = min(boundary, data.len().uint16)
                 boundary -= readable; data.setlen readable
                 await client.treader.readExactly(addr data[0], readable.int)
+                if boundary == 0 and fake_bytes > 0: discard await client.treader.consume(fake_bytes.int)
+
                 if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes from client"
 
 
