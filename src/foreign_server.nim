@@ -151,6 +151,10 @@ proc processConnection(client: Connection) {.async.} =
         except:
             if globals.log_conn_error: echo getCurrentExceptionMsg()
 
+        echo "closed core remote"
+        context.outbounds.remove(remote)
+        remote.close()
+
         #close
         if not remote.flag_no_close_signal:
             try:
@@ -161,8 +165,6 @@ proc processConnection(client: Connection) {.async.} =
             except:
                 if globals.log_conn_error: echo getCurrentExceptionMsg()
 
-        context.outbounds.remove(remote)
-        remote.close()
 
     proc proccessClient() {.async.} =
         var data = newStringOfCap(4200)
