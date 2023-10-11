@@ -91,7 +91,7 @@ proc handleUpRemote(remote: Connection){.async.} =
         when not defined release:
             echo "discarded ", bytes, " bytes form up-bound."
     except:
-        if globals.log_conn_error: echo getCurrentExceptionMsg()
+        echo getCurrentExceptionMsg()
     when not defined release:
         echo "closed a up-bound"
     context.up_bounds.remove(remote)
