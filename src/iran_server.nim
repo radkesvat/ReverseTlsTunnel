@@ -297,7 +297,11 @@ proc processTcpConnection(client: Connection) {.async.} =
                 if up_bound.isTrusted:
                     data.packForSend(client.id, client.port.uint16)
 
-                await up_bound.writer.write(data)
+                try:
+                    await up_bound.writer.write(data)
+                except:
+                    echo "[Error] [processClient] [writeUp]: ", getCurrentExceptionMsg()
+
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
 
                 if fupload and up_bound.isTrusted: await sendJunkData(globals.noise_ratio.int * data.len())
