@@ -214,10 +214,12 @@ proc processConnection(client: Connection) {.async.} =
                     else:
                         dec_bytes_left = min(globals.fast_encrypt_width, boundary)
                     continue
-                let readable = min(boundary, data.len().uint16)
-                boundary -= readable; data.setlen readable
-                await client.treader.readExactly(addr data[0], readable.int)
-                if boundary == 0 and fake_bytes > 0: discard await client.treader.consume(fake_bytes.int)
+
+                # let readable = min(boundary, data.len().uint16)
+                # boundary -= readable; data.setlen readable
+                # await client.treader.readExactly(addr data[0], readable.int)
+                await client.treader.readExactly(addr data[0], boundary.int)
+                if  fake_bytes > 0: discard await client.treader.consume(fake_bytes.int)
 
                 if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes from client"
 

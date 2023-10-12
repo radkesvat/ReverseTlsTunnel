@@ -148,10 +148,12 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
 
                 continue
 
-            let readable = min(boundary, data.len().uint16)
-            boundary -= readable; data.setlen readable
-            await remote.reader.readExactly(addr data[0], readable.int)
-            if boundary == 0 and fake_bytes > 0: discard await remote.reader.consume(fake_bytes.int)
+            # let readable = min(boundary, data.len().uint16)
+            # boundary -= readable; data.setlen readable
+            # await remote.reader.readExactly(addr data[0], readable.int)
+            await client.treader.readExactly(addr data[0], boundary.int)
+            if  fake_bytes > 0: discard await client.treader.consume(fake_bytes.int)
+            # if boundary == 0 and fake_bytes > 0: discard await remote.reader.consume(fake_bytes.int)
             if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
 
             if dec_bytes_left > 0:
@@ -236,7 +238,6 @@ proc processTcpConnection(client: Connection) {.async.} =
                 data.setlen client.reader.tsource.offset
                 if data.len() == 0:
                     if client.reader.atEof():
-                        echo "break"
                         break
                     else:
                         discard await client.reader.readOnce(addr data, 0)
