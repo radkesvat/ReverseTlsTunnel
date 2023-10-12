@@ -248,6 +248,8 @@ proc processConnection(client: Connection) {.async.} =
                         var (found, connection) = findUdp(context.listeners_udp, transp.fd)
                         if found:
                             await processUdpRemote(connection)
+                        else:
+                            echo "Not Found !!!"
 
                     if context.listeners_udp.hasID(cid):
                         context.listeners_udp.with(cid, udp_remote):
