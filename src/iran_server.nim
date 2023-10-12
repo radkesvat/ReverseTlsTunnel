@@ -140,7 +140,6 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
                 boundary -= globals.mux_record_len.uint16 + fake_bytes
                 if boundary == 0:
                     context.user_inbounds.with(cid, child_client):
-                        echo "Remote wanted to close ", cid
                         child_client.close()
                         context.user_inbounds.remove(child_client)
                     if fake_bytes > 0:

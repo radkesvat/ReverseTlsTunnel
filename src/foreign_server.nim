@@ -120,7 +120,12 @@ proc processConnection(client: Connection) {.async.} =
         var client = await acquireClientConnection(true)
         if client == nil:
             if globals.log_conn_error: echo "[Error] no client for tcp !"
+            context.outbounds.remove(remote)
+            remote.close()
             return
+
+            
+            
         var data = newStringOfCap(4600)
         try:
             while not remote.closed:

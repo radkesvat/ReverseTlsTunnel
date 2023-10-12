@@ -346,7 +346,7 @@ proc connect*(address: TransportAddress, scheme: SocketScheme = SocketScheme.Non
 
 proc safeClose(con:Connection){.async.}=
     con.flag_is_closing = true
-    await con.writer.finish()
+    # await con.writer.finish()
     await sleepAsync(timer.seconds(globals.connection_rewind.int))
     con.close()
 
