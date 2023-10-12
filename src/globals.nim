@@ -39,7 +39,7 @@ var mux_width*: uint32 = 1 # 1 -> disabeld
 
 
 var udp_max_ppc*: uint32 = 500
-var udp_max_idle_time*: uint = 5 #secs
+var udp_max_idle_time*: uint = 60 #secs
 
 
 # [Noise]

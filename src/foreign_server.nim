@@ -263,7 +263,7 @@ proc processConnection(client: Connection) {.async.} =
                         context.listeners_udp.register connection
                         await connection.transp.send(data)
                         if globals.log_data_len: echo &"[proccessClient] [Udp-proccessClient] [writeCoreF]: {data.len()} bytes -> remote (udp)"
-                        asyncSpawn connection.transp.join()
+                        # asyncSpawn connection.transp.join()
 
                 else:
                     if context.outbounds.hasID(cid):

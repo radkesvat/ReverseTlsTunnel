@@ -394,7 +394,7 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
                 await remote.writer.write(data)
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
 
-                inc remote.udp_packets; if remote.udp_packets > globals.udp_max_ppc: remote.close()
+                # inc remote.udp_packets; if remote.udp_packets > globals.udp_max_ppc: remote.close()
 
                 if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
 
