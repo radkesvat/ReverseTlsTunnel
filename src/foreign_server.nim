@@ -245,7 +245,7 @@ proc processConnection(client: Connection) {.async.} =
 
                 if DataFlags.udp in cast[TransferFlags](flag):
                     var  connection = context.udp_outbounds.find(cid)
-                    if connection.isNil:
+                    if not connection.isNil:
                         await context.listener_udp.sendTo(connection.raddr,data)
                         if globals.log_data_len: echo &"[proccessClient] [Udp-proccessClient] [writeCoreP]: {data.len()} bytes -> remote "
 
