@@ -71,7 +71,7 @@ template fupload: bool = globals.noise_ratio != 0
 proc sendJunkData(len: int) {.async.} =
     var target: Connection = await acquireRemoteConnection(upload = true)
 
-    if target.isNil:
+    if target.isNil():
         if globals.log_data_len: echo "could not acquire a connection to send fake traffic."
         return
 
@@ -81,7 +81,10 @@ proc sendJunkData(len: int) {.async.} =
     let size: uint16 = data.len().uint16 - globals.full_tls_record_len.uint16
     copyMem(addr data[0], addr globals.tls13_record_layer[0], globals.tls13_record_layer.len())
     copyMem(addr data[0 + globals.tls13_record_layer.len()], addr size, sizeof(size))
-    data.flagForSend(flags = {DataFlags.junk})
+    let flag:TransferFlags = {DataFlags.junk}
+    copyMem(addr data[0 + globals.full_tls_record_len.int+sizeof(uint16)+sizeof(uint16)], addr flag, sizeof(flag))
+
+    # data.flagForSend(flags = )
     await target.writer.write(data)
     if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
 

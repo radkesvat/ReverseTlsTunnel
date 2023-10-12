@@ -67,7 +67,7 @@ proc flagForSend*(data: var string, flags: TransferFlags) =
     let width = globals.full_tls_record_len.int+sizeof(uint16)+sizeof(uint16) + sizeof(uint8)
     if data.len < width: data.setLen(width)
 
-    var size: uint16 = data.len.uint16 - globals.full_tls_record_len.uint16
+    var size: uint16 = (data.len - globals.full_tls_record_len.int).uint16
 
     var dif: uint8 = 16 - (size mod 16).uint8
     if dif == 16: dif = 0
