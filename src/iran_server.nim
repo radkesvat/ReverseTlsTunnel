@@ -403,18 +403,19 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
 
 
     #Initialize remote
+    var client_up_bound: Connection = nil
     try:
         if globals.log_conn_create: echo "Real User connected (UDP) !"
         # var remote = await acquireRemoteConnection(not client.mark) #associate peer
-        if client.bound == nil or client.bound.closed:
-            client.bound = await acquireRemoteConnection(upload = true)
+        if client_up_bound == nil or client_up_bound.closed:
+            client_up_bound = await acquireRemoteConnection(upload = true)
 
-        if client.bound != nil:
+        if client_up_bound != nil:
             if globals.log_conn_create: echo "Associated a peer connection"
         else:
             echo &"[AssociatedCon][Error] left without connection, closes forcefully."
             return
-        await processClient(client.bound)
+        await processClient(client_up_bound)
 
     except:
         printEx()
@@ -544,7 +545,7 @@ proc start*(){.async.} =
 
     asyncSpawn startTcpListener()
     if globals.accept_udp:
-        trackDeadUdpConnections(context.user_inbounds_udp, globals.udp_max_idle_time, false)
+        # trackDeadUdpConnections(context.user_inbounds_udp, globals.udp_max_idle_time, false)
         asyncSpawn startUdpListener()
 
 
