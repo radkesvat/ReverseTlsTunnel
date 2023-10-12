@@ -220,7 +220,7 @@ proc processConnection(client: Connection) {.async.} =
                 # await client.treader.readExactly(addr data[0], readable.int)
                 data.setLen(max(4200,boundary.int))
                 await client.treader.readExactly(addr data[0], boundary.int)
-                data.setLen boundary.int
+                data.setLen boundary.int;boundary = 0
                 if  fake_bytes > 0: discard await client.treader.consume(fake_bytes.int)
 
                 if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes from client"
