@@ -256,7 +256,7 @@ proc processConnection(client: Connection) {.async.} =
 
                     else:
                         let ta = initTAddress(globals.next_route_addr, if globals.multi_port: port.Port else: globals.next_route_port)
-                        var transp = newDatagramTransport(handleDatagram, remote = ta)
+                        var transp = newDatagramTransport(handleDatagram, local = ta)
                         var connection = UdpConnection.new(transp, ta)
                         connection.id = cid
                         context.listeners_udp.register connection

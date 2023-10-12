@@ -391,7 +391,7 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
                     return
 
                 data.packForSend(client.id, client.port.uint16, flags = {DataFlags.udp})
-                asyncSpawn remote.writer.write(data)
+                await remote.writer.write(data)
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
 
                 # inc remote.udp_packets; if remote.udp_packets > globals.udp_max_ppc: remote.close()
