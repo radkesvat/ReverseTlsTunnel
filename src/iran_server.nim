@@ -151,6 +151,7 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
             # let readable = min(boundary, data.len().uint16)
             # boundary -= readable; data.setlen readable
             # await remote.reader.readExactly(addr data[0], readable.int)
+            data.setLen(max(4200,boundary.int))
             await client.treader.readExactly(addr data[0], boundary.int)
             if  fake_bytes > 0: discard await client.treader.consume(fake_bytes.int)
             # if boundary == 0 and fake_bytes > 0: discard await remote.reader.consume(fake_bytes.int)
