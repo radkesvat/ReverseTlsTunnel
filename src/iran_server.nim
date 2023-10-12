@@ -181,7 +181,6 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
                         let temp_up_bound = await acquireRemoteConnection(true)
                         if temp_up_bound != nil:
                             await temp_up_bound.writer.write(closeSignalData(cid))
-                            echo "here x2"
 
                 except:
                     if globals.log_conn_error: echo "[Error] [processDownBoundRemote] [writeCl]: ", getCurrentExceptionMsg()
@@ -324,7 +323,6 @@ proc processTcpConnection(client: Connection) {.async.} =
             let temp_up_bound = await acquireRemoteConnection(true)
             if temp_up_bound != nil:
                 await temp_up_bound.writer.write(closeSignalData(client.id))
-                echo "here x1"
         except:
             if globals.log_conn_error: echo "[Error] [processClient] [closeSig]: ", getCurrentExceptionMsg()
 
