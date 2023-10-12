@@ -24,10 +24,10 @@ let full_tls_record_len*: uint = tls13_record_layer.len().uint + tls13_record_la
 
 # [Connection]
 var trust_time*: uint = 3 #secs
-var upload_cons*: uint = 4
-var download_cons*: uint = 4
+var upload_cons*: uint = 8
+var download_cons*: uint = 8
 var connection_age*: uint = 60 # secs
-var connection_rewind*: uint = 2 # secs
+var connection_rewind*: uint = 3 # secs
 
 var pool_size*: uint = 24
 var pool_age*: uint = 15
@@ -272,16 +272,30 @@ proc init*() =
                         print terminate_secs
 
                     of "pool":
+                        echo "[Deprecated] option \'pool\' may not be set after v6.0, the calculation is done automatically."
+
                         pool_size = parseInt(p.val).uint
-                        print pool_size
+                        # print pool_size
 
                     of "pool-age":
+                        echo "[Deprecated] option \'pool-age\' may not be set after v6.0, the calculation is done automatically."
+
                         pool_age = parseInt(p.val).uint
-                        print pool_age
+                        # print pool_age
 
                     of "mux-width":
+                        echo "[Deprecated] option \'mux-width\' may not be set after v6.0, the calculation is done automatically."
                         mux_width = parseInt(p.val).uint32
-                        print mux_width
+                        # print mux_width
+
+                    of "parallel-cons:":
+                        upload_cons = parseInt(p.val).uint32
+                        download_cons = parseInt(p.val).uint32
+                        print upload_cons,download_cons
+                            
+                    of "connection-age:":
+                        connection_age = parseInt(p.val).uint32
+                        print connection_age
 
                     of "noise":
                         noise_ratio = parseInt(p.val).uint32
@@ -408,5 +422,5 @@ proc init*() =
 
     if mux_width > 1:
         pool_size = pool_size div 2
-    print password, password_hash, sh1, sh2, sh3, pool_size
+    print password, password_hash, sh1, sh2, sh3, download_cons,upload_cons,connection_age
     print "\n"
