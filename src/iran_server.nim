@@ -236,6 +236,7 @@ proc processTcpConnection(client: Connection) {.async.} =
                 data.setlen client.reader.tsource.offset
                 if data.len() == 0:
                     if client.reader.atEof():
+                        echo "break"
                         break
                     else:
                         discard await client.reader.readOnce(addr data, 0)
