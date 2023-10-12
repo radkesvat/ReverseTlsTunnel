@@ -93,7 +93,7 @@ template roundPick*(conns: Connections or UdpConnections): Connection or UdpConn
 template isClosing*(con: Connection): bool = con.flag_is_closing
 template isTrusted*(con: Connection): bool = con.trusted == TrustStatus.yes
 
-proc find*(conns: Connections or UdpConnections, cid: uint16): Connection or UdpConnection =
+proc find*(conns: Connections or UdpConnections, cid: uint16): Connection =
     for el in conns.connections:
         if el.id == cid:
             return el
@@ -101,14 +101,6 @@ proc find*(conns: Connections or UdpConnections, cid: uint16): Connection or Udp
 
 
 template hit*(conn: UdpConnection) = conn.last_action = et
-
-proc findUdpByPort*(conns: UdpConnections,port:Port):tuple[result: bool, connection: UdpConnection] =
-    for el in conns.connections:
-        if el.transp.localAddress().port == port:
-            return (true, el)
-    return (false, nil)
-
-    
 
 proc findUdp*(conns: UdpConnections, raddr: TransportAddress): tuple[result: bool, connection: UdpConnection] =
     for el in conns.connections:
@@ -120,7 +112,7 @@ proc findUdp*(conns: UdpConnections, raddr: TransportAddress): tuple[result: boo
 
 proc findUdp*(conns: UdpConnections, filedesc: AsyncFD): tuple[result: bool, connection: UdpConnection] =
     for el in conns.connections:
-        if el.raddr == filedesc:
+        if el.transp.fd == filedesc:
             el.hit()
             return (true, el)
     return (false, nil)

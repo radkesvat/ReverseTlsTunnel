@@ -7,8 +7,7 @@ from globals import nil
 
 type
     ServerConnectionPoolContext = object
-        listener_udp : DatagramTransport
-        udp_outbounds: UdpConnections
+        listeners_udp: UdpConnections
         pending_free_outbounds: int
         up_bounds: Connections
         dw_bounds: Connections
@@ -75,7 +74,19 @@ proc acquireClientConnection(upload: bool): Future[Connection] {.async.} =
 
 
     return nil
-proc processUdpRemote(remote: UdpConnection) {.async.} =
+
+proc processConnection(client: Connection) {.async.} =
+
+
+    proc closeLine(client: Connection, remote: Connection) {.async.} =
+        if globals.log_conn_destory: echo "closed client & remote"
+        if remote != nil:
+            await allFutures(remote.closeWait(), client.closeWait())
+        else:
+            await client.closeWait()
+
+
+    proc processUdpRemote(remote: UdpConnection) {.async.} =
         var client = await acquireClientConnection(true)
         if client == nil:return
 
@@ -105,18 +116,6 @@ proc processUdpRemote(remote: UdpConnection) {.async.} =
             if globals.log_conn_error: echo "[Error] [Udp-processRemote] [loopEx]: ", getCurrentExceptionMsg()
 
 
-proc processConnection(client: Connection) {.async.} =
-
-
-    proc closeLine(client: Connection, remote: Connection) {.async.} =
-        if globals.log_conn_destory: echo "closed client & remote"
-        if remote != nil:
-            await allFutures(remote.closeWait(), client.closeWait())
-        else:
-            await client.closeWait()
-
-
-    
     proc processRemote(remote: Connection) {.async.} =
         var client = await acquireClientConnection(true)
         if client == nil:
@@ -244,45 +243,26 @@ proc processConnection(client: Connection) {.async.} =
 
 
                 if DataFlags.udp in cast[TransferFlags](flag):
-                    var  connection = context.udp_outbounds.find(cid)
-                    if not connection.isNil:
-                        await context.listener_udp.sendTo(connection.raddr,data)
-                        if globals.log_data_len: echo &"[proccessClient] [Udp-proccessClient] [writeCoreP]: {data.len()} bytes -> remote "
+                    proc handleDatagram(transp: DatagramTransport,
+                        raddr: TransportAddress): Future[void] {.async.} =
+                        var (found, connection) = findUdp(context.listeners_udp, transp.fd)
+                        if found:
+                            await processUdpRemote(connection)
+
+                    if context.listeners_udp.hasID(cid):
+                        context.listeners_udp.with(cid, udp_remote):
+                            await udp_remote.transp.send(data)
+                            if globals.log_data_len: echo &"[proccessClient] [Udp-proccessClient] [writeCoreP]: {data.len()} bytes -> remote "
 
                     else:
                         let ta = initTAddress(globals.next_route_addr, if globals.multi_port: port.Port else: globals.next_route_port)
-                        # var transp = newDatagramTransport(handleDatagram, remote = ta,flags = {ServerFlags.ReuseAddr})
-                        connection = UdpConnection.new(nil, ta)
+                        var transp = newDatagramTransport(handleDatagram, remote = ta)
+                        var connection = UdpConnection.new(transp, ta)
                         connection.id = cid
-                        context.udp_outbounds.register connection
-                        await context.listener_udp.sendTo(connection.raddr,data)
+                        context.listeners_udp.register connection
+                        await connection.transp.send(data)
                         if globals.log_data_len: echo &"[proccessClient] [Udp-proccessClient] [writeCoreF]: {data.len()} bytes -> remote (udp)"
                         # asyncSpawn connection.transp.join()
-
-
-
-
-                    # proc handleDatagram(transp: DatagramTransport,
-                    #     raddr: TransportAddress): Future[void] {.async.} =
-                    #     var (found, connection) = findUdp(context.listeners_udp, transp.fd)
-                    #     if found:
-                    #         await processUdpRemote(connection)
-
-                
-                    # var (found, connection) = context.listeners_udp.findUdpByPort(port.Port)
-                    # if found:
-                    #     await connection.transp.sendTo(connection.raddr,data)
-                    #     if globals.log_data_len: echo &"[proccessClient] [Udp-proccessClient] [writeCoreP]: {data.len()} bytes -> remote "
-
-                    # else:
-                    #     let ta = initTAddress(globals.next_route_addr, if globals.multi_port: port.Port else: globals.next_route_port)
-                    #     var transp = newDatagramTransport(handleDatagram, local = initTAddress("127.0.0.0",port.Port),flags = {ServerFlags.ReuseAddr})
-                    #     connection = UdpConnection.new(transp, ta)
-                    #     connection.id = cid
-                    #     context.listeners_udp.register connection
-                    #     await connection.transp.sendTo(connection.raddr,data)
-                    #     if globals.log_data_len: echo &"[proccessClient] [Udp-proccessClient] [writeCoreF]: {data.len()} bytes -> remote (udp)"
-                    #     # asyncSpawn connection.transp.join()
 
                 else:
                     if context.outbounds.hasID(cid):
@@ -418,7 +398,7 @@ proc poolController() {.async.} =
 
 proc start*(){.async.} =
     echo &"Mode Foreign Server:  {globals.self_ip} <-> {globals.iran_addr} ({globals.final_target_domain} with ip {globals.final_target_ip})"
-    context.udp_outbounds.new()
+    context.listeners_udp.new()
     context.outbounds.new()
     context.up_bounds.new()
     context.dw_bounds.new()
@@ -431,60 +411,6 @@ proc start*(){.async.} =
     # trackDeadUdpConnections(context.listeners_udp, globals.udp_max_idle_time, true)
 
     asyncSpawn poolController()
-
-    proc startUdpListener() {.async.} =
-
-        proc handleDatagram(transp: DatagramTransport,
-                    raddr: TransportAddress): Future[void] {.async.} =
-
-            var (found, connection) = findUdp(context.udp_outbounds, transp.fd)
-            if found:
-                await processUdpRemote(connection)
-
-            # var (found, connection) = findUdp(context.user_inbounds_udp, raddr)
-            # if not found:
-            #     connection = UdpConnection.new(transp, raddr)
-            #     context.user_inbounds_udp.register connection
-
-            # let address = raddr
-            # if globals.log_conn_create: print "Connected client: ", address
-
-            # if globals.multi_port:
-            #     var origin_port: int
-            #     var size = int(if isV4Mapped(connection.transp.remoteAddress): 16 else: 28)
-            #     let sol = int(if isV4Mapped(connection.transp.remoteAddress): globals.SOL_IP else: globals.SOL_IPV6)
-            #     if not getSockOpt(connection.transp.fd, sol, int(globals.SO_ORIGINAL_DST),
-            #     addr pbuf[0], size):
-            #         echo "multiport failure getting origin port. !"
-            #         return
-            #     bigEndian16(addr origin_port, addr pbuf[2])
-
-            #     connection.port = origin_port.Port
-
-            #     if globals.log_conn_create: print "Connected client: ", address, connection.port
-            # else:
-            #     # connection.port = transp.localAddress.port.Port
-            #     connection.port = globals.listen_port
-            #     if globals.log_conn_create: print "Connected client: ", address
-
-
-            # asyncSpawn processUdpPacket(connection)
-
-        # var address4 = initTAddress(globals.listen_addr4, globals.listen_port.Port)
-        var address = initTAddress("127.0.0.1", 0.Port)
-
-        # var dgramServer4 = newDatagramTransport(handleDatagram, local = address4,flags = {ReuseAddr})
-        # echo &"Started udp server  {globals.listen_addr4}:{globals.listen_port}"
-
-        context.listener_udp = newDatagramTransport(handleDatagram, local = address, flags = {ServerFlags.ReuseAddr})
-
-        # echo &"Started udp server  {globals.listen_addr}:{globals.listen_port}"
-
-        await context.listener_udp.join()
-        echo "Udp server ended."
-
-    asyncSpawn startUdpListener()
-    
     while true:
         await sleepAsync(5.secs)
         await context.log_lock.acquire()
