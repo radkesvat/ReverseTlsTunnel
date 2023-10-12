@@ -406,8 +406,8 @@ proc start*(){.async.} =
     context.dw_bounds.new()
     context.log_lock = newAsyncLock()
 
-    trackOldConnections(context.up_bounds, globals.connection_age)
-    trackOldConnections(context.dw_bounds, globals.connection_age)
+    trackOldConnections(context.up_bounds, globals.connection_age+globals.connection_rewind)
+    trackOldConnections(context.dw_bounds, globals.connection_age+globals.connection_rewind)
 
 
     trackDeadUdpConnections(context.listeners_udp, globals.udp_max_idle_time, true)

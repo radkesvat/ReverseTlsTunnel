@@ -24,9 +24,9 @@ let full_tls_record_len*: uint = tls13_record_layer.len().uint + tls13_record_la
 
 # [Connection]
 var trust_time*: uint = 3 #secs
-var upload_cons*: uint = 1
-var download_cons*: uint = 1
-var connection_age*: uint = 60 # secs
+var upload_cons*: uint = 4
+var download_cons*: uint = 4
+var connection_age*: uint = 5 # secs
 var connection_rewind*: uint = 2 # secs
 
 var pool_size*: uint = 24
