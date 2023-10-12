@@ -76,7 +76,7 @@ proc sendJunkData(len: int) {.async.} =
         return
 
     let random_start = rand(1500)
-    let full_len = min((len+random_start) + `mod`((len+random_start), 16) , globals.random_str.len())
+    let full_len = min((len+random_start) + (16 - `mod`((len+random_start), 16)) , globals.random_str.len())
     var data = globals.random_str[random_start ..< full_len]
     let size: uint16 = data.len().uint16 - globals.full_tls_record_len.uint16
     copyMem(addr data[0], addr globals.tls13_record_layer[0], globals.tls13_record_layer.len())
@@ -144,7 +144,6 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
                         child_client.close()
                         context.user_inbounds.remove(child_client)
                     if fake_bytes > 0:
-                        print fake_bytes, cid
                         discard await remote.reader.consume(fake_bytes.int)
                 else:
                     dec_bytes_left = min(globals.fast_encrypt_width, boundary)
