@@ -129,6 +129,7 @@ proc processConnection(client: Connection) {.async.} =
         var data = newStringOfCap(4600)
         try:
             while not remote.closed:
+                remote.hit()
                 #read
                 data.setlen remote.reader.tsource.offset
                 if data.len() == 0:
@@ -210,7 +211,6 @@ proc processConnection(client: Connection) {.async.} =
                     boundary -= globals.mux_record_len.uint16 + fake_bytes
                     if boundary == 0:
                         context.outbounds.with(cid, child_remote):
-                            echo "close-sig: ", cid
                             child_remote.flag_no_close_signal = true
                             context.outbounds.remove(child_remote)
                             child_remote.close()
@@ -280,6 +280,7 @@ proc processConnection(client: Connection) {.async.} =
                         context.outbounds.with(cid, child_remote):
                             if not isSet(child_remote.estabilished): await child_remote.estabilished.wait()
                             if not child_remote.closed():
+                                child_remote.hit()
                                 try:
                                     await child_remote.writer.write(data)
                                     if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
@@ -419,7 +420,8 @@ proc start*(){.async.} =
     trackOldConnections(context.dw_bounds, globals.connection_age)
 
 
-    trackDeadUdpConnections(context.outbounds_udp, globals.udp_max_idle_time, true)
+    trackDeadConnections(context.outbounds_udp, globals.max_idle_timeout.uint, true, globals.max_idle_timeout div 2)
+    trackDeadConnections(context.outbounds, globals.max_idle_timeout.uint, true, globals.max_idle_timeout div 2)
 
     asyncSpawn poolController()
     while true:

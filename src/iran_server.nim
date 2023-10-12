@@ -167,6 +167,7 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
 
             if DataFlags.udp in cast[TransferFlags](flag):
                 context.user_inbounds_udp.with(cid, udp_up_bound):
+                    udp_up_bound.hit()
                     await udp_up_bound.transp.sendTo(udp_up_bound.raddr, data)
                     if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
 
@@ -175,6 +176,7 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
                     if client == nil or client.id != cid:
                         client = context.user_inbounds.find(cid)
                     if client != nil and not client.closed:
+                        client.hit()
                         await client.writer.write(data)
                         if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
                         if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
@@ -237,6 +239,7 @@ proc processTcpConnection(client: Connection) {.async.} =
         var first_packet = true
         try:
             while not client.closed:
+                client.hit()
                 #read
                 data.setlen client.reader.tsource.offset
                 if data.len() == 0:
@@ -496,7 +499,7 @@ proc start*(){.async.} =
             if not found:
                 connection = UdpConnection.new(transp, raddr)
                 context.user_inbounds_udp.register connection
-
+            connection.hit()
             let address = raddr
             if globals.log_conn_create: print "Connected client: ", address
 
@@ -537,6 +540,10 @@ proc start*(){.async.} =
     trackOldConnections(context.up_bounds, globals.connection_age)
     trackOldConnections(context.dw_bounds, globals.connection_age)
 
+
+    trackDeadConnections(context.user_inbounds, globals.max_idle_timeout.uint, true, globals.max_idle_timeout div 2)
+
+
     await sleepAsync(200)
     if globals.accept_udp:
         echo &"Mode Iran (Tcp + Udp): {globals.self_ip}  handshake: {globals.final_target_domain}"
@@ -546,7 +553,7 @@ proc start*(){.async.} =
 
     asyncSpawn startTcpListener()
     if globals.accept_udp:
-        trackDeadUdpConnections(context.user_inbounds_udp, globals.udp_max_idle_time, false)
+        trackDeadConnections(context.user_inbounds_udp, globals.udp_max_idle_time, false)
         asyncSpawn startUdpListener()
 
 

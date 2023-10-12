@@ -41,14 +41,15 @@ type
         reader*: AsyncStreamReader
         writer*: AsyncStreamWriter
         state*: SocketState
+        last_action*: uint        #last action epochtime
         trusted*: TrustStatus     #when fake handshake perfromed
         estabilished*: AsyncEvent #connection has started
         port*: Port               #the port the socket points to
         counter*: uint
         # exhausted*: bool
         udp_packets*: uint32
-        flag_no_close_signal*:bool
-        flag_is_closing:bool
+        flag_no_close_signal*: bool
+        flag_is_closing: bool
 
     UdpConnection* = ref object
         creation_time*: uint #creation epochtime
@@ -100,12 +101,11 @@ proc find*(conns: Connections or UdpConnections, cid: uint16): Connection =
     return nil
 
 
-template hit*(conn: UdpConnection) = conn.last_action = et
+template hit*(conn: UdpConnection or Connection) = conn.last_action = et
 
 proc findUdp*(conns: UdpConnections, raddr: TransportAddress): tuple[result: bool, connection: UdpConnection] =
     for el in conns.connections:
         if el.raddr == raddr:
-            el.hit()
             return (true, el)
     return (false, nil)
 
@@ -113,7 +113,6 @@ proc findUdp*(conns: UdpConnections, raddr: TransportAddress): tuple[result: boo
 proc findUdp*(conns: UdpConnections, filedesc: AsyncFD): tuple[result: bool, connection: UdpConnection] =
     for el in conns.connections:
         if el.transp.fd == filedesc:
-            el.hit()
             return (true, el)
     return (false, nil)
 
@@ -276,7 +275,9 @@ proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketSc
                     reader: newAsyncStreamReader(transp),
                     writer: newAsyncStreamWriter(transp),
                     state: SocketState.Connecting,
-                    estabilished: newAsyncEvent()
+                    estabilished: newAsyncEvent(),
+                    last_action: et,
+
                     )
                     res
                 of SocketScheme.Secure:
@@ -296,7 +297,9 @@ proc new*(ctype: typedesc[Connection], transp: StreamTransport, scheme: SocketSc
                     writer: tls.writer,
                     tls: tls,
                     state: SocketState.Connecting,
-                    estabilished: newAsyncEvent()
+                    estabilished: newAsyncEvent(),
+                    last_action: et,
+
 
                     )
                     res
@@ -344,7 +347,7 @@ proc connect*(address: TransportAddress, scheme: SocketScheme = SocketScheme.Non
 
 
 
-proc safeClose(con:Connection){.async.}=
+proc safeClose(con: Connection){.async.} =
     con.flag_is_closing = true
     # await con.writer.finish()
     await sleepAsync(timer.seconds(globals.connection_rewind.int))
@@ -367,23 +370,24 @@ template trackOldConnections*(conns: var Connections, age: uint) =
                 checkAndRemove()
         asyncSpawn tracker()
 
-template trackDeadUdpConnections*(conns: var UdpConnections, age: uint, doclose: bool) =
+template trackDeadConnections*(conns: UdpConnections or Connections, age: uint, doclose: bool, per: int = 1) =
     block:
         proc checkAndRemove() =
-            conns.keepIf(proc(x: UdpConnection): bool =
+            conns.keepIf(proc(x: (when conns is UdpConnections:UdpConnection else: Connection)
+                ): bool =
                 if x.last_action != 0:
                     if et - x.last_action > age:
                         if doclose:
                             x.close()
 
 
-                        if globals.log_conn_destory: echo "[Controller] closed a dead udp connection, ", et - x.last_action
+                        if globals.log_conn_destory: echo "[Controller] closed a dead connection, ", et - x.last_action
                         return false
                 return true
             )
         proc tracker() {.async.} =
             while true:
-                await sleepAsync(timer.seconds(1))
+                await sleepAsync(timer.seconds(per))
                 checkAndRemove()
         asyncSpawn tracker()
 
