@@ -93,7 +93,7 @@ template roundPick*(conns: Connections or UdpConnections): Connection or UdpConn
 template isClosing*(con: Connection): bool = con.flag_is_closing
 template isTrusted*(con: Connection): bool = con.trusted == TrustStatus.yes
 
-proc find*(conns: Connections or UdpConnections, cid: uint16): Connection =
+proc find*(conns: Connections or UdpConnections, cid: uint16): Connection or UdpConnection =
     for el in conns.connections:
         if el.id == cid:
             return el
