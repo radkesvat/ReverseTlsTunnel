@@ -87,6 +87,7 @@ proc processConnection(client: Connection) {.async.} =
 
 
     proc processUdpRemote(remote: UdpConnection) {.async.} =
+        remote.hit()
         var client = await acquireClientConnection(true)
         if client == nil:return
 
@@ -420,7 +421,7 @@ proc start*(){.async.} =
     trackOldConnections(context.dw_bounds, globals.connection_age)
 
 
-    trackDeadConnections(context.outbounds_udp, globals.max_idle_timeout.uint, true, globals.max_idle_timeout div 2)
+    trackDeadConnections(context.outbounds_udp, globals.udp_max_idle_time.uint, true,globals.udp_max_idle_time.int div 2)
     trackDeadConnections(context.outbounds, globals.max_idle_timeout.uint, true, globals.max_idle_timeout div 2)
 
     asyncSpawn poolController()
