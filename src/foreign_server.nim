@@ -120,7 +120,7 @@ proc processConnection(client: Connection) {.async.} =
         if client == nil:
             if globals.log_conn_error: echo "[Error] no client for tcp !"
             return
-        var data = newStringOfCap(4200)
+        var data = newStringOfCap(4600)
         try:
             while not remote.closed:
                 #read
@@ -167,7 +167,7 @@ proc processConnection(client: Connection) {.async.} =
 
 
     proc proccessClient() {.async.} =
-        var data = newStringOfCap(4200)
+        var data = newStringOfCap(4600)
         var boundary: uint16 = 0
         var cid: uint16
         var port: uint16
@@ -218,7 +218,7 @@ proc processConnection(client: Connection) {.async.} =
                 # let readable = min(boundary, data.len().uint16)
                 # boundary -= readable; data.setlen readable
                 # await client.treader.readExactly(addr data[0], readable.int)
-                data.setLen(max(4200,boundary.int))
+                data.setLen(max(4600,boundary.int))
                 await client.treader.readExactly(addr data[0], boundary.int)
                 data.setLen boundary.int;boundary = 0
                 if  fake_bytes > 0: discard await client.treader.consume(fake_bytes.int)
