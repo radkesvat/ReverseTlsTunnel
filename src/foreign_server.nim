@@ -249,15 +249,17 @@ proc processConnection(client: Connection) {.async.} =
                         if found:
                             await processUdpRemote(connection)
 
-                    if context.listeners_udp.hasID(cid):
-                        context.listeners_udp.with(cid, udp_remote):
-                            await udp_remote.transp.sendTo(udp_remote.raddr,data)
-                            if globals.log_data_len: echo &"[proccessClient] [Udp-proccessClient] [writeCoreP]: {data.len()} bytes -> remote "
+                    
+
+                    var (found, connection) = context.listeners_udp.findUdpByPort(port.Port)
+                    if found:
+                        await connection.transp.sendTo(connection.raddr,data)
+                        if globals.log_data_len: echo &"[proccessClient] [Udp-proccessClient] [writeCoreP]: {data.len()} bytes -> remote "
 
                     else:
                         let ta = initTAddress(globals.next_route_addr, if globals.multi_port: port.Port else: globals.next_route_port)
-                        var transp = newDatagramTransport(handleDatagram, local = ta,flags = {ServerFlags.ReuseAddr})
-                        var connection = UdpConnection.new(transp, ta)
+                        var transp = newDatagramTransport(handleDatagram, local = initTAddress("::",ta.port),flags = {ServerFlags.ReuseAddr})
+                        connection = UdpConnection.new(transp, ta)
                         connection.id = cid
                         context.listeners_udp.register connection
                         await connection.transp.sendTo(connection.raddr,data)

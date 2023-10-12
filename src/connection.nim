@@ -102,6 +102,14 @@ proc find*(conns: Connections or UdpConnections, cid: uint16): Connection =
 
 template hit*(conn: UdpConnection) = conn.last_action = et
 
+proc findUdpByPort*(conns: UdpConnections,port:Port):tuple[result: bool, connection: UdpConnection] =
+    for el in conns.connections:
+        if el.transp.localAddress().port == port:
+            return (true, el)
+    return (false, nil)
+
+    
+
 proc findUdp*(conns: UdpConnections, raddr: TransportAddress): tuple[result: bool, connection: UdpConnection] =
     for el in conns.connections:
         if el.raddr == raddr:
