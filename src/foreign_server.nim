@@ -101,10 +101,10 @@ proc processConnection(client: Connection) {.async.} =
                 if globals.log_data_len: echo &"[processUdpRemote] {nbytes} bytes from remote {client.id} (udp)"
 
                 #write
-                if client.closed:
+                if client.closed or client.isClosing:
                     client = await acquireClientConnection(true)
                     if client == nil:
-                        if globals.log_conn_error: echo "[Error] no client for udp !"
+                        if globals.log_conn_error: echo "[Error] [Udp-processRemote] [loop]: ", "no client for tcp !"
                         return
 
                 packForSend(data, remote.id, remote.port.uint16, flags = {DataFlags.udp})
@@ -112,7 +112,7 @@ proc processConnection(client: Connection) {.async.} =
                 if globals.log_data_len: echo &"[processUdpRemote] Sent {data.len()} bytes ->  client (udp)"
 
         except:
-            if globals.log_conn_error: echo getCurrentExceptionMsg()
+            if globals.log_conn_error: echo "[Error] [Udp-processRemote] [loopEx]: ", getCurrentExceptionMsg()
 
 
     proc processRemote(remote: Connection) {.async.} =
@@ -252,18 +252,16 @@ proc processConnection(client: Connection) {.async.} =
                         context.listeners_udp.with(cid, udp_remote):
                             udp_remote.hit()
                             await udp_remote.transp.send(data)
-                            if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote (presist udp)"
+                            if globals.log_data_len: echo &"[proccessClient] [Udp-proccessClient] [writeCoreP]: {data.len()} bytes -> remote "
 
                     else:
                         let ta = initTAddress(globals.next_route_addr, if globals.multi_port: port.Port else: globals.next_route_port)
                         var transp = newDatagramTransport(handleDatagram, remote = ta)
-
                         var connection = UdpConnection.new(transp, ta)
-
                         connection.id = cid
                         context.listeners_udp.register connection
                         await connection.transp.send(data)
-                        if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote (udp)"
+                        if globals.log_data_len: echo &"[proccessClient] [Udp-proccessClient] [writeCoreF]: {data.len()} bytes -> remote (udp)"
                         asyncSpawn connection.transp.join()
 
                 else:
