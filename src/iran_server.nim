@@ -82,9 +82,9 @@ proc sendJunkData(len: int) {.async.} =
     copyMem(addr data[0], addr globals.tls13_record_layer[0], globals.tls13_record_layer.len())
     copyMem(addr data[0 + globals.tls13_record_layer.len()], addr size, sizeof(size))
     let flag:TransferFlags = {DataFlags.junk}
-    copyMem(addr data[0 + globals.full_tls_record_len.int+sizeof(uint16)+sizeof(uint16)], addr flag, sizeof(flag))
+    # copyMem(addr data[0 + globals.full_tls_record_len.int+sizeof(uint16)+sizeof(uint16)], addr flag, sizeof(flag))
 
-    # data.flagForSend(flags = )
+    data.flagForSend(flag)
     await target.writer.write(data)
     if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
 

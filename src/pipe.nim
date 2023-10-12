@@ -70,6 +70,8 @@ proc flagForSend*(data: var string, flags: TransferFlags) =
     var size: uint16 = (data.len - globals.full_tls_record_len.int).uint16
 
     var dif: uint8 = 16 - (size mod 16).uint8
+    echo "dif ", dif, "size ",size
+
     if dif == 16: dif = 0
     data.setLen data.len + dif.int
     size += dif
@@ -80,7 +82,6 @@ proc flagForSend*(data: var string, flags: TransferFlags) =
     var e_flags: uint8 = bitand(cast[uint8](flags), 0xF)
     e_flags = bitor((dif shl 4), e_flags)
     e_flags = e_flags xor size.uint8
-
 
     copyMem(addr data[0 + globals.full_tls_record_len.int+sizeof(uint16)+sizeof(uint16)], addr e_flags, sizeof(e_flags))
 
