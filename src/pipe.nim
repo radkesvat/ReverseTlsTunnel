@@ -128,7 +128,6 @@ proc closeSignalData*(cid: uint16): string =
     data.setLen data.len + dif.int
     size += dif
 
-    echo "close signal diff: ", dif
 
     # let size: uint16 = sizeof(port)+sizeof(cid) + sizeof(uint8)
     let e_cid: uint16 = cid xor size

@@ -2,7 +2,7 @@ import chronos
 import chronos/streams/[tlsstream], chronos/transports/datagram
 import std/[strformat, net, openssl, random]
 import overrides/[asyncnet]
-import print, connection, pipe,bitops
+import print, connection, pipe, bitops
 from globals import nil
 
 type
@@ -151,7 +151,7 @@ proc processConnection(client: Connection) {.async.} =
         except:
             if globals.log_conn_error: echo "[Error] [processRemote] [loopEx]: ", getCurrentExceptionMsg()
 
-        if globals.log_conn_destory:echo "[Closed] [processRemote] [end]: closed core remote"
+        if globals.log_conn_destory: echo "[Closed] [processRemote] [end]: closed core remote"
         context.outbounds.remove(remote)
         remote.close()
 
@@ -163,7 +163,7 @@ proc processConnection(client: Connection) {.async.} =
                 if client != nil:
                     await client.twriter.write(closeSignalData(remote.id))
             except:
-                if globals.log_conn_error:echo "[Error] [processRemote] [closeSig]: " , getCurrentExceptionMsg()
+                if globals.log_conn_error: echo "[Error] [processRemote] [closeSig]: ", getCurrentExceptionMsg()
 
 
     proc proccessClient() {.async.} =
@@ -208,9 +208,9 @@ proc processConnection(client: Connection) {.async.} =
                             child_remote.flag_no_close_signal = true
                             context.outbounds.remove(child_remote)
                             child_remote.close()
-                            
+
                         if fake_bytes > 0: discard await client.treader.consume(fake_bytes.int)
-                        
+
                     else:
                         dec_bytes_left = min(globals.fast_encrypt_width, boundary)
                     continue
@@ -273,7 +273,7 @@ proc processConnection(client: Connection) {.async.} =
 
                                 except:
                                     if globals.log_conn_error: echo "[Error] [proccessClient] [writeCoreP]: ", getCurrentExceptionMsg()
-                                
+
                     else:
                         var remote = await remoteTrusted(if globals.multi_port: port.Port else: globals.next_route_port)
                         remote.id = cid
@@ -314,7 +314,7 @@ proc poolController() {.async.} =
                 echo "discarded ", bytes, " bytes form up-bound."
         except:
             if globals.log_conn_error: echo "[Error] [poolController] [loopEx]: ", getCurrentExceptionMsg()
-        if globals.log_conn_destory: echo "[Closed] [poolController] [End]:","a up-bound"
+        if globals.log_conn_destory: echo "[Closed] [poolController] [End]:", "a up-bound"
         context.up_bounds.remove(client)
         client.close
 
@@ -402,8 +402,8 @@ proc start*(){.async.} =
     context.dw_bounds.new()
     context.log_lock = newAsyncLock()
 
-    trackOldConnections(context.up_bounds, globals.connection_age )
-    trackOldConnections(context.dw_bounds, globals.connection_age )
+    trackOldConnections(context.up_bounds, globals.connection_age)
+    trackOldConnections(context.dw_bounds, globals.connection_age)
 
 
     trackDeadUdpConnections(context.listeners_udp, globals.udp_max_idle_time, true)

@@ -93,7 +93,7 @@ proc handleUpRemote(remote: Connection){.async.} =
     except:
         if globals.log_conn_error: echo "[Error] [handleUpRemote] [loopEx]: ", getCurrentExceptionMsg()
 
-    if globals.log_conn_destory: echo "[Closed] [poolController] [End]:","a up-bound"
+    if globals.log_conn_destory: echo "[Closed] [poolController] [End]:", "a up-bound"
     context.up_bounds.remove(remote)
     remote.close
 
@@ -107,7 +107,7 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
     var flag: uint8
     var dec_bytes_left: uint
     var fake_bytes: uint8 = 0
-    var client:Connection = nil
+    var client: Connection = nil
     try:
         while not remote.isNil and not remote.closed:
             #read
@@ -139,8 +139,8 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
                     context.user_inbounds.with(cid, child_client):
                         child_client.close()
                         context.user_inbounds.remove(child_client)
-                    if fake_bytes > 0: 
-                        print fake_bytes
+                    if fake_bytes > 0:
+                        print fake_bytes, cid
                         discard await remote.reader.consume(fake_bytes.int)
                 else:
                     dec_bytes_left = min(globals.fast_encrypt_width, boundary)
@@ -175,12 +175,14 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
                         let temp_up_bound = await acquireRemoteConnection(true)
                         if temp_up_bound != nil:
                             await temp_up_bound.writer.write(closeSignalData(cid))
+                            echo "here x2"
+
                 except:
-                    if globals.log_conn_error: echo "[Error] [processDownBoundRemote] [writeCl]: ",getCurrentExceptionMsg()
+                    if globals.log_conn_error: echo "[Error] [processDownBoundRemote] [writeCl]: ", getCurrentExceptionMsg()
 
 
     except:
-        if globals.log_conn_error: echo "[Error] [processDownBoundRemote] [loopEx]: ",getCurrentExceptionMsg()
+        if globals.log_conn_error: echo "[Error] [processDownBoundRemote] [loopEx]: ", getCurrentExceptionMsg()
     #close
     context.dw_bounds.remove(remote)
     await remote.closeWait()
@@ -194,7 +196,7 @@ proc processTcpConnection(client: Connection) {.async.} =
         else:
             await client.closeWait()
 
-    proc processSNIRemote(remote:Connection) {.async.} =
+    proc processSNIRemote(remote: Connection) {.async.} =
         var data = newStringOfCap(4200)
         try:
             while not remote.isNil and not remote.closed:
@@ -216,14 +218,14 @@ proc processTcpConnection(client: Connection) {.async.} =
                     await client.writer.write(data)
                     if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client "
         except:
-            if globals.log_conn_error: echo "[Error] [processSNIRemote] [loopEx]: ",getCurrentExceptionMsg()
+            if globals.log_conn_error: echo "[Error] [processSNIRemote] [loopEx]: ", getCurrentExceptionMsg()
         #close
         # await remote.closeWait()
         if not client.isTrusted():
             await client.closeWait()
 
 
-    proc processClient(ub:Connection) {.async.} =
+    proc processClient(ub: Connection) {.async.} =
         var up_bound = ub
         var data = newStringOfCap(4200)
         var first_packet = true
@@ -289,7 +291,7 @@ proc processTcpConnection(client: Connection) {.async.} =
                 if up_bound.closed or up_bound.isClosing:
                     up_bound = await acquireRemoteConnection(upload = true)
                     if up_bound == nil:
-                        if globals.log_conn_error: echo "[Error] [processClient] [loop]: ","left without connection, closes forcefully."
+                        if globals.log_conn_error: echo "[Error] [processClient] [loop]: ", "left without connection, closes forcefully."
                         await closeLine(client, up_bound); return
 
                 if up_bound.isTrusted:
@@ -312,12 +314,13 @@ proc processTcpConnection(client: Connection) {.async.} =
             let temp_up_bound = await acquireRemoteConnection(true)
             if temp_up_bound != nil:
                 await temp_up_bound.writer.write(closeSignalData(client.id))
+                echo "here x1"
         except:
-            if globals.log_conn_error: echo  "[Error] [processClient] [closeSig]: ",getCurrentExceptionMsg()
+            if globals.log_conn_error: echo "[Error] [processClient] [closeSig]: ", getCurrentExceptionMsg()
 
 
     #Initialize remote
-    var client_up_bound:Connection = nil
+    var client_up_bound: Connection = nil
     try:
         if globals.trusted_foreign_peers.len != 0:
 
@@ -374,7 +377,7 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
 
                 #write
                 if remote.closed:
-                    if globals.log_conn_error: echo  "[Error] [UDP-processClient] [loop]: "," Tcp remote was just closed!"
+                    if globals.log_conn_error: echo "[Error] [UDP-processClient] [loop]: ", " Tcp remote was just closed!"
                     return
 
                 data.packForSend(client.id, client.port.uint16, flags = {DataFlags.udp})
@@ -386,7 +389,7 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
                 if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
 
         except:
-            if globals.log_conn_error: echo "[Error] [UDP-processClient] [loopEx]: ",getCurrentExceptionMsg()
+            if globals.log_conn_error: echo "[Error] [UDP-processClient] [loopEx]: ", getCurrentExceptionMsg()
 
 
     #Initialize remote
