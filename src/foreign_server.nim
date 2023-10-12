@@ -137,11 +137,11 @@ proc processConnection(client: Connection) {.async.} =
                 data.setLen(data.len() + width)
                 await remote.reader.readExactly(addr data[0 + width], data.len - width)
 
-                # if client.closed or client.isClosing:
-                client = await acquireClientConnection(true)
-                if client == nil:
-                    if globals.log_conn_error: echo "[Error] [processRemote] [loop]: ", "no client for tcp !"
-                    break
+                if client.closed or client.isClosing:
+                    client = await acquireClientConnection(true)
+                    if client == nil:
+                        if globals.log_conn_error: echo "[Error] [processRemote] [loop]: ", "no client for tcp !"
+                        break
 
                 # echo "before enc:  ", data[10 .. data.high].hash(), "  len:",data.len
                 packForSend(data, remote.id, remote.port.uint16)
