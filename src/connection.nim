@@ -120,7 +120,7 @@ proc findUdp*(conns: UdpConnections, raddr: TransportAddress): tuple[result: boo
 
 proc findUdp*(conns: UdpConnections, filedesc: AsyncFD): tuple[result: bool, connection: UdpConnection] =
     for el in conns.connections:
-        if el.transp.fd == filedesc:
+        if el.raddr == filedesc:
             el.hit()
             return (true, el)
     return (false, nil)
