@@ -294,12 +294,12 @@ proc processTcpConnection(client: Connection) {.async.} =
 
                 #write
                 # if up_bound.closed or up_bound.isClosing:
-                up_bound = await acquireRemoteConnection(upload = true)
-                if up_bound == nil:
-                    if globals.log_conn_error: echo "[Error] [processClient] [loop]: ", "left without connection, closes forcefully."
-                    await closeLine(client, up_bound); return
+                if up_bound.isTrusted():
+                    up_bound = await acquireRemoteConnection(upload = true)
+                    if up_bound == nil:
+                        if globals.log_conn_error: echo "[Error] [processClient] [loop]: ", "left without connection, closes forcefully."
+                        await closeLine(client, up_bound); return
 
-                if up_bound.isTrusted:
                     data.packForSend(client.id, client.port.uint16)
 
                 try:
