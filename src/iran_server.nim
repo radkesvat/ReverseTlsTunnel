@@ -100,7 +100,7 @@ proc handleUpRemote(remote: Connection){.async.} =
 
 
 proc processDownBoundRemote(remote: Connection) {.async.} =
-    var data = newStringOfCap(4600)
+    var data = newStringOfCap(4200)
     var boundary: uint16 = 0
     var cid: uint16
     var port: uint16
@@ -151,7 +151,7 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
             # let readable = min(boundary, data.len().uint16)
             # boundary -= readable; data.setlen readable
             # await remote.reader.readExactly(addr data[0], readable.int)
-            data.setLen(max(4600,boundary.int))
+            data.setLen(max(4200,boundary.int))
             await remote.reader.readExactly(addr data[0], boundary.int)
             data.setLen boundary.int;boundary = 0
 
@@ -184,7 +184,7 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
 
                 except:
                     if globals.log_conn_error: echo "[Error] [processDownBoundRemote] [writeCl]: ", getCurrentExceptionMsg()
-dif
+
 
     except:
         if globals.log_conn_error: echo "[Error] [processDownBoundRemote] [loopEx]: ", getCurrentExceptionMsg()
@@ -202,7 +202,7 @@ proc processTcpConnection(client: Connection) {.async.} =
             await client.closeWait()
 
     proc processSNIRemote(remote: Connection) {.async.} =
-        var data = newStringOfCap(4600)
+        var data = newStringOfCap(4200)
         try:
             while not remote.isNil and not remote.closed:
                 #read
@@ -232,7 +232,7 @@ proc processTcpConnection(client: Connection) {.async.} =
 
     proc processClient(ub: Connection) {.async.} =
         var up_bound = ub
-        var data = newStringOfCap(4600)
+        var data = newStringOfCap(4200)
         var first_packet = true
         try:
             while not client.closed:
