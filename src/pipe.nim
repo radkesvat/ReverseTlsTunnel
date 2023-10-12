@@ -76,7 +76,10 @@ proc flagForSend*(data: var string, flags: TransferFlags) =
 
     copyMem(addr size, addr data[0 + globals.tls13_record_layer.len()], sizeof(size))
 
-    let e_flags: uint8 = bitand(cast[uint8](flags), 0xF) xor size.uint8
+
+    var e_flags: uint8 = bitand(cast[uint8](flags), 0xF)
+    e_flags = bitor((dif shl 4), e_flags)
+    e_flags = e_flags xor size.uint8
 
 
     copyMem(addr data[0 + globals.full_tls_record_len.int+sizeof(uint16)+sizeof(uint16)], addr e_flags, sizeof(e_flags))
