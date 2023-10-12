@@ -547,7 +547,7 @@ proc start*(){.async.} =
 
     asyncSpawn startTcpListener()
     if globals.accept_udp:
-        # trackDeadUdpConnections(context.user_inbounds_udp, globals.udp_max_idle_time, false)
+        trackDeadUdpConnections(context.user_inbounds_udp, globals.udp_max_idle_time, false)
         asyncSpawn startUdpListener()
 
 

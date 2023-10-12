@@ -367,26 +367,25 @@ template trackOldConnections*(conns: var Connections, age: uint) =
                 checkAndRemove()
         asyncSpawn tracker()
 
-# template trackDeadUdpConnections*(conns: var UdpConnections, age: uint, doclose: bool) =
-#     block:
-#         proc checkAndRemove() =
-#             conns.keepIf(proc(x: UdpConnection): bool =
-#                 if x.last_action != 0:
-#                     if et - x.last_action > age:
-#                         if doclose:
-#                             x.close()
-#                             if not isNil x.bound:
-#                                 x.bound.close()
+template trackDeadUdpConnections*(conns: var UdpConnections, age: uint, doclose: bool) =
+    block:
+        proc checkAndRemove() =
+            conns.keepIf(proc(x: UdpConnection): bool =
+                if x.last_action != 0:
+                    if et - x.last_action > age:
+                        if doclose:
+                            x.close()
 
-#                         if globals.log_conn_destory: echo "[Controller] closed a dead udp connection, ", et - x.last_action
-#                         return false
-#                 return true
-#             )
-#         proc tracker() {.async.} =
-#             while true:
-#                 await sleepAsync(timer.seconds(1))
-#                 checkAndRemove()
-#         asyncSpawn tracker()
+
+                        if globals.log_conn_destory: echo "[Controller] closed a dead udp connection, ", et - x.last_action
+                        return false
+                return true
+            )
+        proc tracker() {.async.} =
+            while true:
+                await sleepAsync(timer.seconds(1))
+                checkAndRemove()
+        asyncSpawn tracker()
 
 proc startController*() {.async.} =
     while true:

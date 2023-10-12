@@ -256,6 +256,7 @@ proc processConnection(client: Connection) {.async.} =
 
                     if context.outbounds_udp.hasID(cid):
                         context.outbounds_udp.with(cid, udp_remote):
+                            udp_remote.hit()
                             await udp_remote.transp.send(data)
                             if globals.log_data_len: echo &"[proccessClient] [Udp-proccessClient] [writeCoreP]: {data.len()} bytes -> remote "
 
@@ -413,7 +414,7 @@ proc start*(){.async.} =
     trackOldConnections(context.dw_bounds, globals.connection_age)
 
 
-    # trackDeadUdpConnections(context.outbounds_udp, globals.udp_max_idle_time, true)
+    trackDeadUdpConnections(context.outbounds_udp, globals.udp_max_idle_time, true)
 
     asyncSpawn poolController()
     while true:
