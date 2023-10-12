@@ -7,7 +7,7 @@ from globals import nil
 
 type
     ServerConnectionPoolContext = object
-        listeners_udp: UdpConnections
+        outbounds_udp: UdpConnections
         pending_free_outbounds: int
         up_bounds: Connections
         dw_bounds: Connections
@@ -245,14 +245,12 @@ proc processConnection(client: Connection) {.async.} =
                 if DataFlags.udp in cast[TransferFlags](flag):
                     proc handleDatagram(transp: DatagramTransport,
                         raddr: TransportAddress): Future[void] {.async.} =
-                        var (found, connection) = findUdp(context.listeners_udp, transp.fd)
+                        var (found, connection) = findUdp(context.outbounds_udp, transp.fd)
                         if found:
                             await processUdpRemote(connection)
-                        else:
-                            echo "Not Found !!!"
 
-                    if context.listeners_udp.hasID(cid):
-                        context.listeners_udp.with(cid, udp_remote):
+                    if context.outbounds_udp.hasID(cid):
+                        context.outbounds_udp.with(cid, udp_remote):
                             await udp_remote.transp.send(data)
                             if globals.log_data_len: echo &"[proccessClient] [Udp-proccessClient] [writeCoreP]: {data.len()} bytes -> remote "
 
@@ -261,7 +259,7 @@ proc processConnection(client: Connection) {.async.} =
                         var transp = newDatagramTransport(handleDatagram, remote = ta)
                         var connection = UdpConnection.new(transp, ta)
                         connection.id = cid
-                        context.listeners_udp.register connection
+                        context.outbounds_udp.register connection
                         await connection.transp.send(data)
                         if globals.log_data_len: echo &"[proccessClient] [Udp-proccessClient] [writeCoreF]: {data.len()} bytes -> remote (udp)"
                         # asyncSpawn connection.transp.join()
@@ -400,7 +398,7 @@ proc poolController() {.async.} =
 
 proc start*(){.async.} =
     echo &"Mode Foreign Server:  {globals.self_ip} <-> {globals.iran_addr} ({globals.final_target_domain} with ip {globals.final_target_ip})"
-    context.listeners_udp.new()
+    context.outbounds_udp.new()
     context.outbounds.new()
     context.up_bounds.new()
     context.dw_bounds.new()
@@ -410,7 +408,7 @@ proc start*(){.async.} =
     trackOldConnections(context.dw_bounds, globals.connection_age)
 
 
-    # trackDeadUdpConnections(context.listeners_udp, globals.udp_max_idle_time, true)
+    # trackDeadUdpConnections(context.outbounds_udp, globals.udp_max_idle_time, true)
 
     asyncSpawn poolController()
     while true:
