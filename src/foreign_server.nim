@@ -219,13 +219,6 @@ proc processConnection(client: Connection) {.async.} =
                 # let readable = min(boundary, data.len().uint16)
                 # boundary -= readable; data.setlen readable
                 # await client.treader.readExactly(addr data[0], readable.int)
-
-                if DataFlags.junk in cast[TransferFlags](flag):
-                    discard await client.treader.consume(boundary.int)
-                    if  fake_bytes > 0: discard await client.treader.consume(fake_bytes.int)
-                    if globals.log_data_len: echo &"[proccessClient] {data.len()} discarded from client"
-                    continue
-
                 data.setLen(max(4600,boundary.int))
                 await client.treader.readExactly(addr data[0], boundary.int)
                 data.setLen boundary.int;boundary = 0
@@ -234,7 +227,10 @@ proc processConnection(client: Connection) {.async.} =
                 if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes from client"
 
 
-              
+                if DataFlags.junk in cast[TransferFlags](flag):
+                    if globals.log_data_len: echo &"[proccessClient] {data.len()} discarded from client"
+                    continue
+
                 if dec_bytes_left > 0:
                     let consumed = min(data.len(), dec_bytes_left.int)
                     dec_bytes_left -= consumed.uint
