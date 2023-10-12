@@ -88,6 +88,7 @@ proc processConnection(client: Connection) {.async.} =
 
     proc processUdpRemote(remote: UdpConnection) {.async.} =
         var client = await acquireClientConnection(true)
+        if client == nil:return
 
         let width = globals.full_tls_record_len.int + globals.mux_record_len.int
 
@@ -101,11 +102,11 @@ proc processConnection(client: Connection) {.async.} =
                 if globals.log_data_len: echo &"[processUdpRemote] {nbytes} bytes from remote {client.id} (udp)"
 
                 #write
-                if client.closed or client.isClosing:
-                    client = await acquireClientConnection(true)
-                    if client == nil:
-                        if globals.log_conn_error: echo "[Error] [Udp-processRemote] [loop]: ", "no client for tcp !"
-                        return
+                # if client.closed or client.isClosing:
+                client = await acquireClientConnection(true)
+                if client == nil:
+                    if globals.log_conn_error: echo "[Error] [Udp-processRemote] [loop]: ", "no client for tcp !"
+                    return
 
                 packForSend(data, remote.id, remote.port.uint16, flags = {DataFlags.udp})
                 await client.twriter.write(data)
@@ -136,11 +137,11 @@ proc processConnection(client: Connection) {.async.} =
                 data.setLen(data.len() + width)
                 await remote.reader.readExactly(addr data[0 + width], data.len - width)
 
-                if client.closed or client.isClosing:
-                    client = await acquireClientConnection(true)
-                    if client == nil:
-                        if globals.log_conn_error: echo "[Error] [processRemote] [loop]: ", "no client for tcp !"
-                        break
+                # if client.closed or client.isClosing:
+                client = await acquireClientConnection(true)
+                if client == nil:
+                    if globals.log_conn_error: echo "[Error] [processRemote] [loop]: ", "no client for tcp !"
+                    break
 
                 # echo "before enc:  ", data[10 .. data.high].hash(), "  len:",data.len
                 packForSend(data, remote.id, remote.port.uint16)

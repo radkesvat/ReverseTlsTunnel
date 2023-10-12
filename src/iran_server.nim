@@ -293,11 +293,11 @@ proc processTcpConnection(client: Connection) {.async.} =
                     first_packet = false
 
                 #write
-                if up_bound.closed or up_bound.isClosing:
-                    up_bound = await acquireRemoteConnection(upload = true)
-                    if up_bound == nil:
-                        if globals.log_conn_error: echo "[Error] [processClient] [loop]: ", "left without connection, closes forcefully."
-                        await closeLine(client, up_bound); return
+                # if up_bound.closed or up_bound.isClosing:
+                up_bound = await acquireRemoteConnection(upload = true)
+                if up_bound == nil:
+                    if globals.log_conn_error: echo "[Error] [processClient] [loop]: ", "left without connection, closes forcefully."
+                    await closeLine(client, up_bound); return
 
                 if up_bound.isTrusted:
                     data.packForSend(client.id, client.port.uint16)
@@ -384,11 +384,11 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
                 if globals.log_data_len: echo &"[processClient] {data.len()} bytes from client {client.id}"
 
                 #write
-                if remote.closed or remote.isClosing:
-                    remote = await acquireRemoteConnection(upload = true)
-                    if remote == nil:
-                        if globals.log_conn_error: echo "[Error] [UDP-processClient] [loop]: ", " Tcp remote was just closed!"
-                        return
+                # if remote.closed or remote.isClosing:
+                remote = await acquireRemoteConnection(upload = true)
+                if remote == nil:
+                    if globals.log_conn_error: echo "[Error] [UDP-processClient] [loop]: ", " Tcp remote was just closed!"
+                    return
 
                 data.packForSend(client.id, client.port.uint16, flags = {DataFlags.udp})
                 await remote.writer.write(data)
