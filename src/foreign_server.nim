@@ -367,16 +367,13 @@ proc poolController() {.async.} =
         dec context.pending_free_outbounds
 
     proc reCreate() {.async.} =
-        var u_futs: seq[Future[void]]
-        var d_futs: seq[Future[void]]
+
         if context.up_bounds.len().uint <= globals.upload_cons:
             for i in 0..<globals.upload_cons:
-                u_futs.add connect(true)
-        await all u_futs
+               await connect(true)
         if context.dw_bounds.len().uint <= globals.download_cons:
             for i in 0..<globals.download_cons:
-                d_futs.add connect(false)
-        await all d_futs
+                await connect(false)
 
 
     proc watch(): Future[bool] {.async.} =
