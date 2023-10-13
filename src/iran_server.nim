@@ -41,7 +41,7 @@ proc monitorData(data: var string): tuple[trust: bool, upload: bool] =
         return (false, up)
 
 
-proc acquireRemoteConnection(upload: bool, mark = true): Future[Connection] {.async.} =
+proc acquireRemoteConnection(upload: bool,ip:TransportAddress = TransportAddress()): Future[Connection] {.async.} =
     var remote: Connection = nil
     var source: Connections = if upload: context.up_bounds else: context.dw_bounds
     for i in 0..<100:
@@ -52,12 +52,19 @@ proc acquireRemoteConnection(upload: bool, mark = true): Future[Connection] {.as
                     source.remove(remote)
                     continue
 
-                if mark:
-                    inc remote.counter
+                if ip.family != AddressFamily.None:
+                    if ip == remote.transp.remoteAddress():
+                        return remote
+                    else:
+                        continue
 
-                return remote
+                else:
+                    return remote
         await sleepAsync(20)
     return nil
+
+
+
 
 proc connectTargetSNI(): Future[Connection] {.async.} =
     let address = initTAddress(globals.final_target_ip, globals.final_target_port)
@@ -181,7 +188,7 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
                         if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
                         if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
                     else:
-                        let temp_up_bound = await acquireRemoteConnection(true)
+                        let temp_up_bound = await acquireRemoteConnection(true,ip = remote.transp.remoteAddress())
                         if temp_up_bound != nil:
                             await temp_up_bound.writer.write(closeSignalData(cid))
 
@@ -298,7 +305,7 @@ proc processTcpConnection(client: Connection) {.async.} =
 
                 #write
                 if up_bound.closed or up_bound.isClosing:
-                    up_bound = await acquireRemoteConnection(upload = true)
+                    up_bound = await acquireRemoteConnection(upload = true,ip = up_bound.transp.remoteAddress())
                     if up_bound == nil:
                         if globals.log_conn_error: echo "[Error] [processClient] [loop]: ", "left without connection, closes forcefully."
                         await closeLine(client, up_bound); return
@@ -324,7 +331,7 @@ proc processTcpConnection(client: Connection) {.async.} =
         context.user_inbounds.remove(client)
 
         try:
-            let temp_up_bound = await acquireRemoteConnection(true)
+            let temp_up_bound = await acquireRemoteConnection(true,ip = up_bound.transp.remoteAddress())
             if temp_up_bound != nil:
                 await temp_up_bound.writer.write(closeSignalData(client.id))
         except:
@@ -389,7 +396,7 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
 
                 #write
                 # if remote.closed or remote.isClosing:
-                remote = await acquireRemoteConnection(upload = true)
+                remote = await acquireRemoteConnection(upload = true,ip = remote.transp.remoteAddress())
                 if remote == nil:
                     if globals.log_conn_error: echo "[Error] [UDP-processClient] [loop]: ", " Tcp remote was just closed!"
                     return

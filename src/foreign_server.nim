@@ -125,6 +125,8 @@ proc processConnection(client: Connection) {.async.} =
             remote.close()
             return
 
+            
+            
         var data = newStringOfCap(4600)
         try:
             while not remote.closed:
@@ -288,18 +290,19 @@ proc processConnection(client: Connection) {.async.} =
                                     if globals.log_conn_error: echo "[Error] [proccessClient] [writeCoreP]: ", getCurrentExceptionMsg()
 
                     else:
-                        var remote = await remoteTrusted(if globals.multi_port: port.Port else: globals.next_route_port)
-                        remote.id = cid
-                        context.outbounds.register(remote)
-                        asyncSpawn processRemote(remote)
                         try:
+                            var remote = await remoteTrusted(if globals.multi_port: port.Port else: globals.next_route_port)
+                            remote.id = cid
+                            context.outbounds.register(remote)
+                            asyncSpawn processRemote(remote)
                             await remote.writer.write(data)
                             if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
                         except:
                             if globals.log_conn_error: echo "[Error] [proccessClient] [writeCoreF]: ", getCurrentExceptionMsg()
+                            
 
         except:
-            echo getCurrentExceptionMsg()
+            if globals.log_conn_error: echo "[Error] [proccessClient] [loopEx]: ", getCurrentExceptionMsg()
 
         #close
         context.dw_bounds.remove(client)
@@ -365,13 +368,16 @@ proc poolController() {.async.} =
         dec context.pending_free_outbounds
 
     proc reCreate() {.async.} =
+        var u_futs: seq[Future[void]]
+        var d_futs: seq[Future[void]]
 
-        if context.up_bounds.len().uint <= globals.upload_cons:
-            for i in 0..<globals.upload_cons:
-               await connect(true)
-        if context.dw_bounds.len().uint <= globals.download_cons:
-            for i in 0..<globals.download_cons:
-                await connect(false)
+        for i in 0..< (globals.upload_cons+globals.download_cons) div 2:
+            if context.up_bounds.len().uint <= globals.upload_cons:
+                u_futs.add connect(true)
+            if context.dw_bounds.len().uint <= globals.download_cons:
+                d_futs.add connect(false)
+
+        await (all u_futs) and (all d_futs)
 
 
     proc watch(): Future[bool] {.async.} =
