@@ -37,7 +37,7 @@ let mux_record_len*: uint32 = 5 #2bytes port 2bytes id 1byte reserved
 
 var mux_width*: uint32 = 1 # 1 -> disabeld
 
-var max_idle_timeout*:int = 500 #secs
+var max_idle_timeout*:int = 600 #secs
 
 # var udp_max_ppc*: uint32 = 500
 var udp_max_idle_time*: uint = 12000 #secs

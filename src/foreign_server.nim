@@ -125,8 +125,6 @@ proc processConnection(client: Connection) {.async.} =
             remote.close()
             return
 
-            
-            
         var data = newStringOfCap(4600)
         try:
             while not remote.closed:
