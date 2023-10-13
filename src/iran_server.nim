@@ -53,7 +53,7 @@ proc acquireRemoteConnection(upload: bool,ip:TransportAddress = TransportAddress
                     continue
 
                 if ip.family != AddressFamily.None:
-                    if ip == remote.transp.remoteAddress():
+                    if ip.address == remote.transp.remoteAddress().address:
                         return remote
                     else:
                         continue
