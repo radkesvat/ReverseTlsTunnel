@@ -167,7 +167,7 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
             if DataFlags.udp in cast[TransferFlags](flag):
                 context.user_inbounds_udp.with(cid, udp_up_bound):
                     udp_up_bound.hit()
-                    await udp_up_bound.transp.sendTo(udp_up_bound.raddr, data)
+                    await context.listener_udp.sendTo(udp_up_bound.raddr, data)
                     if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
 
             else:
@@ -435,7 +435,7 @@ proc start*(){.async.} =
             try:
                 if not globals.keep_system_limit and not(setSockOpt(transp.fd, osdefs.IPPROTO_TCP,
                           osdefs.TCP_NODELAY, 1)):
-                    quit("Could not set TCP_NODELAY !")
+                    quit("Could not set TCP_NODELAY ! run with --keep-os-limit")
 
                 let con = await Connection.new(transp, no_id = true)
                 let address = con.transp.remoteAddress()
