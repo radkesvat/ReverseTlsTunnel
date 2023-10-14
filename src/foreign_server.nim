@@ -1,7 +1,6 @@
 import chronos
 import chronos/streams/[tlsstream], chronos/transports/datagram
-import std/[strformat, net, openssl, random]
-import overrides/[asyncnet]
+import std/[strformat, net, random]
 import print, connection, pipe, bitops
 from globals import nil
 
@@ -40,24 +39,19 @@ proc generateFinishHandShakeData(upload: bool): string =
 
     return random_trust_data
 
-proc monitorData(data: string): bool =
-    try:
-        if len(data) < 16: return false
-        let base = 5 + 7 + `mod`(globals.sh5, 7.uint8)
-        var sh3_c: uint32
-        var sh4_c: uint32
-        copyMem(unsafeAddr sh3_c, unsafeAddr data[base+0], 4)
-        copyMem(unsafeAddr sh4_c, unsafeAddr data[base+4], 4)
-        let chk1 = sh3_c == globals.sh3
-        let chk2 = sh4_c == globals.sh4
-        return chk1 and chk2
-    except:
-        return false
 
-proc remoteTrusted(port: Port): Future[Connection] {.async.} =
-    var con = await connection.connect(initTAddress(globals.next_route_addr, port))
-    con.trusted = TrustStatus.yes
-    return con
+proc connectCore(port: Port): Future[Connection] {.async.} =
+    for i in 0 ..< 5:
+        try:
+            var con = await connection.connect(initTAddress(globals.next_route_addr, port))
+            con.trusted = TrustStatus.yes
+            return con
+        except:
+            if globals.log_conn_error: echo "[Error] [connectCore] [dial]: ", getCurrentExceptionMsg()
+    raise newException(TransportError, "Failed to connect after 5 retries.")
+
+
+
 
 proc acquireClientConnection(upload: bool): Future[Connection] {.async.} =
     var found: Connection = nil
@@ -71,7 +65,8 @@ proc acquireClientConnection(upload: bool): Future[Connection] {.async.} =
                 continue
 
             return found
-
+        else:
+            await sleepAsync(25)
 
     return nil
 
@@ -89,7 +84,7 @@ proc processConnection(client: Connection) {.async.} =
     proc processUdpRemote(remote: UdpConnection) {.async.} =
         remote.hit()
         var client = await acquireClientConnection(true)
-        if client == nil:return
+        if client == nil: return
 
         let width = globals.full_tls_record_len.int + globals.mux_record_len.int
 
@@ -125,8 +120,6 @@ proc processConnection(client: Connection) {.async.} =
             remote.close()
             return
 
-            
-            
         var data = newStringOfCap(4600)
         try:
             while not remote.closed:
@@ -228,20 +221,20 @@ proc processConnection(client: Connection) {.async.} =
 
                 if DataFlags.junk in cast[TransferFlags](flag):
                     discard await client.treader.consume(boundary.int)
-                    if  fake_bytes > 0: discard await client.treader.consume(fake_bytes.int)
+                    if fake_bytes > 0: discard await client.treader.consume(fake_bytes.int)
                     if globals.log_data_len: echo &"[proccessClient] {data.len()} discarded from client"
                     boundary = 0
                     continue
 
-                data.setLen(max(4600,boundary.int))
+                data.setLen(max(4600, boundary.int))
                 await client.treader.readExactly(addr data[0], boundary.int)
-                data.setLen boundary.int;boundary = 0
-                if  fake_bytes > 0: discard await client.treader.consume(fake_bytes.int)
+                data.setLen boundary.int; boundary = 0
+                if fake_bytes > 0: discard await client.treader.consume(fake_bytes.int)
 
                 if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes from client"
 
 
-              
+
                 if dec_bytes_left > 0:
                     let consumed = min(data.len(), dec_bytes_left.int)
                     dec_bytes_left -= consumed.uint
@@ -291,7 +284,7 @@ proc processConnection(client: Connection) {.async.} =
 
                     else:
                         try:
-                            var remote = await remoteTrusted(if globals.multi_port: port.Port else: globals.next_route_port)
+                            var remote = await connectCore(if globals.multi_port: port.Port else: globals.next_route_port)
                             remote.id = cid
                             context.outbounds.register(remote)
                             asyncSpawn processRemote(remote)
@@ -299,7 +292,7 @@ proc processConnection(client: Connection) {.async.} =
                             if globals.log_data_len: echo &"[proccessClient] {data.len()} bytes -> remote"
                         except:
                             if globals.log_conn_error: echo "[Error] [proccessClient] [writeCoreF]: ", getCurrentExceptionMsg()
-                            
+
 
         except:
             if globals.log_conn_error: echo "[Error] [proccessClient] [loopEx]: ", getCurrentExceptionMsg()
@@ -371,7 +364,7 @@ proc poolController() {.async.} =
         var u_futs: seq[Future[void]]
         var d_futs: seq[Future[void]]
 
-        for i in 0..< (globals.upload_cons+globals.download_cons) div 2:
+        for i in 0 ..< (globals.upload_cons+globals.download_cons) div 2:
             if context.up_bounds.len().uint <= globals.upload_cons:
                 u_futs.add connect(true)
             if context.dw_bounds.len().uint <= globals.download_cons:
@@ -381,7 +374,7 @@ proc poolController() {.async.} =
 
 
     proc watch(): Future[bool] {.async.} =
-        if context.up_bounds.len() < max(1,globals.upload_cons.int div 2) or context.dw_bounds.len() <  max(1,globals.download_cons.int div 2) :
+        if context.up_bounds.len() < max(1, globals.upload_cons.int div 2) or context.dw_bounds.len() < max(1, globals.download_cons.int div 2):
             await context.log_lock.acquire()
             stdout.write "[Warn] few connections exist!, retry to connect in 3 seconds."; stdout.flushFile()
             for i in 0..<3:
@@ -422,7 +415,7 @@ proc start*(){.async.} =
     trackOldConnections(context.dw_bounds, globals.connection_age)
 
 
-    trackDeadConnections(context.outbounds_udp, globals.udp_max_idle_time.uint, true,globals.udp_max_idle_time.int div 2)
+    trackDeadConnections(context.outbounds_udp, globals.udp_max_idle_time.uint, true, globals.udp_max_idle_time.int div 2)
     trackDeadConnections(context.outbounds, globals.max_idle_timeout.uint, true, globals.max_idle_timeout div 2)
 
     asyncSpawn poolController()
