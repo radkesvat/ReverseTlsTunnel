@@ -3,7 +3,7 @@ import dns_resolve, hashes, print, parseopt, strutils, random, net, osproc, strf
 import checksums/sha1
 
 
-const version = "6.3"
+const version = "6.4"
 
 type RunMode*{.pure.} = enum
     unspecified, iran, kharej
@@ -28,15 +28,11 @@ var upload_cons*: uint = 8
 var download_cons*: uint = 8
 var connection_age*: uint = 60 # secs
 var connection_rewind*: uint = 3 # secs
-
-var pool_size*: uint = 24
-var pool_age*: uint = 15
+# var pool_size*: uint = 24
+# var pool_age*: uint = 15
 var fakeupload_con_age*: uint = 60 #secs
 var max_pool_unused_time*: uint = 60 #secs
 let mux_record_len*: uint32 = 5 #2bytes port 2bytes id 1byte reserved
-
-var mux_width*: uint32 = 1 # 1 -> disabeld
-
 var max_idle_timeout*:int = 200 #secs
 
 # var udp_max_ppc*: uint32 = 500
@@ -226,7 +222,7 @@ proc init*() =
                         if not multiportSupported(): quit(-1)
                         multi_port = true
                         if listen_port != 0.Port:
-                            multi_port_additions.add listen_port.Port
+                            multi_port_additions.add listen_port
                             listen_port = 0.Port
                         multi_port_additions.add p.val.parseInt().Port
 
@@ -275,26 +271,26 @@ proc init*() =
                     of "pool":
                         echo "[Deprecated] option \'pool\' may not be set after v6.0, the calculation is done automatically."
 
-                        pool_size = parseInt(p.val).uint
+                        # pool_size = parseInt(p.val).uint
                         # print pool_size
 
                     of "pool-age":
                         echo "[Deprecated] option \'pool-age\' may not be set after v6.0, the calculation is done automatically."
 
-                        pool_age = parseInt(p.val).uint
+                        # pool_age = parseInt(p.val).uint
                         # print pool_age
 
                     of "mux-width":
                         echo "[Deprecated] option \'mux-width\' may not be set after v6.0, the calculation is done automatically."
-                        mux_width = parseInt(p.val).uint32
+                        # mux_width = parseInt(p.val).uint32
                         # print mux_width
 
-                    of "parallel-cons:":
+                    of "parallel-cons":
                         upload_cons = parseInt(p.val).uint32
                         download_cons = parseInt(p.val).uint32
                         print upload_cons,download_cons
                             
-                    of "connection-age:":
+                    of "connection-age":
                         connection_age = parseInt(p.val).uint32
                         print connection_age
 
@@ -382,20 +378,17 @@ proc init*() =
         echo "specify the password  --password:{something}"
         exit = true
 
-    if mux_width == 0:
-        echo "mux-width cannot be less than 1 !"
-        exit = true
 
     if exit: quit("Application did not start due to above logs.")
 
     if terminate_secs != 0:
-        sleepAsync(terminate_secs*1000).addCallback(
+        sleepAsync(terminate_secs.secs).addCallback(
             proc(arg: pointer) =
             echo "Exiting due to termination timeout. (--terminate)"
             quit(0)
         )
 
-    let rs_capacity = 4200 + (noise_ratio * 4200)
+    let rs_capacity = 4400 + (noise_ratio * 4400)
     random_str = newStringOfCap(rs_capacity); random_str.setLen(rs_capacity)
     for i in 0..<random_str.len():
         random_str[i] = rand(char.low .. char.high).char
@@ -421,7 +414,6 @@ proc init*() =
     while sh5 <= 2.uint32 or sh5 >= 223.uint32:
         sh5 = hash(sh5).uint8
 
-    if mux_width > 1:
-        pool_size = pool_size div 2
+
     print password, password_hash, sh1, sh2, sh3, download_cons,upload_cons,connection_age
     print "\n"
