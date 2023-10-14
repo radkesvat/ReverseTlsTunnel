@@ -433,6 +433,10 @@ proc start*(){.async.} =
         proc serveStreamClient(server: StreamServer,
                         transp: StreamTransport) {.async.} =
             try:
+                if not globals.keep_system_limit and not(setSockOpt(transp.fd, osdefs.IPPROTO_TCP,
+                          osdefs.TCP_NODELAY, 1)):
+                    quit("Could not set TCP_NODELAY !")
+
                 let con = await Connection.new(transp, no_id = true)
                 let address = con.transp.remoteAddress()
                 if globals.multi_port:
