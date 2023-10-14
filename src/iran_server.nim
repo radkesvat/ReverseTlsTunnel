@@ -512,10 +512,10 @@ proc start*(){.async.} =
 
                 connection.port = origin_port.Port
 
-                if globals.log_conn_create: print "Connected client: ", address, connection.port
+                if globals.log_conn_create and not found: print "Connected client: ", address, connection.port
             else:
                 connection.port = globals.listen_port
-                if globals.log_conn_create: print "Connected client: ", address
+                if globals.log_conn_create  and not found: print "Connected client: ", address
 
 
             asyncSpawn processUdpPacket(connection)
