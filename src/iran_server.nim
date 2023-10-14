@@ -56,13 +56,13 @@ proc acquireRemoteConnection(upload: bool,ip:TransportAddress = TransportAddress
                     if ip.address == remote.transp.remoteAddress().address:
                         return remote
                     else:
-                        continue
+                        if i notin 50..60:
+                            continue
 
                 else:
                     return remote
         await sleepAsync(20)
     return nil
-
 
 
 
@@ -79,18 +79,13 @@ proc sendJunkData(len: int) {.async.} =
     var target: Connection = await acquireRemoteConnection(upload = true)
 
     if target.isNil():
-        if globals.log_data_len: echo "could not acquire a connection to send fake traffic."
+        if globals.log_conn_error: echo "could not acquire a connection to send fake traffic."
         return
 
     let random_start = rand(1500)
-    let full_len = min((len+random_start) + (16 - `mod`((len+random_start), 16)) , globals.random_str.len())
+    let full_len = min((len+random_start) , globals.random_str.len())
     var data = globals.random_str[random_start ..< full_len]
-    let size: uint16 = data.len().uint16 - globals.full_tls_record_len.uint16
-    copyMem(addr data[0], addr globals.tls13_record_layer[0], globals.tls13_record_layer.len())
-    copyMem(addr data[0 + globals.tls13_record_layer.len()], addr size, sizeof(size))
     let flag:TransferFlags = {DataFlags.junk}
-    # copyMem(addr data[0 + globals.full_tls_record_len.int+sizeof(uint16)+sizeof(uint16)], addr flag, sizeof(flag))
-
     data.flagForSend(flag)
     await target.writer.write(data)
     if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
@@ -106,8 +101,6 @@ proc handleUpRemote(remote: Connection){.async.} =
     if globals.log_conn_destory: echo "[Closed] [poolController] [End]:", "a up-bound"
     context.up_bounds.remove(remote)
     remote.close
-
-
 
 proc processDownBoundRemote(remote: Connection) {.async.} =
     var data = newStringOfCap(4600)
@@ -239,7 +232,6 @@ proc processTcpConnection(client: Connection) {.async.} =
         if not client.isTrusted():
             await client.closeWait()
 
-
     proc processClient(ub: Connection) {.async.} =
         var up_bound = ub
         var data = newStringOfCap(4600)
@@ -315,12 +307,12 @@ proc processTcpConnection(client: Connection) {.async.} =
 
                 try:
                     await up_bound.writer.write(data)
+                    if globals.log_data_len: echo &"{data.len} bytes -> Remote"
+                    if fupload and up_bound.isTrusted: await sendJunkData(globals.noise_ratio.int * data.len())
                 except:
                     echo "[Error] [processClient] [writeUp]: ", getCurrentExceptionMsg()
 
-                if globals.log_data_len: echo &"{data.len} bytes -> Remote"
-
-                if fupload and up_bound.isTrusted: await sendJunkData(globals.noise_ratio.int * data.len())
+                
 
 
         except:
@@ -336,7 +328,6 @@ proc processTcpConnection(client: Connection) {.async.} =
                 await temp_up_bound.writer.write(closeSignalData(client.id))
         except:
             if globals.log_conn_error: echo "[Error] [processClient] [closeSig]: ", getCurrentExceptionMsg()
-
 
     #Initialize remote
     var client_up_bound: Connection = nil
@@ -405,7 +396,6 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
                 await remote.writer.write(data)
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
 
-                # inc remote.udp_packets; if remote.udp_packets > globals.udp_max_ppc: remote.close()
 
                 if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
 
@@ -524,18 +514,13 @@ proc start*(){.async.} =
 
                 if globals.log_conn_create: print "Connected client: ", address, connection.port
             else:
-                # connection.port = transp.localAddress.port.Port
                 connection.port = globals.listen_port
                 if globals.log_conn_create: print "Connected client: ", address
 
 
             asyncSpawn processUdpPacket(connection)
 
-        # var address4 = initTAddress(globals.listen_addr4, globals.listen_port.Port)
         var address = initTAddress(globals.listen_addr, globals.listen_port.Port)
-
-        # var dgramServer4 = newDatagramTransport(handleDatagram, local = address4,flags = {ReuseAddr})
-        # echo &"Started udp server  {globals.listen_addr4}:{globals.listen_port}"
 
         context.listener_udp = newDatagramTransport6(handleDatagram, local = address, flags = {ServerFlags.ReuseAddr})
 
