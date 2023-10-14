@@ -76,6 +76,7 @@ proc flagForSend*(data: var string, flags: TransferFlags) =
     data.setLen data.len + dif.int
     size += dif
 
+    copyMem(addr data[0], addr globals.tls13_record_layer[0], globals.tls13_record_layer.len())
     copyMem(addr data[0 + globals.tls13_record_layer.len()],addr size,  sizeof(size))
 
 
