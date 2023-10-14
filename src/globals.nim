@@ -27,13 +27,13 @@ var trust_time*: uint = 3 #secs
 var upload_cons*: uint = 8
 var download_cons*: uint = 8
 var connection_age*: uint = 60 # secs
-var connection_rewind*: uint = 3 # secs
+var connection_rewind*: uint = 4 # secs
 # var pool_size*: uint = 24
 # var pool_age*: uint = 15
 var fakeupload_con_age*: uint = 60 #secs
 var max_pool_unused_time*: uint = 60 #secs
 let mux_record_len*: uint32 = 5 #2bytes port 2bytes id 1byte reserved
-var max_idle_timeout*:int = 200 #secs
+var max_idle_timeout*:int = 500 #secs
 
 # var udp_max_ppc*: uint32 = 500
 var udp_max_idle_time*: uint = 12000 #secs

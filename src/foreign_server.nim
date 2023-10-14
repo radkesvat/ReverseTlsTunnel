@@ -33,8 +33,6 @@ proc generateFinishHandShakeData(upload: bool): string =
     var up: uint8 = (if upload: 1+rand(uint8.high.int-1) else: 0x0).uint8
 
     up = up xor globals.sh5
-
-
     copyMem(unsafeAddr random_trust_data[base+8], unsafeAddr up, 1)
 
     return random_trust_data
@@ -241,11 +239,6 @@ proc processConnection(client: Connection) {.async.} =
                     unPackForRead(data, consumed)
 
                 #write
-                # echo "before dec:" ,data[0 .. 10].repr
-                # unPackForRead(data)
-                # echo "after dec:", data.hash
-
-
                 if DataFlags.udp in cast[TransferFlags](flag):
                     proc handleDatagram(transp: DatagramTransport,
                         raddr: TransportAddress): Future[void] {.async.} =
@@ -299,13 +292,7 @@ proc processConnection(client: Connection) {.async.} =
 
         #close
         context.dw_bounds.remove(client)
-        # poolFrame()
-
         await client.closeWait()
-
-
-        # await closeLine(client, remote)
-
 
     try:
         asyncSpawn proccessClient()
@@ -393,14 +380,7 @@ proc poolController() {.async.} =
             if await watch():
                 break
             if secs_left <= 0: break
-        # if  context.up_bounds.len().uint < 2 or context.up_bounds.len().uint < 2:
-        #     await context.log_lock.acquire()
-        #     stdout.write "[Warn] few connections exist!, retry to connect in 3 seconds."; stdout.flushFile()
-        #     for i in 0..<3:
-        #         stdout.write "."; await sleepAsync (1).seconds; stdout.flushFile();
-        #     stdout.write '\n'; context.log_lock.release()
-        # else:
-        #     await sleepAsync ((globals.connection_age - globals.connection_rewind).int).seconds
+  
 
 
 proc start*(){.async.} =

@@ -61,9 +61,8 @@ proc acquireRemoteConnection(upload: bool,ip:TransportAddress = TransportAddress
 
                 else:
                     return remote
-        await sleepAsync(20)
+        await sleepAsync(25)
     return nil
-
 
 
 proc connectTargetSNI(): Future[Connection] {.async.} =
@@ -369,7 +368,7 @@ proc processTcpConnection(client: Connection) {.async.} =
         asyncSpawn processClient(client_up_bound)
 
     except:
-        printEx()
+        if globals.log_conn_error: echo "[Error] [processClient] [loopEx]: ", getCurrentExceptionMsg()
 
 proc processUdpPacket(client: UdpConnection) {.async.} =
 
@@ -548,10 +547,6 @@ proc start*(){.async.} =
         trackDeadConnections(context.user_inbounds_udp, globals.udp_max_idle_time, false,globals.udp_max_idle_time.int div 2)
         asyncSpawn startUdpListener()
 
-
-
-
-    # asyncSpawn start_server_listener()
 
 
 
