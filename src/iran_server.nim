@@ -13,7 +13,7 @@ type
         dw_bounds: Connections
         available_peer_inbounds: Connections
         peer_ip: IpAddress
-        fakeupload_remain:int32 
+        fakeupload_remain: int32
 
 var context = TunnelConnectionPoolContext()
 
@@ -40,10 +40,10 @@ proc monitorData(data: var string): tuple[trust: bool, upload: bool] =
         return (false, up)
 
 
-proc acquireRemoteConnection(upload: bool,remove = false,ip:TransportAddress = TransportAddress()): Future[Connection] {.async.} =
+proc acquireRemoteConnection(upload: bool, remove = false, ip: TransportAddress = TransportAddress()): Future[Connection] {.async.} =
     var remote: Connection = nil
     var source: Connections = if upload: context.up_bounds else: context.dw_bounds
-    
+
     for i in 0..<200:
         if source.len != 0:
             remote = source.roundPick()
@@ -78,18 +78,20 @@ template fupload: bool = globals.noise_ratio != 0
 proc sendJunkData() {.async.} =
     while true:
         if context.fakeupload_remain > 0:
-            var target {.global.}: Connection = await acquireRemoteConnection(upload = true,remove = true)
+            var target {.global.}: Connection = await acquireRemoteConnection(upload = true, remove = true)
+            if target.closed or target.isClosing: target = await acquireRemoteConnection(upload = true, remove = true)
 
             if target.isNil():
                 if globals.log_conn_error: echo "could not acquire a connection to send fake traffic."
-                return
-            
+                await sleepAsync(500)
+                continue
+
             var len = 800+rand(globals.random_str.len() div 2)
             let random_start = rand(1500)
-            let full_len = min((len+random_start) , globals.random_str.len() - random_start)
+            let full_len = min((len+random_start), globals.random_str.len() - random_start)
             var data = globals.random_str[random_start ..< full_len]
-            let flag:TransferFlags = {DataFlags.junk}
-            context.fakeupload_remain.dec  full_len
+            let flag: TransferFlags = {DataFlags.junk}
+            context.fakeupload_remain.dec full_len
             data.flagForSend(flag)
             await target.writer.write(data)
             if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
@@ -157,11 +159,11 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
             # let readable = min(boundary, data.len().uint16)
             # boundary -= readable; data.setlen readable
             # await remote.reader.readExactly(addr data[0], readable.int)
-            data.setLen(max(4600,boundary.int))
+            data.setLen(max(4600, boundary.int))
             await remote.reader.readExactly(addr data[0], boundary.int)
-            data.setLen boundary.int;boundary = 0
+            data.setLen boundary.int; boundary = 0
 
-            if  fake_bytes > 0: discard await  remote.reader.consume(fake_bytes.int)
+            if fake_bytes > 0: discard await remote.reader.consume(fake_bytes.int)
             # if boundary == 0 and fake_bytes > 0: discard await remote.reader.consume(fake_bytes.int)
             if globals.log_data_len: echo &"[processRemote] {data.len()} bytes from remote"
 
@@ -186,7 +188,7 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
                         if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
                         if fupload: context.fakeupload_remain.inc(globals.noise_ratio.int * data.len())
                     else:
-                        let temp_up_bound = await acquireRemoteConnection(true,ip = remote.transp.remoteAddress())
+                        let temp_up_bound = await acquireRemoteConnection(true, ip = remote.transp.remoteAddress())
                         if temp_up_bound != nil:
                             await temp_up_bound.writer.write(closeSignalData(cid))
 
@@ -303,7 +305,7 @@ proc processTcpConnection(client: Connection) {.async.} =
 
                 #write
                 if up_bound.closed or up_bound.isClosing:
-                    up_bound = await acquireRemoteConnection(upload = true,ip = up_bound.transp.remoteAddress())
+                    up_bound = await acquireRemoteConnection(upload = true, ip = up_bound.transp.remoteAddress())
                     if up_bound == nil:
                         if globals.log_conn_error: echo "[Error] [processClient] [loop]: ", "left without connection, closes forcefully."
                         await closeLine(client, up_bound); return
@@ -318,7 +320,7 @@ proc processTcpConnection(client: Connection) {.async.} =
                 except:
                     echo "[Error] [processClient] [writeUp]: ", getCurrentExceptionMsg()
 
-    
+
         except:
             if globals.log_conn_error: echo "[Error] [processClient] [loopEx]: ", getCurrentExceptionMsg()
 
@@ -327,7 +329,7 @@ proc processTcpConnection(client: Connection) {.async.} =
         context.user_inbounds.remove(client)
 
         try:
-            let temp_up_bound = await acquireRemoteConnection(true,ip = up_bound.transp.remoteAddress())
+            let temp_up_bound = await acquireRemoteConnection(true, ip = up_bound.transp.remoteAddress())
             if temp_up_bound != nil:
                 await temp_up_bound.writer.write(closeSignalData(client.id))
         except:
@@ -391,7 +393,7 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
 
                 #write
                 # if remote.closed or remote.isClosing:
-                remote = await acquireRemoteConnection(upload = true,ip = remote.transp.remoteAddress())
+                remote = await acquireRemoteConnection(upload = true, ip = remote.transp.remoteAddress())
                 if remote == nil:
                     if globals.log_conn_error: echo "[Error] [UDP-processClient] [loop]: ", " Tcp remote was just closed!"
                     return
@@ -524,7 +526,7 @@ proc start*(){.async.} =
                 if globals.log_conn_create and not found: print "Connected client: ", address, connection.port
             else:
                 connection.port = globals.listen_port
-                if globals.log_conn_create  and not found: print "Connected client: ", address
+                if globals.log_conn_create and not found: print "Connected client: ", address
 
 
             asyncSpawn processUdpPacket(connection)
@@ -554,7 +556,7 @@ proc start*(){.async.} =
 
     asyncSpawn startTcpListener()
     if globals.accept_udp:
-        trackDeadConnections(context.user_inbounds_udp, globals.udp_max_idle_time, false,globals.udp_max_idle_time.int div 2)
+        trackDeadConnections(context.user_inbounds_udp, globals.udp_max_idle_time, false, globals.udp_max_idle_time.int div 2)
         asyncSpawn startUdpListener()
     if fupload > 0:
         asyncSpawn sendJunkData()
