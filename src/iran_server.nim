@@ -56,6 +56,8 @@ proc acquireRemoteConnection(upload: bool, remove = false, ip: TransportAddress 
                 if ip.family != AddressFamily.None:
                     if ip.address == remote.transp.remoteAddress().address:
                         if remove: source.remove(remote)
+                        return remote
+
                     else:
                         if i notin 50..60:
                             continue
