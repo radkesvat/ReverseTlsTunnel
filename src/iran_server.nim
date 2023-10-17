@@ -13,6 +13,7 @@ type
         dw_bounds: Connections
         available_peer_inbounds: Connections
         peer_ip: IpAddress
+        fakeupload_remain:int32 
 
 var context = TunnelConnectionPoolContext()
 
@@ -39,7 +40,7 @@ proc monitorData(data: var string): tuple[trust: bool, upload: bool] =
         return (false, up)
 
 
-proc acquireRemoteConnection(upload: bool,ip:TransportAddress = TransportAddress()): Future[Connection] {.async.} =
+proc acquireRemoteConnection(upload: bool,remove = false,ip:TransportAddress = TransportAddress()): Future[Connection] {.async.} =
     var remote: Connection = nil
     var source: Connections = if upload: context.up_bounds else: context.dw_bounds
     
@@ -53,12 +54,13 @@ proc acquireRemoteConnection(upload: bool,ip:TransportAddress = TransportAddress
 
                 if ip.family != AddressFamily.None:
                     if ip.address == remote.transp.remoteAddress().address:
-                        return remote
+                        if remove: source.remove(remote)
                     else:
                         if i notin 50..60:
                             continue
 
                 else:
+                    if remove: source.remove(remote)
                     return remote
         await sleepAsync(25)
     return nil
@@ -73,20 +75,25 @@ proc connectTargetSNI(): Future[Connection] {.async.} =
 
 template fupload: bool = globals.noise_ratio != 0
 
-proc sendJunkData(len: int) {.async.} =
-    var target: Connection = await acquireRemoteConnection(upload = true)
+proc sendJunkData() {.async.} =
+    while true:
+        if context.fakeupload_remain > 0:
+            var target {.global.}: Connection = await acquireRemoteConnection(upload = true,remove = true)
 
-    if target.isNil():
-        if globals.log_conn_error: echo "could not acquire a connection to send fake traffic."
-        return
-
-    let random_start = rand(1500)
-    let full_len = min((len+random_start) , globals.random_str.len())
-    var data = globals.random_str[random_start ..< full_len]
-    let flag:TransferFlags = {DataFlags.junk}
-    data.flagForSend(flag)
-    await target.writer.write(data)
-    if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
+            if target.isNil():
+                if globals.log_conn_error: echo "could not acquire a connection to send fake traffic."
+                return
+            
+            var len = 800+rand(globals.random_str.len() div 2)
+            let random_start = rand(1500)
+            let full_len = min((len+random_start) , globals.random_str.len() - random_start)
+            var data = globals.random_str[random_start ..< full_len]
+            let flag:TransferFlags = {DataFlags.junk}
+            context.fakeupload_remain.dec  full_len
+            data.flagForSend(flag)
+            await target.writer.write(data)
+            if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
+        await sleepAsync(500)
 
 proc handleUpRemote(remote: Connection){.async.} =
     try:
@@ -177,7 +184,7 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
                         client.hit()
                         await client.writer.write(data)
                         if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
-                        if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
+                        if fupload: context.fakeupload_remain.inc(globals.noise_ratio.int * data.len())
                     else:
                         let temp_up_bound = await acquireRemoteConnection(true,ip = remote.transp.remoteAddress())
                         if temp_up_bound != nil:
@@ -307,7 +314,7 @@ proc processTcpConnection(client: Connection) {.async.} =
                 try:
                     await up_bound.writer.write(data)
                     if globals.log_data_len: echo &"{data.len} bytes -> Remote"
-                    if fupload and up_bound.isTrusted: await sendJunkData(globals.noise_ratio.int * data.len())
+                    if fupload and up_bound.isTrusted: context.fakeupload_remain.inc(globals.noise_ratio.int * data.len())
                 except:
                     echo "[Error] [processClient] [writeUp]: ", getCurrentExceptionMsg()
 
@@ -394,7 +401,7 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
 
 
-                if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
+                if fupload: context.fakeupload_remain.inc(globals.noise_ratio.int * data.len())
 
         except:
             if globals.log_conn_error: echo "[Error] [UDP-processClient] [loopEx]: ", getCurrentExceptionMsg()
@@ -549,7 +556,8 @@ proc start*(){.async.} =
     if globals.accept_udp:
         trackDeadConnections(context.user_inbounds_udp, globals.udp_max_idle_time, false,globals.udp_max_idle_time.int div 2)
         asyncSpawn startUdpListener()
-
+    if fupload > 0:
+        asyncSpawn sendJunkData()
 
 
 
