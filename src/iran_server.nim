@@ -96,13 +96,12 @@ proc sendJunkData() {.async.} =
             let full_len = min((len+random_start), globals.random_str.len() - random_start)
             var data = globals.random_str[random_start ..< full_len]
             let flag: TransferFlags = {DataFlags.junk}
-            context.fakeupload_remain.dec full_len
             data.flagForSend(flag)
             try:
                 await context.fakeupload_conn.writer.write(data)
-            except :
+            except :    
                 discard
-                
+            context.fakeupload_remain.dec full_len
             if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
             continue
         await sleepAsync(500)
