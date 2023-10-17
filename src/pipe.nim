@@ -42,20 +42,20 @@ type
 #         data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
 #         i += 1
 
-proc encrypt(data: var string, start: int = 0, nbytes: int = data.len()) =
-    var i: int = start
-    let loopmax = min(data.len(), start + nbytes)
+proc encrypt(data_str: var string, start: int = 0, nbytes: int = data_str.len()) =
+    var i: int = start; var data = cast[seq[uint32]](data_str)
+    let loopmax = min(data.len(), start + (nbytes div 4))
     while i < loopmax:
-        data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
+        data[i] = uint32(uint32(data[i]) xor cast[uint32](globals.sh4))
         i += 2
 
-proc decrypt(data: var string, nbytes: int = data.len()) =
+proc decrypt(data_str: var string, nbytes: int = data_str.len()) =
 
-    var i: int = 0
-    let loopmax = min(data.len(), nbytes)
+    var i: int = 0; var data = cast[seq[uint32]](data_str)
+    let loopmax = min(data.len(), (nbytes div 4))
     while i < loopmax:
-        data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
-        i += 2
+        data[i] = uint32(uint32(data[i]) xor cast[uint32](globals.sh4))
+        i += 1
 
 
 
@@ -76,7 +76,7 @@ proc flagForSend*(data: var string, flags: TransferFlags) =
     size += dif
 
     copyMem(addr data[0], addr globals.tls13_record_layer[0], globals.tls13_record_layer.len())
-    copyMem(addr data[0 + globals.tls13_record_layer.len()],addr size,  sizeof(size))
+    copyMem(addr data[0 + globals.tls13_record_layer.len()], addr size, sizeof(size))
 
 
     var e_flags: uint8 = bitand(cast[uint8](flags), 0xF)
