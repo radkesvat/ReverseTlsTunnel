@@ -70,7 +70,6 @@ proc flagForSend*(data: var string, flags: TransferFlags) =
     var size: uint16 = (data.len - globals.full_tls_record_len.int).uint16
 
     var dif: uint8 = 16 - (size mod 16).uint8
-    echo "dif ", dif, "size ",size
 
     if dif == 16: dif = 0
     data.setLen data.len + dif.int

@@ -177,7 +177,7 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
                         client.hit()
                         await client.writer.write(data)
                         if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
-                        if fupload: asyncSpawn sendJunkData(globals.noise_ratio.int * data.len())
+                        if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
                     else:
                         let temp_up_bound = await acquireRemoteConnection(true,ip = remote.transp.remoteAddress())
                         if temp_up_bound != nil:
@@ -205,7 +205,7 @@ proc processTcpConnection(client: Connection) {.async.} =
     proc processSNIRemote(remote: Connection) {.async.} =
         var data = newStringOfCap(4600)
         try:
-            while not remote.isNil and not remote.closed:
+            while not remote.closed:
                 #read
                 data.setlen remote.reader.tsource.offset
                 if data.len() == 0:
@@ -224,9 +224,10 @@ proc processTcpConnection(client: Connection) {.async.} =
                     await client.writer.write(data)
                     if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client "
         except:
-            if globals.log_conn_error: echo "[Error] [processSNIRemote] [loopEx]: ", getCurrentExceptionMsg()
+            discard # no need to log this as expected
+            # if globals.log_conn_error: echo "[Error] [processSNIRemote] [loopEx]: ", getCurrentExceptionMsg()
         #close
-        # await remote.closeWait()
+        await remote.closeWait()
         if not client.isTrusted():
             await client.closeWait()
 
@@ -306,7 +307,7 @@ proc processTcpConnection(client: Connection) {.async.} =
                 try:
                     await up_bound.writer.write(data)
                     if globals.log_data_len: echo &"{data.len} bytes -> Remote"
-                    if fupload and up_bound.isTrusted: asyncSpawn sendJunkData(globals.noise_ratio.int * data.len())
+                    if fupload and up_bound.isTrusted: await sendJunkData(globals.noise_ratio.int * data.len())
                 except:
                     echo "[Error] [processClient] [writeUp]: ", getCurrentExceptionMsg()
 
@@ -393,7 +394,7 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
 
 
-                if fupload: asyncSpawn sendJunkData(globals.noise_ratio.int * data.len())
+                if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
 
         except:
             if globals.log_conn_error: echo "[Error] [UDP-processClient] [loopEx]: ", getCurrentExceptionMsg()
