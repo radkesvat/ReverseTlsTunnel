@@ -14,6 +14,7 @@ type
         available_peer_inbounds: Connections
         peer_ip: IpAddress
         fakeupload_remain: int32
+        fakeupload_conn: Connection
 
 var context = TunnelConnectionPoolContext()
 
@@ -78,10 +79,12 @@ template fupload: bool = globals.noise_ratio != 0
 proc sendJunkData() {.async.} =
     while true:
         if context.fakeupload_remain > 0:
-            var target {.global.}: Connection = await acquireRemoteConnection(upload = true, remove = true)
-            if target.closed or target.isClosing: target = await acquireRemoteConnection(upload = true, remove = true)
+            # var target {.global.}: Connection = await acquireRemoteConnection(upload = true, remove = true)
+            if context.fakeupload_conn.isNil or context.fakeupload_conn.closed or 
+            context.fakeupload_conn.isClosing
+            : context.fakeupload_conn = await acquireRemoteConnection(upload = true, remove = true)
 
-            if target.isNil():
+            if context.fakeupload_conn.isNil():
                 if globals.log_conn_error: echo "could not acquire a connection to send fake traffic."
                 await sleepAsync(500)
                 continue
@@ -93,7 +96,7 @@ proc sendJunkData() {.async.} =
             let flag: TransferFlags = {DataFlags.junk}
             context.fakeupload_remain.dec full_len
             data.flagForSend(flag)
-            await target.writer.write(data)
+            await context.fakeupload_conn.writer.write(data)
             if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
         await sleepAsync(500)
 
