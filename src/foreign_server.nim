@@ -55,7 +55,7 @@ proc acquireClientConnection(upload: bool): Future[Connection] {.async.} =
     var found: Connection = nil
     var source: Connections = if upload: context.up_bounds else: context.dw_bounds
 
-    for i in 0..<50:
+    while true:
         found = source.roundPick()
         if found != nil:
             if found.closed or found.isClosing:
@@ -64,7 +64,7 @@ proc acquireClientConnection(upload: bool): Future[Connection] {.async.} =
 
             return found
         else:
-            await sleepAsync(25)
+            await sleepAsync(30)
 
     return nil
 

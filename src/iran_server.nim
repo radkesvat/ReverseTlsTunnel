@@ -5,12 +5,10 @@ from globals import nil
 
 type
     TunnelConnectionPoolContext = object
-        # listener_server: Connection for testing on local pc
         listener: StreamServer
         listener_udp: DatagramTransport
         user_inbounds: Connections
         user_inbounds_udp: UdpConnections
-
         up_bounds: Connections
         dw_bounds: Connections
         available_peer_inbounds: Connections
@@ -44,7 +42,8 @@ proc monitorData(data: var string): tuple[trust: bool, upload: bool] =
 proc acquireRemoteConnection(upload: bool,ip:TransportAddress = TransportAddress()): Future[Connection] {.async.} =
     var remote: Connection = nil
     var source: Connections = if upload: context.up_bounds else: context.dw_bounds
-    for i in 0..<100:
+    
+    for i in 0..<200:
         if source.len != 0:
             remote = source.roundPick()
             if remote != nil:
@@ -178,7 +177,7 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
                         client.hit()
                         await client.writer.write(data)
                         if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
-                        if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
+                        if fupload: asyncSpawn sendJunkData(globals.noise_ratio.int * data.len())
                     else:
                         let temp_up_bound = await acquireRemoteConnection(true,ip = remote.transp.remoteAddress())
                         if temp_up_bound != nil:
@@ -307,13 +306,11 @@ proc processTcpConnection(client: Connection) {.async.} =
                 try:
                     await up_bound.writer.write(data)
                     if globals.log_data_len: echo &"{data.len} bytes -> Remote"
-                    if fupload and up_bound.isTrusted: await sendJunkData(globals.noise_ratio.int * data.len())
+                    if fupload and up_bound.isTrusted: asyncSpawn sendJunkData(globals.noise_ratio.int * data.len())
                 except:
                     echo "[Error] [processClient] [writeUp]: ", getCurrentExceptionMsg()
 
-                
-
-
+    
         except:
             if globals.log_conn_error: echo "[Error] [processClient] [loopEx]: ", getCurrentExceptionMsg()
 
@@ -396,7 +393,7 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
                 if globals.log_data_len: echo &"{data.len} bytes -> Remote"
 
 
-                if fupload: await sendJunkData(globals.noise_ratio.int * data.len())
+                if fupload: asyncSpawn sendJunkData(globals.noise_ratio.int * data.len())
 
         except:
             if globals.log_conn_error: echo "[Error] [UDP-processClient] [loopEx]: ", getCurrentExceptionMsg()
@@ -414,6 +411,7 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
             if globals.log_conn_create: echo "Associated a peer connection"
         else:
             echo &"[AssociatedCon][Error] left without connection, closes forcefully."
+            context.peer_ip = IpAddress.default()
             return
         await processClient(client_up_bound)
 
