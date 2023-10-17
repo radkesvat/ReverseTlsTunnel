@@ -91,7 +91,7 @@ proc sendJunkData() {.async.} =
                 await sleepAsync(500)
                 continue
 
-            var len = 800+rand(globals.random_str.len() div 2)
+            var len = 3000+rand(globals.random_str.len() - 3000)
             let random_start = rand(1500)
             let full_len = min((len+random_start), globals.random_str.len() - random_start)
             var data = globals.random_str[random_start ..< full_len]
@@ -100,6 +100,7 @@ proc sendJunkData() {.async.} =
             data.flagForSend(flag)
             await context.fakeupload_conn.writer.write(data)
             if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
+            continue
         await sleepAsync(500)
 
 proc handleUpRemote(remote: Connection){.async.} =
