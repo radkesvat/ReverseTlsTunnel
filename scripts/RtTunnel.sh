@@ -72,7 +72,7 @@ install_selected_version() {
 
 # Function to download and install RTT
 install_rtt() {
-    wget "https://raw.githubusercontent.com/radkesvat/ReverseTlsTunnel/master/install.sh" -O install.sh && chmod +x install.sh && bash install.sh
+    wget "https://raw.githubusercontent.com/radkesvat/ReverseTlsTunnel/master/scripts/install.sh" -O install.sh && chmod +x install.sh && bash install.sh
 }
 
 
@@ -335,7 +335,7 @@ update_services() {
         fi
 
         # Download and run the installation script
-        wget "https://raw.githubusercontent.com/radkesvat/ReverseTlsTunnel/master/install.sh" -O install.sh && chmod +x install.sh && bash install.sh
+        wget "https://raw.githubusercontent.com/radkesvat/ReverseTlsTunnel/master/scripts/install.sh" -O install.sh && chmod +x install.sh && bash install.sh
 
         # Start the previously active service
         if sudo systemctl list-units --type=service --all | grep -q 'tunnel.service'; then
