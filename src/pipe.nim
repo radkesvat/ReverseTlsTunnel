@@ -9,38 +9,6 @@ type
 
     TransferFlags* = set[DataFlags]
 
-# proc `+`*(x: ptr[uint32],y:uint): ptr[uint32] =
-#   return cast[ptr[uint32]](cast[uint](x) + y)
-
-# proc `+`(a:pointer,p:pointer): pointer =
-#   result = cast[pointer](cast[int](a) + 1 * sizeof(p))
-
-# proc encrypt(data_pure: var string, start = 0) =
-#     let len = (data.len() - start) div 4
-#     var data = cast[seq[uint32]](data_pure)
-#     for i in 0..<len:
-#         data[i] = `xor`(data[i], globals.sh4)
-
-
-# proc decrypt(data: var string) =
-#     var address =cast[ptr[uint32]](addr data[0])
-#     for i in 0 ..< (data.len() div 4):
-#         (address+i.uint)[] = `xor`((address+i.uint)[], globals.sh4)
-
-# proc encrypt(data: var string, start:int = 0, nbytes: int = data.len()) =
-#     var i: int = start
-#     let loopmax = min(data.len(), start + nbytes)
-#     while i < loopmax:
-#         data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
-#         i += 1
-
-# proc decrypt(data: var string, nbytes: int = data.len()) =
-
-#     var i: int = 0
-#     let loopmax = min(data.len(), nbytes)
-#     while i < loopmax:
-#         data[i] = chr(uint8(data[i]) xor cast[uint8](globals.sh5))
-#         i += 1
 
 proc encrypt(data_str: var string, start: int = 0, nbytes: int = data_str.len()) =
     var i: int = start; var data = cast[seq[uint32]](data_str)

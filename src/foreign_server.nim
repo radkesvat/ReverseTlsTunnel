@@ -48,9 +48,6 @@ proc connectCore(port: Port): Future[Connection] {.async.} =
             if globals.log_conn_error: echo "[Error] [connectCore] [dial]: ", getCurrentExceptionMsg()
     raise newException(TransportError, "Failed to connect after 5 retries.")
 
-
-
-
 proc acquireClientConnection(upload: bool): Future[Connection] {.async.} =
     var found: Connection = nil
     var source: Connections = if upload: context.up_bounds else: context.dw_bounds
@@ -299,9 +296,6 @@ proc processConnection(client: Connection) {.async.} =
     except:
         print getCurrentExceptionMsg()
 
-
-
-
 proc poolController() {.async.} =
     proc handleUpClient(client: Connection){.async.} =
         try:
@@ -380,8 +374,6 @@ proc poolController() {.async.} =
             if await watch():
                 break
             if secs_left <= 0: break
-  
-
 
 proc start*(){.async.} =
     echo &"Mode Foreign Server:  {globals.self_ip} <-> {globals.iran_addr} ({globals.final_target_domain} with ip {globals.final_target_ip})"
@@ -406,9 +398,4 @@ proc start*(){.async.} =
              "parallel download: ", context.dw_bounds.len, "   ",
              "outbounds: ", context.outbounds.len
         context.log_lock.release()
-
-
-
-    # await sleepAsync(2.secs)
-    # poolFrame()
 

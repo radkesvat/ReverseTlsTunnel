@@ -1,19 +1,19 @@
 
-[آموزش های ویدویی](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/Tutorials.md)
+[آموزش های ویدویی](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/docs/Tutorials.md)
 
-[راهنمای  اجرای مالتی پورت](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/MultiPort.md)
+[راهنمای  اجرای مالتی پورت](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/docs/MultiPort.md)
 
-[راهنمای اجرا به صورت سرویس](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/Service.md)
+[راهنمای اجرا به صورت سرویس](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/docs/Service.md)
 
-[راهنمای لود بالانسر](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/Loadbalancer.md)
+[راهنمای لود بالانسر](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/docs/Loadbalancer.md)
 
-[راهنمای Connection Multiplexer](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/Mux.md)
+[راهنمای Connection Multiplexer](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/docs/Mux.md)
 
-[راهنمای آپلود فیک](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/FUpload.md)
+[راهنمای آپلود فیک](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/docs/FUpload.md)
 
-[راهنمای آیپی v6](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/Ipv6.md)
+[راهنمای آیپی v6](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/docs/Ipv6.md)
 
-[راهنمای فوروارد UDP](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/Udp.md)
+[راهنمای فوروارد UDP](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/docs/Udp.md)
 
 
 [راهنمای  استفاده از haproxy و همچنین استفاده از تمام هسته های cpu](https://github.com/radkesvat/ReverseTlsTunnel/issues/173)
@@ -64,7 +64,7 @@
 
 با این دستور برنامه رو دانلود کنید هم سرور ایران و هم خارج
 ```sh
-wget  "https://raw.githubusercontent.com/radkesvat/ReverseTlsTunnel/master/install.sh" -O install.sh && chmod +x install.sh && bash install.sh 
+wget  "https://raw.githubusercontent.com/radkesvat/ReverseTlsTunnel/master/scripts/install.sh" -O install.sh && chmod +x install.sh && bash install.sh 
 ```
 
 و مراحل را دنبال کنید:
@@ -131,7 +131,7 @@ wget  "https://raw.githubusercontent.com/radkesvat/ReverseTlsTunnel/master/insta
 ***
 
 
-برای اینکه برنامه بعد از بسته شدن ssh ؛ بسته نشه و ران بمونه از nohup یا [service](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/Service.md) استفاده کنید 
+برای اینکه برنامه بعد از بسته شدن ssh ؛ بسته نشه و ران بمونه از nohup یا [service](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/docs/Service.md) استفاده کنید 
 
 پیشناهاد میکنم از سرویس استفاده کنین چون اگرم برنامه کرش کنه دوباره استارت میشه توسط سرویس و همچنین اگر سرور شما ری استارت بشه هم ؛ برنامه بعد از بوت شدن اجرا میشه
 

@@ -46,7 +46,6 @@ type
         estabilished*: AsyncEvent #connection has started
         port*: Port               #the port the socket points to
         counter*: uint
-        # exhausted*: bool
         udp_packets*: uint32
         flag_no_close_signal*: bool
         flag_is_closing: bool
@@ -346,7 +345,6 @@ proc connect*(address: TransportAddress, scheme: SocketScheme = SocketScheme.Non
     return con
 
 
-
 proc safeClose(con: Connection){.async.} =
     con.flag_is_closing = true
     # await con.writer.finish()
@@ -397,22 +395,7 @@ proc startController*() {.async.} =
         await sleepAsync(1000)
 
         # echo GC_getStatistics()
-        # allConnections.keepIf(
-        #     proc(x: Connection): bool =
-        #     if x.action_start_time != 0:
-        #         if et - x.action_start_time > globals.max_idle_time:
-        #             if x.socket != nil: x.socket.close()
-        #             if globals.log_conn_destory: echo "[Controller] closed a idle connection"
-        #             return false
-
-        #     if x.register_start_time != 0:
-        #         if et - x.register_start_time > globals.max_pool_unused_time:
-        #             if x.socket != nil: x.socket.close()
-        #             if globals.log_conn_destory: echo "[Controller] closed a unused connection"
-        #             return false
-        #     return true
-        # )
-
+    
         # when not defined release:
         #     if globals.debug_info:
         #         echo "futures in list : ", getFuturesInProgress().len()

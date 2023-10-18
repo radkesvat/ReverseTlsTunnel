@@ -40,7 +40,6 @@ proc monitorData(data: var string): tuple[trust: bool, upload: bool] =
     else:
         return (false, up)
 
-
 proc acquireRemoteConnection(upload: bool, remove = false, ip: TransportAddress = TransportAddress()): Future[Connection] {.async.} =
     var remote: Connection = nil
     var source: Connections = if upload: context.up_bounds else: context.dw_bounds
@@ -68,7 +67,6 @@ proc acquireRemoteConnection(upload: bool, remove = false, ip: TransportAddress 
         await sleepAsync(25)
     return nil
 
-
 proc connectTargetSNI(): Future[Connection] {.async.} =
     let address = initTAddress(globals.final_target_ip, globals.final_target_port)
     var new_remote: Connection = await connection.connect(address, no_id = true)
@@ -82,7 +80,7 @@ proc sendJunkData() {.async.} =
     while true:
         if context.fakeupload_remain > 0:
             # var target {.global.}: Connection = await acquireRemoteConnection(upload = true, remove = true)
-            if context.fakeupload_conn.isNil or context.fakeupload_conn.closed or 
+            if context.fakeupload_conn.isNil or context.fakeupload_conn.closed or
             context.fakeupload_conn.isClosing
             : context.fakeupload_conn = await acquireRemoteConnection(upload = true, remove = true)
 
@@ -99,7 +97,7 @@ proc sendJunkData() {.async.} =
             data.flagForSend(flag)
             try:
                 await context.fakeupload_conn.writer.write(data)
-            except :    
+            except:
                 discard
             context.fakeupload_remain.dec full_len
             if globals.log_data_len: echo &"{data.len} Junk bytes -> Remote"
@@ -437,7 +435,6 @@ proc processUdpPacket(client: UdpConnection) {.async.} =
     except:
         printEx()
 
-
 proc start*(){.async.} =
     var pbuf = newString(len = 28)
     context.user_inbounds.new()
@@ -569,7 +566,6 @@ proc start*(){.async.} =
         asyncSpawn startUdpListener()
     if fupload:
         asyncSpawn sendJunkData()
-
 
 
 
