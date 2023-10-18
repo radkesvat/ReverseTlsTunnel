@@ -16,7 +16,7 @@
 [راهنمای فوروارد UDP](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/docs/Udp.md)
 
 
-[راهنمای  استفاده از haproxy و همچنین استفاده از تمام هسته های cpu](https://github.com/radkesvat/ReverseTlsTunnel/issues/173)
+[راهنمای  استفاده از haproxy](https://github.com/radkesvat/ReverseTlsTunnel/issues/173)
 
 
  حتما با اجرای دوباره دستور نصب همیشه اپدیت کنید
