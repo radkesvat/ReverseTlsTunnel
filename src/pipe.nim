@@ -12,15 +12,15 @@ type
 
 proc encrypt(data_str: var string, start: int = 0, nbytes: int = data_str.len()) =
     var i: int = start; var data = cast[seq[uint32]](data_str)
-    let loopmax = min(data.len(), start + (nbytes div 4))
+    let loopmax = min(data_str.len() div 4, (nbytes div 4))
     while i < loopmax:
         data[i] = uint32(uint32(data[i]) xor cast[uint32](globals.sh4))
-        i += 2
+        i += 1
 
 proc decrypt(data_str: var string, nbytes: int = data_str.len()) =
 
     var i: int = 0; var data = cast[seq[uint32]](data_str)
-    let loopmax = min(data.len(), (nbytes div 4))
+    let loopmax = min(data_str.len() div 4, (nbytes div 4))
     while i < loopmax:
         data[i] = uint32(uint32(data[i]) xor cast[uint32](globals.sh4))
         i += 1
