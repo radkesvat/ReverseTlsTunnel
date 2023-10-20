@@ -12,4 +12,4 @@ ENV RunMode=${RunMode}
 
 
 # ENTRYPOINT  ["dist/RTT"]
-CMD ["dist/RTT",$RunMode]
+CMD ["dist/RTT","echo $RunMode"]
