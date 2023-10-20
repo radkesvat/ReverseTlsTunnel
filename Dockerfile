@@ -11,5 +11,5 @@ ARG RunMode
 ENV RunMode=${RunMode}
 
 
-ENTRYPOINT  ["dist/RTT"]
-CMD [$RunMode]
+# ENTRYPOINT  ["dist/RTT"]
+CMD ["dist/RTT",$RunMode]
