@@ -1,4 +1,4 @@
-FROM nimlang/nim:2.0.0-onbuild
+FROM nimlang/nim:2.0.0-regular
 
 WORKDIR /usr/src/app
 
