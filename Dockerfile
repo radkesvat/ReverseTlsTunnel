@@ -4,7 +4,12 @@ WORKDIR /usr/src/app
 
 COPY . .
 
-RUN nim install && nim build
+RUN nim install
+RUN nim build
+
+ARG RunMode
+ENV RunMode=${RunMode}
 
 
 ENTRYPOINT  ["dist/RTT"]
+CMD [$RunMode]
