@@ -184,6 +184,8 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
                     udp_up_bound.hit()
                     await context.listener_udp.sendTo(udp_up_bound.raddr, data)
                     if globals.log_data_len: echo &"[processRemote] {data.len} bytes -> client"
+                    if fupload: context.fakeupload_remain.inc(globals.noise_ratio.int * data.len())
+
 
             else:
                 try:
