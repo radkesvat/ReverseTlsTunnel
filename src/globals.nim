@@ -3,7 +3,7 @@ import dns_resolve, hashes, print, parseopt, strutils, random, net, osproc, strf
 import checksums/sha1
 
 
-const version = "6.8"
+const version = "6.9"
 
 type RunMode*{.pure.} = enum
     unspecified, iran, kharej
@@ -122,18 +122,21 @@ proc resetIptables*() =
         assert 0 == execCmdEx("ip6tables -t nat -F").exitCode
         assert 0 == execCmdEx("ip6tables -t nat -X").exitCode
 
-template FWProtocol(): string = (if accept_udp: "all" else: "tcp")
 
 #ip6tables -t nat -A PREROUTING -p tcp --dport 443:2083 -j REDIRECT --to-port
 proc createIptablesForwardRules*() =
     if reset_iptable: resetIptables()
-    if not (multi_port_min == 0.Port or multi_port_max == 0.Port):
-        assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p {FWProtocol} --dport {multi_port_min}:{multi_port_max} -j REDIRECT --to-port {listen_port}""").exitCode
-        assert 0 == execCmdEx(&"""ip6tables -t nat -A PREROUTING -p {FWProtocol} --dport {multi_port_min}:{multi_port_max} -j REDIRECT --to-port {listen_port}""").exitCode
+    proc rule(protocal : string)=
+        if not (multi_port_min == 0.Port or multi_port_max == 0.Port):
+            assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p {protocal} --dport {multi_port_min}:{multi_port_max} -j REDIRECT --to-port {listen_port}""").exitCode
+            assert 0 == execCmdEx(&"""ip6tables -t nat -A PREROUTING -p {protocal} --dport {multi_port_min}:{multi_port_max} -j REDIRECT --to-port {listen_port}""").exitCode
 
-    for port in multi_port_additions:
-        assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p {FWProtocol} --dport {port} -j REDIRECT --to-port {listen_port}""").exitCode
-        assert 0 == execCmdEx(&"""ip6tables -t nat -A PREROUTING -p {FWProtocol} --dport {port} -j REDIRECT --to-port {listen_port}""").exitCode
+        for port in multi_port_additions:
+            assert 0 == execCmdEx(&"""iptables -t nat -A PREROUTING -p {protocal} --dport {port} -j REDIRECT --to-port {listen_port}""").exitCode
+            assert 0 == execCmdEx(&"""ip6tables -t nat -A PREROUTING -p {protocal} --dport {port} -j REDIRECT --to-port {listen_port}""").exitCode
+
+    rule("tcp")
+    if accept_udp: rule("udp")
 
 proc multiportSupported(): bool =
     when defined(windows) or defined(android):
