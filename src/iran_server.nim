@@ -313,7 +313,10 @@ proc processTcpConnection(client: Connection) {.async.} =
                     first_packet = false
 
                 #write
+                if not up_bound.closed and up_bound.isClosing: await up_bound.writer.finish()
+
                 if up_bound.closed or up_bound.isClosing:
+
                     up_bound = await acquireRemoteConnection(upload = true, ip = up_bound.transp.remoteAddress())
                     if up_bound == nil:
                         if globals.log_conn_error: echo "[Error] [processClient] [loop]: ", "left without connection, closes forcefully."
@@ -548,8 +551,8 @@ proc start*(){.async.} =
         await context.listener_udp.join()
         echo "Udp server ended."
 
-    trackOldConnections(context.up_bounds, globals.connection_age)
-    trackOldConnections(context.dw_bounds, globals.connection_age)
+    trackOldConnections(context.up_bounds, globals.connection_age + globals.connection_rewind)
+    trackOldConnections(context.dw_bounds, globals.connection_age + globals.connection_rewind)
 
 
     trackDeadConnections(context.user_inbounds, globals.max_idle_timeout.uint, true, globals.max_idle_timeout div 2)

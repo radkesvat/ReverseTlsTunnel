@@ -351,6 +351,7 @@ proc safeClose(con: Connection){.async.} =
     await sleepAsync(timer.seconds(globals.connection_rewind.int))
     con.close()
 
+
 template trackOldConnections*(conns: var Connections, age: uint) =
     block:
         proc checkAndRemove() =

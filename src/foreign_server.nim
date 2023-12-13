@@ -132,6 +132,7 @@ proc processConnection(client: Connection) {.async.} =
                 data.setLen(data.len() + width)
                 await remote.reader.readExactly(addr data[0 + width], data.len - width)
 
+                if not client.closed and client.isClosing: await client.writer.finish()
                 if client.closed or client.isClosing:
                     client = await acquireClientConnection(true)
                     if client == nil:
@@ -368,12 +369,13 @@ proc poolController() {.async.} =
 
     while true:
         await reCreate()
-        var secs_left = (globals.connection_age - globals.connection_rewind).int
+        var secs_left = (globals.connection_age ).int
         while true:
             await sleepAsync 1.seconds; dec secs_left
             if await watch():
                 break
-            if secs_left <= 0: break
+            if secs_left <= 0: 
+                break
 
 proc start*(){.async.} =
     echo &"Mode Foreign Server:  {globals.self_ip} <-> {globals.iran_addr} ({globals.final_target_domain} with ip {globals.final_target_ip})"
@@ -383,8 +385,8 @@ proc start*(){.async.} =
     context.dw_bounds.new()
     context.log_lock = newAsyncLock()
 
-    trackOldConnections(context.up_bounds, globals.connection_age)
-    trackOldConnections(context.dw_bounds, globals.connection_age)
+    trackOldConnections(context.up_bounds, globals.connection_age + globals.connection_rewind)
+    trackOldConnections(context.dw_bounds, globals.connection_age + globals.connection_rewind)
 
 
     trackDeadConnections(context.outbounds_udp, globals.udp_max_idle_time.uint, true, globals.udp_max_idle_time.int div 2)
