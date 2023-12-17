@@ -369,7 +369,7 @@ proc poolController() {.async.} =
 
     while true:
         await reCreate()
-        var secs_left = (globals.connection_age ).int
+        var secs_left = (globals.connection_age).int
         while true:
             await sleepAsync 1.seconds; dec secs_left
             if await watch():

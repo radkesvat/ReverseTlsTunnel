@@ -551,8 +551,8 @@ proc start*(){.async.} =
         await context.listener_udp.join()
         echo "Udp server ended."
 
-    trackOldConnections(context.up_bounds, globals.connection_age + globals.connection_rewind)
-    trackOldConnections(context.dw_bounds, globals.connection_age + globals.connection_rewind)
+    trackOldConnections(context.up_bounds, globals.connection_age + 2*globals.connection_rewind)
+    trackOldConnections(context.dw_bounds, globals.connection_age + 2*globals.connection_rewind)
 
 
     trackDeadConnections(context.user_inbounds, globals.max_idle_timeout.uint, true, globals.max_idle_timeout div 2)
