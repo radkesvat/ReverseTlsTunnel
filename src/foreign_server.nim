@@ -132,7 +132,7 @@ proc processConnection(client: Connection) {.async.} =
                 data.setLen(data.len() + width)
                 await remote.reader.readExactly(addr data[0 + width], data.len - width)
 
-                if not client.closed and client.isClosing: await client.writer.finish()
+                if not client.closed and client.isClosing: await client.twriter.finish()
                 if client.closed or client.isClosing:
                     client = await acquireClientConnection(true)
                     if client == nil:
