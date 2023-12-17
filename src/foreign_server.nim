@@ -132,8 +132,7 @@ proc processConnection(client: Connection) {.async.} =
                 data.setLen(data.len() + width)
                 await remote.reader.readExactly(addr data[0 + width], data.len - width)
 
-                if not client.closed and client.isClosing: await client.twriter.finish()
-                if client.closed or client.isClosing:
+                if client.closed :
                     client = await acquireClientConnection(true)
                     if client == nil:
                         if globals.log_conn_error: echo "[Error] [processRemote] [loop]: ", "no client for tcp !"
@@ -144,7 +143,13 @@ proc processConnection(client: Connection) {.async.} =
 
                 await client.twriter.write(data)
                 if globals.log_data_len: echo &"[processRemote] Sent {data.len()} bytes ->  client"
-
+                
+                if client.isClosing: 
+                    await client.twriter.finish()
+                    client = await acquireClientConnection(true)
+                    if client == nil:
+                        if globals.log_conn_error: echo "[Error] [processRemote] [loop]: ", "no client for tcp !"
+                        break
         except:
             if globals.log_conn_error: echo "[Error] [processRemote] [loopEx]: ", getCurrentExceptionMsg()
 

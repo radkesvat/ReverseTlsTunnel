@@ -313,10 +313,8 @@ proc processTcpConnection(client: Connection) {.async.} =
                     first_packet = false
 
                 #write
-                if not up_bound.closed and up_bound.isClosing: await up_bound.writer.finish()
 
-                if up_bound.closed or up_bound.isClosing:
-
+                if up_bound.closed:
                     up_bound = await acquireRemoteConnection(upload = true, ip = up_bound.transp.remoteAddress())
                     if up_bound == nil:
                         if globals.log_conn_error: echo "[Error] [processClient] [loop]: ", "left without connection, closes forcefully."
@@ -332,6 +330,12 @@ proc processTcpConnection(client: Connection) {.async.} =
                 except:
                     echo "[Error] [processClient] [writeUp]: ", getCurrentExceptionMsg()
 
+                if up_bound.isClosing:
+                    await up_bound.writer.finish()
+                    up_bound = await acquireRemoteConnection(upload = true, ip = up_bound.transp.remoteAddress())
+                    if up_bound == nil:
+                        if globals.log_conn_error: echo "[Error] [processClient] [loop]: ", "left without connection, closes forcefully."
+                        await closeLine(client, up_bound); return
 
         except:
             if globals.log_conn_error: echo "[Error] [processClient] [loopEx]: ", getCurrentExceptionMsg()
