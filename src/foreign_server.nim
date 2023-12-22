@@ -145,7 +145,7 @@ proc processConnection(client: Connection) {.async.} =
                 if globals.log_data_len: echo &"[processRemote] Sent {data.len()} bytes ->  client"
 
                 if client.isClosing:
-                    await client.twriter.finish()
+                    # await client.twriter.finish()
                     client = await acquireClientConnection(true)
                     if client == nil:
                         if globals.log_conn_error: echo "[Error] [processRemote] [loop]: ", "no client for tcp !"
