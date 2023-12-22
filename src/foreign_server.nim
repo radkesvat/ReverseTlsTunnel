@@ -132,7 +132,7 @@ proc processConnection(client: Connection) {.async.} =
                 data.setLen(data.len() + width)
                 await remote.reader.readExactly(addr data[0 + width], data.len - width)
 
-                if client.closed :
+                if client.closed:
                     client = await acquireClientConnection(true)
                     if client == nil:
                         if globals.log_conn_error: echo "[Error] [processRemote] [loop]: ", "no client for tcp !"
@@ -143,8 +143,8 @@ proc processConnection(client: Connection) {.async.} =
 
                 await client.twriter.write(data)
                 if globals.log_data_len: echo &"[processRemote] Sent {data.len()} bytes ->  client"
-                
-                if client.isClosing: 
+
+                if client.isClosing:
                     await client.twriter.finish()
                     client = await acquireClientConnection(true)
                     if client == nil:
@@ -327,16 +327,18 @@ proc poolController() {.async.} =
 
                 await conn.twriter.write(generateFinishHandShakeData(upload))
 
-                await sleepAsync(200)
-                if upload:
-                    block initialWriteToOpenBandWidth:
-                        var len = 3000+rand(globals.random_str.len() - 3000)
-                        let random_start = rand(1500)
-                        let full_len = min((len+random_start), globals.random_str.len() - random_start)
-                        var data = globals.random_str[random_start ..< full_len]
-                        let flag: TransferFlags = {DataFlags.junk}
-                        data.flagForSend(flag)
-                        await conn.twriter.write(data)
+
+                var initsend: CallbackFunc = proc (arg: pointer){.gcsafe.} =
+                    var len = 3000+rand(globals.random_str.len() - 3000)
+                    let random_start = rand(1500)
+                    let full_len = min((len+random_start), globals.random_str.len() - random_start)
+                    var data = globals.random_str[random_start ..< full_len]
+                    let flag: TransferFlags = {DataFlags.junk}
+                    data.flagForSend(flag)
+                    discard conn.twriter.write(data)
+                if upload: sleepAsync((globals.connection_rewind-1).int * 1000).addcallback(initsend)
+
+
 
                 if upload:
                     context.up_bounds.add conn
@@ -390,7 +392,7 @@ proc poolController() {.async.} =
             await sleepAsync 1.seconds; dec secs_left
             if await watch():
                 break
-            if secs_left <= 0: 
+            if secs_left <= 0:
                 break
 
 proc start*(){.async.} =
