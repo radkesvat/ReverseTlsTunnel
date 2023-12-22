@@ -327,6 +327,17 @@ proc poolController() {.async.} =
 
                 await conn.twriter.write(generateFinishHandShakeData(upload))
 
+                await sleepAsync(200)
+                if upload:
+                    block initialWriteToOpenBandWidth:
+                        var len = 3000+rand(globals.random_str.len() - 3000)
+                        let random_start = rand(1500)
+                        let full_len = min((len+random_start), globals.random_str.len() - random_start)
+                        var data = globals.random_str[random_start ..< full_len]
+                        let flag: TransferFlags = {DataFlags.junk}
+                        data.flagForSend(flag)
+                        await conn.twriter.write(data)
+
                 if upload:
                     context.up_bounds.add conn
                     asyncSpawn handleUpClient(conn)

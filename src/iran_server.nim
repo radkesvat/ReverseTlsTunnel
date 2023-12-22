@@ -163,6 +163,12 @@ proc processDownBoundRemote(remote: Connection) {.async.} =
 
                 continue
 
+            if DataFlags.junk in cast[TransferFlags](flag):
+                discard await remote.reader.consume(boundary.int)
+                if fake_bytes > 0: discard await remote.reader.consume(fake_bytes.int)
+                if globals.log_data_len: echo &"[processDownBoundRemote] {data.len()} discarded from remote"
+                boundary = 0
+                continue
             # let readable = min(boundary, data.len().uint16)
             # boundary -= readable; data.setlen readable
             # await remote.reader.readExactly(addr data[0], readable.int)
