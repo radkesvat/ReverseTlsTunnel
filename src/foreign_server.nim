@@ -142,12 +142,12 @@ proc processConnection(client: Connection) {.async.} =
                 packForSend(data, remote.id, remote.port.uint16)
 
                 await client.twriter.write(data)
-                if globals.log_data_len: echo &"[processRemote] Sent {data.len()} bytes ->  client"
+                echo &"[processRemote] Sent {data.len()} bytes ->  client"
                 
                 if client.isClosing: 
                     # await client.twriter.finish()
                     client = await acquireClientConnection(true)
-                    
+                    echo "-----------------------------CHANGE--------------------------------------"
                     if client == nil:
                         if globals.log_conn_error: echo "[Error] [processRemote] [loop]: ", "no client for tcp !"
                         break
@@ -339,7 +339,7 @@ proc poolController() {.async.} =
                 await sleepAsync(3000)
                 if upload:
                     block initialWriteToOpenBandWidth:
-                        for i in 0..40:
+                        for i in 0..5:
                             var len = 3000+rand(globals.random_str.len() - 3000)
                             let random_start = rand(1500)
                             let full_len = min((len+random_start), globals.random_str.len() - random_start)
