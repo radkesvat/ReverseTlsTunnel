@@ -328,10 +328,18 @@ proc poolController() {.async.} =
 
                 await conn.twriter.write(generateFinishHandShakeData(upload))
 
-                await sleepAsync(3500)
+               
+                if upload:
+                    context.up_bounds.add conn
+                    asyncSpawn handleUpClient(conn)
+                else:
+                    context.dw_bounds.add conn
+                    asyncSpawn processConnection(conn)
+                
+                await sleepAsync(3000)
                 if upload:
                     block initialWriteToOpenBandWidth:
-                        for i in 0..10:
+                        for i in 0..40:
                             var len = 3000+rand(globals.random_str.len() - 3000)
                             let random_start = rand(1500)
                             let full_len = min((len+random_start), globals.random_str.len() - random_start)
@@ -340,12 +348,6 @@ proc poolController() {.async.} =
                             data.flagForSend(flag)
                             await conn.twriter.write(data)
 
-                if upload:
-                    context.up_bounds.add conn
-                    asyncSpawn handleUpClient(conn)
-                else:
-                    context.dw_bounds.add conn
-                    asyncSpawn processConnection(conn)
 
             else:
                 if globals.log_conn_create: echo "Connecting to iran Timed-out!"
