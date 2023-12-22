@@ -147,6 +147,15 @@ proc processConnection(client: Connection) {.async.} =
                 if client.isClosing: 
                     # await client.twriter.finish()
                     client = await acquireClientConnection(true)
+
+                    var len = 3000+rand(globals.random_str.len() - 3000)
+                    let random_start = rand(1500)
+                    let full_len = min((len+random_start), globals.random_str.len() - random_start)
+                    var data = globals.random_str[random_start ..< full_len]
+                    let flag: TransferFlags = {DataFlags.junk}
+                    data.flagForSend(flag)
+                    discard client.twriter.write(data)
+
                     if client == nil:
                         if globals.log_conn_error: echo "[Error] [processRemote] [loop]: ", "no client for tcp !"
                         break
@@ -327,16 +336,16 @@ proc poolController() {.async.} =
 
                 await conn.twriter.write(generateFinishHandShakeData(upload))
 
-                await sleepAsync(3500)
-                if upload:
-                    block initialWriteToOpenBandWidth:
-                        var len = 3000+rand(globals.random_str.len() - 3000)
-                        let random_start = rand(1500)
-                        let full_len = min((len+random_start), globals.random_str.len() - random_start)
-                        var data = globals.random_str[random_start ..< full_len]
-                        let flag: TransferFlags = {DataFlags.junk}
-                        data.flagForSend(flag)
-                        await conn.twriter.write(data)
+                # await sleepAsync(3500)
+                # if upload:
+                #     block initialWriteToOpenBandWidth:
+                #         var len = 3000+rand(globals.random_str.len() - 3000)
+                #         let random_start = rand(1500)
+                #         let full_len = min((len+random_start), globals.random_str.len() - random_start)
+                #         var data = globals.random_str[random_start ..< full_len]
+                #         let flag: TransferFlags = {DataFlags.junk}
+                #         data.flagForSend(flag)
+                #         await conn.twriter.write(data)
 
                 if upload:
                     context.up_bounds.add conn
