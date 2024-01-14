@@ -1,6 +1,3 @@
- [پروژه جدید](https://github.com/radkesvat/RTCF) قرار داده شده که به نظر تا حد خوبی پایدار شده ؛ اگه مشکل سرعت یا لگ با این تونل دارید حتما پروژه جدید رو تست کنید.
-
----
 
 [آموزش های ویدویی](https://github.com/radkesvat/ReverseTlsTunnel/blob/master/docs/Tutorials.md)
 
