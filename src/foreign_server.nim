@@ -318,7 +318,7 @@ proc poolController() {.async.} =
     proc connect(upload: bool) {.async.} =
         inc context.pending_free_outbounds
         try:
-            var con_fut = connect(initTAddress(globals.iran_addr, globals.iran_port), SocketScheme.Secure, globals.final_target_domain)
+            var con_fut = connect(initTAddress(globals.iran_ip, globals.iran_port), SocketScheme.Secure, globals.final_target_domain)
             var notimeout = await withTimeout(con_fut, 3.secs)
             if notimeout:
                 var conn = con_fut.read()
@@ -396,7 +396,7 @@ proc poolController() {.async.} =
                 break
 
 proc start*(){.async.} =
-    echo &"Mode Foreign Server:  {globals.self_ip} <-> {globals.iran_addr} ({globals.final_target_domain} with ip {globals.final_target_ip})"
+    echo &"Mode Foreign Server:  {globals.self_ip} <-> {globals.iran_ip} ({globals.final_target_domain} with ip {globals.final_target_ip})"
     context.outbounds_udp.new()
     context.outbounds.new()
     context.up_bounds.new()

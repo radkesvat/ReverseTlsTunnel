@@ -49,7 +49,7 @@ var listen_addr* = "::"
 var listen_port*: Port = 0.Port
 var next_route_addr* = ""
 var next_route_port*: Port = 0.Port
-var iran_addr* = ""
+var iran_ip* = ""
 var iran_port*: Port = 0.Port
 var final_target_domain* = ""
 var final_target_ip*: string
@@ -252,8 +252,8 @@ proc init*() =
                                 quit("could not parse toport.")
 
                     of "iran-ip":
-                        iran_addr = (p.val)
-                        print iran_addr
+                        iran_ip = (p.val)
+                        print iran_ip
 
                     of "iran-port":
                         iran_port = parseInt(p.val).Port
@@ -349,8 +349,8 @@ proc init*() =
 
     case mode:
         of RunMode.kharej:
-            if iran_addr.isEmptyOrWhitespace():
-                echo "specify the ip address of the iran server --iran-addr:{ip}"
+            if iran_ip.isEmptyOrWhitespace():
+                echo "specify the ip address of the iran server --iran-ip:{ip}"
                 exit = true
             if iran_port == 0.Port and not multi_port:
                 echo "specify the iran server prot --iran-port:{port}"
